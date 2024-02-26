@@ -4,6 +4,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 project(roast)
 
 set(PROJECT_FILES
+    README.md
     src/main.c)
 
 set(FLAGS
