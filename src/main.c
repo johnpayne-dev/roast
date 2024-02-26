@@ -84,7 +84,7 @@ static int get_input_file_contents(int argc, char *argv[], char **file_contents)
 {
 	if (argc != 2) {
 		g_printerr(argc < 2 ? "No input file passed in.\n" :
-				   "Too many input files passed in.\n");
+				      "Too many input files passed in.\n");
 		return -1;
 	}
 
