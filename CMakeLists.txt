@@ -5,7 +5,11 @@ project(roast)
 
 set(PROJECT_FILES
     README.md
-    src/main.c)
+    src/main.c
+    src/scanner/scanner.c
+    src/scanner/scanner.h
+    src/scanner/token.c
+    src/scanner/token.h)
 
 set(FLAGS
     "-Wall"

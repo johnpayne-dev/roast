@@ -2,6 +2,8 @@
 #include <stdbool.h>
 #include <glib.h>
 
+#include "scanner/scanner.h"
+
 struct options {
 	char *target;
 	char *output_file;
@@ -99,8 +101,12 @@ static int get_input_file_contents(int argc, char *argv[], char **file_contents)
 
 static int run_scan_target(char *source)
 {
-	g_printerr("scan target not implemented yet.\n");
-	return -1;
+	struct scanner *scanner = scanner_new();
+
+	int result = scanner_tokenize(scanner, source, true, NULL);
+
+	scanner_free(scanner);
+	return result;
 }
 
 static int run_parse_target(char *source)
