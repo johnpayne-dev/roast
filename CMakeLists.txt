@@ -27,5 +27,3 @@ pkg_check_modules(DEPENDENCIES REQUIRED IMPORTED_TARGET glib-2.0)
 target_link_libraries(roast PkgConfig::DEPENDENCIES)
 target_compile_options(roast PRIVATE ${FLAGS})
 target_include_directories(roast PRIVATE src/)
-
-# set_target_properties(roast PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
