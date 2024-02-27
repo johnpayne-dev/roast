@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 build_system="DEFAULT"
 compiler="DEFAULT"
 
