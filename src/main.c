@@ -3,6 +3,7 @@
 #include <glib.h>
 
 #include "scanner/scanner.h"
+#include "parser/parser.h"
 
 struct options {
 	char *target;
@@ -111,8 +112,14 @@ static int run_scan_target(char *source)
 
 static int run_parse_target(char *source)
 {
-	g_printerr("parse target not implemented yet.\n");
-	return -1;
+	struct scanner *scanner = scanner_new();
+	struct parser *parser = parser_new();
+
+	int result = parser_parse(parser, source, scanner, NULL);
+
+	parser_free(parser);
+	scanner_free(scanner);
+	return result;
 }
 
 static int run_intermediate_target(char *source)

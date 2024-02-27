@@ -6,6 +6,9 @@ project(roast)
 set(PROJECT_FILES
     README.md
     src/main.c
+    src/parser/ast.h
+    src/parser/parser.c
+    src/parser/parser.h
     src/scanner/scanner.c
     src/scanner/scanner.h
     src/scanner/token.c
