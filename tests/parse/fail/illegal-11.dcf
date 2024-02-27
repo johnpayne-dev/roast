@@ -1,0 +1,6 @@
+import a;
+
+void main(){}
+
+// Should be illegal
+import b;

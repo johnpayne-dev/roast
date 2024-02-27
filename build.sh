@@ -1,5 +1,7 @@
+#!/usr/bin/env bash
+
 build_system="DEFAULT"
-compiler=""
+compiler="DEFAULT"
 compiler_path=""
 
 if [ $# -ge 1 ]; then
@@ -8,7 +10,9 @@ fi
 
 if [ $# -ge 2 ]; then
     compiler="$2"
-    if [ "${compiler}" = "gcc" ]; then
+    if [ "${compiler}" = "DEFAULT" ]; then
+        compiler_path=""
+    elif [ "${compiler}" = "gcc" ]; then
         compiler_path="/opt/homebrew/bin/gcc-13"
     else
         echo "${compiler} is not a valid compiler option"
@@ -16,7 +20,7 @@ if [ $# -ge 2 ]; then
     fi
 fi
 
-if [ "${compiler_path}" = "" ]; then
+if [ "${compiler}" = "DEFAULT" ]; then
     echo "CMake'ing to ${build_system} build system using DEFAULT compiler"
     if [ "${build_system}" = "DEFAULT" ]; then
         cmake -B "./build/${build_system}_DEFAULT" -DCMAKE_RUNTIME_OUTPUT_DIRECTORY:PATH="../../bin/${build_system}_DEFAULT"
