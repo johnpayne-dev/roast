@@ -45,6 +45,17 @@ static const uint32_t INCREMENT_OPERATORS[][2] = {
 	{ TOKEN_TYPE_DECREMENT, AST_INCREMENT_OPERATOR_TYPE_SUB },
 };
 
+static const uint32_t KEYWORDS[][2] = {
+	{ TOKEN_TYPE_KEYWORD_BOOL },   { TOKEN_TYPE_KEYWORD_BREAK },
+	{ TOKEN_TYPE_KEYWORD_CONST },  { TOKEN_TYPE_KEYWORD_CONTINUE },
+	{ TOKEN_TYPE_KEYWORD_ELSE },   { TOKEN_TYPE_KEYWORD_FALSE },
+	{ TOKEN_TYPE_KEYWORD_FOR },    { TOKEN_TYPE_KEYWORD_IF },
+	{ TOKEN_TYPE_KEYWORD_IMPORT }, { TOKEN_TYPE_KEYWORD_INT },
+	{ TOKEN_TYPE_KEYWORD_LEN },    { TOKEN_TYPE_KEYWORD_RETURN },
+	{ TOKEN_TYPE_KEYWORD_TRUE },   { TOKEN_TYPE_KEYWORD_VOID },
+	{ TOKEN_TYPE_KEYWORD_WHILE },
+};
+
 static const uint32_t BINARY_OPERATOR_PRECEDENCE[] = {
 	[TOKEN_TYPE_OR] = 0,
 	[TOKEN_TYPE_AND] = 1,
@@ -140,7 +151,10 @@ static void parse_error(struct parser *parser, const char *message)
 static struct ast_identifier *parse_identifier(struct parser *parser)
 {
 	struct token token;
-	if (!next_token(parser, TOKEN_TYPE_IDENTIFIER, &token))
+	if (next_token_in_table(parser, KEYWORDS, G_N_ELEMENTS(KEYWORDS),
+				&token, NULL))
+		parse_error(parser, "Keyword cannot be used as identifier");
+	else if (!next_token(parser, TOKEN_TYPE_IDENTIFIER, &token))
 		return NULL;
 
 	struct ast_identifier *identifier = g_new(struct ast_identifier, 1);
@@ -372,12 +386,14 @@ static struct ast_type *parse_type(struct parser *parser)
 {
 	struct token token;
 	enum ast_type_type type;
-	if (!next_token_in_table(parser, TYPES, G_N_ELEMENTS(TYPES), &token,
-				 &type))
-		return NULL;
 
-	if (next_token(parser, TOKEN_TYPE_KEYWORD_VOID, NULL))
+	if (next_token(parser, TOKEN_TYPE_KEYWORD_VOID, &token)) {
 		parse_error(parser, "void type not permitted here");
+		type = 0;
+	} else if (!next_token_in_table(parser, TYPES, G_N_ELEMENTS(TYPES),
+					&token, &type)) {
+		return NULL;
+	}
 
 	struct ast_type *ast_type = g_new(struct ast_type, 1);
 	ast_type->type = type;
@@ -516,18 +532,26 @@ static struct ast_method_call *parse_method_call(struct parser *parser)
 	call->arguments = g_array_new(
 		false, false, sizeof(struct ast_method_call_argument *));
 
-	while (!next_token(parser, TOKEN_TYPE_CLOSE_PARENTHESIS, NULL)) {
+	if (next_token(parser, TOKEN_TYPE_CLOSE_PARENTHESIS, NULL))
+		return call;
+
+	while (true) {
 		struct ast_method_call_argument *argument =
 			parse_method_call_argument(parser);
-		if (argument == NULL) {
+		if (argument == NULL)
 			parse_error(parser, "Expected argument in method call");
-			break;
-		}
-		g_array_append_val(call->arguments, argument);
+		else
+			g_array_append_val(call->arguments, argument);
 
-		if (next_token(parser, TOKEN_TYPE_COMMA, NULL) &&
-		    peek_token(parser, 0, TOKEN_TYPE_CLOSE_PARENTHESIS))
-			parse_error(parser, "Extra comma in method call");
+		if (next_token(parser, TOKEN_TYPE_COMMA, NULL))
+			continue;
+		if (next_token(parser, TOKEN_TYPE_CLOSE_PARENTHESIS, NULL))
+			break;
+
+		parse_error(
+			parser,
+			"Expected comma or closing parenthesis in method call");
+		break;
 	}
 
 	return call;
@@ -750,7 +774,12 @@ parse_unary_expression(struct parser *parser)
 	struct ast_unary_expression *expression =
 		g_new(struct ast_unary_expression, 1);
 
-	if ((expression->method_call = parse_method_call(parser))) {
+	if ((expression->literal = parse_literal(parser))) {
+		expression->type = AST_UNARY_EXPRESSION_TYPE_LITERAL;
+	} else if ((expression->len_identifier =
+			    parse_len_expression(parser))) {
+		expression->type = AST_UNARY_EXPRESSION_TYPE_LEN;
+	} else if ((expression->method_call = parse_method_call(parser))) {
 		expression->type = AST_UNARY_EXPRESSION_TYPE_METHOD_CALL;
 	} else if ((expression->location = parse_location(parser))) {
 		expression->type = AST_UNARY_EXPRESSION_TYPE_LOCATION;
@@ -760,11 +789,6 @@ parse_unary_expression(struct parser *parser)
 	} else if ((expression->negate_expression =
 			    parse_negate_expression(parser))) {
 		expression->type = AST_UNARY_EXPRESSION_TYPE_NEGATE;
-	} else if ((expression->literal = parse_literal(parser))) {
-		expression->type = AST_UNARY_EXPRESSION_TYPE_LITERAL;
-	} else if ((expression->len_identifier =
-			    parse_len_expression(parser))) {
-		expression->type = AST_UNARY_EXPRESSION_TYPE_LEN;
 	} else if ((expression->parenthesis_expression =
 			    parse_parenthesis_expression(parser))) {
 		expression->type = AST_UNARY_EXPRESSION_TYPE_PARENTHESIS;
@@ -1221,12 +1245,7 @@ static struct ast_statement *parse_statement(struct parser *parser)
 {
 	struct ast_statement *statement = g_new(struct ast_statement, 1);
 
-	if ((statement->method_call = parse_method_call_statement(parser))) {
-		statement->type = AST_STATEMENT_TYPE_METHOD_CALL;
-	} else if ((statement->assign_statement =
-			    parse_assign_statement(parser))) {
-		statement->type = AST_STATEMENT_TYPE_ASSIGN;
-	} else if ((statement->if_statement = parse_if_statement(parser))) {
+	if ((statement->if_statement = parse_if_statement(parser))) {
 		statement->type = AST_STATEMENT_TYPE_IF;
 	} else if ((statement->for_statement = parse_for_statement(parser))) {
 		statement->type = AST_STATEMENT_TYPE_FOR;
@@ -1240,6 +1259,12 @@ static struct ast_statement *parse_statement(struct parser *parser)
 		statement->type = AST_STATEMENT_TYPE_BREAK;
 	} else if (parse_continue_statement(parser)) {
 		statement->type = AST_STATEMENT_TYPE_CONTINUE;
+	} else if ((statement->method_call =
+			    parse_method_call_statement(parser))) {
+		statement->type = AST_STATEMENT_TYPE_METHOD_CALL;
+	} else if ((statement->assign_statement =
+			    parse_assign_statement(parser))) {
+		statement->type = AST_STATEMENT_TYPE_ASSIGN;
 	} else {
 		free_statement(statement);
 		return NULL;
@@ -1453,20 +1478,19 @@ void free_field_identifier(struct ast_field_identifier *field_identifier)
 static struct ast_field *parse_field(struct parser *parser)
 {
 	bool constant = next_token(parser, TOKEN_TYPE_KEYWORD_CONST, NULL);
-	bool is_field = constant ||
-			((peek_token(parser, 0, TOKEN_TYPE_KEYWORD_INT) ||
-			  peek_token(parser, 0, TOKEN_TYPE_KEYWORD_BOOL)) &&
-			 peek_token(parser, 1, TOKEN_TYPE_IDENTIFIER) &&
-			 !peek_token(parser, 2, TOKEN_TYPE_OPEN_PARENTHESIS));
-	if (!is_field)
-		return NULL;
+
+	struct ast_type *type = parse_type(parser);
+	if (type == NULL) {
+		if (constant)
+			parse_error(parser,
+				    "Expected type in field declaration");
+		else
+			return NULL;
+	}
 
 	struct ast_field *field = g_new0(struct ast_field, 1);
 	field->constant = constant;
-
-	field->type = parse_type(parser);
-	if (field->type == NULL)
-		parse_error(parser, "Expected type in field declaration");
+	field->type = type;
 
 	field->field_identifiers = g_array_new(
 		false, false, sizeof(struct ast_field_identifier *));
@@ -1492,6 +1516,15 @@ static struct ast_field *parse_field(struct parser *parser)
 	}
 
 	return field;
+}
+
+static bool peek_field(struct parser *parser)
+{
+	uint32_t i = peek_token(parser, 0, TOKEN_TYPE_KEYWORD_CONST);
+	return (peek_token(parser, i, TOKEN_TYPE_KEYWORD_INT) ||
+		peek_token(parser, i, TOKEN_TYPE_KEYWORD_BOOL)) &&
+	       peek_token(parser, i + 1, TOKEN_TYPE_IDENTIFIER) &&
+	       !peek_token(parser, i + 2, TOKEN_TYPE_OPEN_PARENTHESIS);
 }
 
 static void free_field(struct ast_field *field)
@@ -1547,15 +1580,16 @@ static struct ast_program *parse_program(struct parser *parser)
 		g_array_new(false, false, sizeof(struct ast_method *));
 
 	struct ast_import *import;
-	while ((import = parse_import(parser)) != NULL)
+	while ((import = parse_import(parser)))
 		g_array_append_val(program->imports, import);
 
-	struct ast_field *field;
-	while ((field = parse_field(parser)) != NULL)
+	while (peek_field(parser)) {
+		struct ast_field *field = parse_field(parser);
 		g_array_append_val(program->fields, field);
+	}
 
 	struct ast_method *method;
-	while ((method = parse_method(parser)) != NULL)
+	while ((method = parse_method(parser)))
 		g_array_append_val(program->methods, method);
 
 	if (parser->position != parser->token_count)
@@ -1600,7 +1634,7 @@ int parser_parse(struct parser *parser, const char *source,
 	if (scanner_tokenize(scanner, source, false, &tokens) != 0)
 		return -1;
 
-	*parser = (struct parser) {
+	*parser = (struct parser){
 		.tokens = &g_array_index(tokens, struct token, 0),
 		.token_count = tokens->len,
 		.source = source,
@@ -1608,7 +1642,7 @@ int parser_parse(struct parser *parser, const char *source,
 		.parse_error = false,
 	};
 	struct ast_program *program = parse_program(parser);
-	
+
 	g_array_free(tokens, true);
 
 	if (ast != NULL && !parser->parse_error) {
