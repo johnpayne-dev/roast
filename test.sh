@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-stage=""
+stage="all"
 build_system="DEFAULT"
 compiler="DEFAULT"
 
