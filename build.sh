@@ -23,7 +23,7 @@ if [ "${compiler_path}" = "" ]; then
     else
         cmake -B "./build/${build_system}_DEFAULT" -G "${build_system}" -DCMAKE_RUNTIME_OUTPUT_DIRECTORY:PATH="../../bin/${build_system}_DEFAULT"
     fi
-    cmake --build "./build/${build_system}_DEFAULT" --verbose
+    cmake --build "./build/${build_system}_DEFAULT"
 else
     echo "CMake'ing to ${build_system} build system using ${compiler} compiler"
     if [ "${build_system}" = "DEFAULT" ]; then
@@ -31,5 +31,5 @@ else
     else
         cmake -B "./build/${build_system}_${compiler}" -G "${build_system}" -DCMAKE_C_COMPILER="${compiler_path}" -DCMAKE_RUNTIME_OUTPUT_DIRECTORY:PATH="../../bin/${build_system}_${compiler}"
     fi
-    cmake --build "./build/${build_system}_${compiler}" --verbose
+    cmake --build "./build/${build_system}_${compiler}"
 fi
