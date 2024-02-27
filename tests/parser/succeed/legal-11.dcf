@@ -1,0 +1,13 @@
+int A[10];
+void bar ( ) {
+  for ( i = 0; i < 10; i = 999 ) {
+    A[i] = i;
+  }
+
+  for ( i = 0; i < 10; i *= 2) {}
+  for ( i = 0; i < 10; i /= 5) {}
+  for ( i = 0; i < 10; i %= 5) {}
+}
+void main ( ) {
+  bar ( );
+}
