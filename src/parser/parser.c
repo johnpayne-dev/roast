@@ -140,7 +140,9 @@ static bool peek_token_in_table(struct parser *parser,
 
 static void parse_error(struct parser *parser, const char *message)
 {
-	struct token *token = &parser->tokens[parser->position];
+	uint32_t token_index = parser->position == 0 ? 0 : parser->position - 1;
+	struct token *token = &parser->tokens[token_index];
+
 	uint32_t line_number = token_get_line_number(token, parser->source);
 	uint32_t column_number = token_get_column_number(token, parser->source);
 
@@ -157,7 +159,7 @@ static struct ast_identifier *parse_identifier(struct parser *parser)
 	else if (!next_token(parser, TOKEN_TYPE_IDENTIFIER, &token))
 		return NULL;
 
-	struct ast_identifier *identifier = g_new(struct ast_identifier, 1);
+	struct ast_identifier *identifier = g_new0(struct ast_identifier, 1);
 	identifier->token = token;
 	return identifier;
 }
@@ -176,7 +178,7 @@ static struct ast_char_literal *parse_char_literal(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_CHAR_LITERAL, &token))
 		return NULL;
 
-	struct ast_char_literal *literal = g_new(struct ast_char_literal, 1);
+	struct ast_char_literal *literal = g_new0(struct ast_char_literal, 1);
 	literal->token = token;
 	return literal;
 }
@@ -196,7 +198,7 @@ static struct ast_string_literal *parse_string_literal(struct parser *parser)
 		return NULL;
 
 	struct ast_string_literal *literal =
-		g_new(struct ast_string_literal, 1);
+		g_new0(struct ast_string_literal, 1);
 	literal->token = token;
 	return literal;
 }
@@ -217,7 +219,7 @@ static struct ast_bool_literal *parse_bool_literal(struct parser *parser)
 				 G_N_ELEMENTS(BOOL_LITERALS), &token, &type))
 		return NULL;
 
-	struct ast_bool_literal *literal = g_new(struct ast_bool_literal, 1);
+	struct ast_bool_literal *literal = g_new0(struct ast_bool_literal, 1);
 	literal->token = token;
 	literal->type = type;
 	return literal;
@@ -239,7 +241,7 @@ static struct ast_int_literal *parse_int_literal(struct parser *parser)
 				 G_N_ELEMENTS(INT_LITERALS), &token, &type))
 		return NULL;
 
-	struct ast_int_literal *literal = g_new(struct ast_int_literal, 1);
+	struct ast_int_literal *literal = g_new0(struct ast_int_literal, 1);
 	literal->token = token;
 	literal->type = type;
 	return literal;
@@ -306,7 +308,7 @@ static struct ast_array_literal *parse_array_literal(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_OPEN_CURLY_BRACKET, NULL))
 		return NULL;
 
-	struct ast_array_literal *array = g_new(struct ast_array_literal, 1);
+	struct ast_array_literal *array = g_new0(struct ast_array_literal, 1);
 	array->literals =
 		g_array_new(false, false, sizeof(struct ast_literal *));
 
@@ -395,7 +397,7 @@ static struct ast_type *parse_type(struct parser *parser)
 		return NULL;
 	}
 
-	struct ast_type *ast_type = g_new(struct ast_type, 1);
+	struct ast_type *ast_type = g_new0(struct ast_type, 1);
 	ast_type->type = type;
 	ast_type->token = token;
 	return ast_type;
@@ -418,7 +420,7 @@ static struct ast_binary_operator *parse_binary_operator(struct parser *parser)
 		return NULL;
 
 	struct ast_binary_operator *binary =
-		g_new(struct ast_binary_operator, 1);
+		g_new0(struct ast_binary_operator, 1);
 	binary->type = type;
 	binary->token = token;
 	return binary;
@@ -443,7 +445,7 @@ parse_increment_operator(struct parser *parser)
 		return NULL;
 
 	struct ast_increment_operator *increment =
-		g_new(struct ast_increment_operator, 1);
+		g_new0(struct ast_increment_operator, 1);
 	increment->type = type;
 	increment->token = token;
 	return increment;
@@ -466,7 +468,7 @@ static struct ast_assign_operator *parse_assign_operator(struct parser *parser)
 		return NULL;
 
 	struct ast_assign_operator *assign =
-		g_new(struct ast_assign_operator, 1);
+		g_new0(struct ast_assign_operator, 1);
 	assign->type = type;
 	assign->token = token;
 	return assign;
@@ -662,18 +664,20 @@ parse_binary_expression(struct parser *parser, uint32_t length)
 	}
 
 	struct ast_binary_expression *expression =
-		g_new(struct ast_binary_expression, 1);
+		g_new0(struct ast_binary_expression, 1);
 
 	uint32_t operator_index = get_lowest_precedence_index(parser, indices);
-	g_array_free(indices, true);
+	uint32_t expected_position = parser->position + operator_index;
 
 	expression->left = parse_expression_with_length(parser, operator_index);
 	if (expression->left == NULL)
 		parse_error(parser, "Expected expression before operator");
 
-	expression->binary_operator = parse_binary_operator(parser);
-	if (expression->binary_operator == NULL)
+	if (parser->position != expected_position) {
 		parse_error(parser, "Expected binary operator in expression");
+		parser->position = expected_position;
+	}
+	expression->binary_operator = parse_binary_operator(parser);
 
 	if (length != (uint32_t)-1)
 		length -= operator_index + 1;
@@ -681,6 +685,7 @@ parse_binary_expression(struct parser *parser, uint32_t length)
 	if (expression->right == NULL)
 		parse_error(parser, "Expected expression after operator");
 
+	g_array_free(indices, true);
 	return expression;
 }
 
@@ -772,7 +777,7 @@ static struct ast_unary_expression *
 parse_unary_expression(struct parser *parser)
 {
 	struct ast_unary_expression *expression =
-		g_new(struct ast_unary_expression, 1);
+		g_new0(struct ast_unary_expression, 1);
 
 	if ((expression->literal = parse_literal(parser))) {
 		expression->type = AST_UNARY_EXPRESSION_TYPE_LITERAL;
@@ -837,7 +842,7 @@ static void free_unary_expression(struct ast_unary_expression *expression)
 static struct ast_expression *
 parse_expression_with_length(struct parser *parser, uint32_t length)
 {
-	struct ast_expression *expression = g_new(struct ast_expression, 1);
+	struct ast_expression *expression = g_new0(struct ast_expression, 1);
 
 	if ((expression->binary = parse_binary_expression(parser, length))) {
 		expression->type = AST_EXPRESSION_TYPE_BINARY;
@@ -882,7 +887,7 @@ static struct ast_assign_expression *
 parse_assign_expression(struct parser *parser)
 {
 	struct ast_assign_expression *assign =
-		g_new(struct ast_assign_expression, 1);
+		g_new0(struct ast_assign_expression, 1);
 
 	if ((assign->assign_operator = parse_assign_operator(parser))) {
 		assign->type = AST_ASSIGN_EXPRESSION_TYPE_ASSIGNMENT;
@@ -891,7 +896,7 @@ parse_assign_expression(struct parser *parser)
 			parse_error(parser,
 				    "Expected expression in assignment");
 	} else if ((assign->increment_operator =
-			    parse_increment_operator(parser)) != NULL) {
+			    parse_increment_operator(parser))) {
 		assign->type = AST_ASSIGN_EXPRESSION_TYPE_INCREMENT;
 	} else {
 		free_assign_expression(assign);
@@ -1214,7 +1219,7 @@ parse_assign_statement(struct parser *parser)
 		return NULL;
 
 	struct ast_assign_statement *statement =
-		g_new(struct ast_assign_statement, 1);
+		g_new0(struct ast_assign_statement, 1);
 	statement->location = location;
 
 	statement->assign_expression = parse_assign_expression(parser);
@@ -1243,7 +1248,7 @@ static void free_statement(struct ast_statement *statement);
 
 static struct ast_statement *parse_statement(struct parser *parser)
 {
-	struct ast_statement *statement = g_new(struct ast_statement, 1);
+	struct ast_statement *statement = g_new0(struct ast_statement, 1);
 
 	if ((statement->if_statement = parse_if_statement(parser))) {
 		statement->type = AST_STATEMENT_TYPE_IF;
@@ -1312,11 +1317,11 @@ static struct ast_block *parse_block(struct parser *parser)
 		g_array_new(false, false, sizeof(struct ast_statement *));
 
 	struct ast_field *field;
-	while ((field = parse_field(parser)) != NULL)
+	while ((field = parse_field(parser)))
 		g_array_append_val(block->fields, field);
 
 	struct ast_statement *statement;
-	while ((statement = parse_statement(parser)) != NULL)
+	while ((statement = parse_statement(parser)))
 		g_array_append_val(block->statements, statement);
 
 	if (!next_token(parser, TOKEN_TYPE_CLOSE_CURLY_BRACKET, NULL))
@@ -1623,7 +1628,7 @@ static void free_program(struct ast_program *program)
 
 struct parser *parser_new(void)
 {
-	struct parser *parser = g_new(struct parser, 1);
+	struct parser *parser = g_new0(struct parser, 1);
 	return parser;
 }
 
@@ -1646,7 +1651,7 @@ int parser_parse(struct parser *parser, const char *source,
 	g_array_free(tokens, true);
 
 	if (ast != NULL && !parser->parse_error) {
-		*ast = g_new(struct ast, 1);
+		*ast = g_new0(struct ast, 1);
 		(*ast)->program = program;
 	} else {
 		free_program(program);
