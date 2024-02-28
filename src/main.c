@@ -111,7 +111,7 @@ static int run_scan_target(char *source, bool print_output, GArray **token_list)
 	return result;
 }
 
-static int run_parse_target(char *source, struct ast **ast)
+static int run_parse_target(char *source, struct ast_node **ast)
 {
 	GArray *tokens;
 	if (run_scan_target(source, false, &tokens) != 0)
