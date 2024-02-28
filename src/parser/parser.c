@@ -779,21 +779,20 @@ parse_unary_expression(struct parser *parser)
 	struct ast_unary_expression *expression =
 		g_new0(struct ast_unary_expression, 1);
 
-	if ((expression->literal = parse_literal(parser))) {
-		expression->type = AST_UNARY_EXPRESSION_TYPE_LITERAL;
-	} else if ((expression->len_identifier =
-			    parse_len_expression(parser))) {
+	if ((expression->len_identifier = parse_len_expression(parser))) {
 		expression->type = AST_UNARY_EXPRESSION_TYPE_LEN;
-	} else if ((expression->method_call = parse_method_call(parser))) {
-		expression->type = AST_UNARY_EXPRESSION_TYPE_METHOD_CALL;
-	} else if ((expression->location = parse_location(parser))) {
-		expression->type = AST_UNARY_EXPRESSION_TYPE_LOCATION;
 	} else if ((expression->not_expression =
 			    parse_not_expression(parser))) {
 		expression->type = AST_UNARY_EXPRESSION_TYPE_NOT;
 	} else if ((expression->negate_expression =
 			    parse_negate_expression(parser))) {
 		expression->type = AST_UNARY_EXPRESSION_TYPE_NEGATE;
+	} else if ((expression->literal = parse_literal(parser))) {
+		expression->type = AST_UNARY_EXPRESSION_TYPE_LITERAL;
+	} else if ((expression->method_call = parse_method_call(parser))) {
+		expression->type = AST_UNARY_EXPRESSION_TYPE_METHOD_CALL;
+	} else if ((expression->location = parse_location(parser))) {
+		expression->type = AST_UNARY_EXPRESSION_TYPE_LOCATION;
 	} else if ((expression->parenthesis_expression =
 			    parse_parenthesis_expression(parser))) {
 		expression->type = AST_UNARY_EXPRESSION_TYPE_PARENTHESIS;
