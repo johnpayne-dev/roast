@@ -1625,36 +1625,44 @@ static void free_program(struct ast_program *program)
 	g_free(program);
 }
 
+struct ast *ast_new(struct ast_program *program)
+{
+	struct ast *ast = g_new(struct ast, 1);
+	ast->program = program;
+	return ast;
+}
+
+void ast_free(struct ast *ast)
+{
+	if (ast == NULL)
+		return;
+
+	free_program(ast->program);
+	g_free(ast);
+}
+
 struct parser *parser_new(void)
 {
 	struct parser *parser = g_new0(struct parser, 1);
 	return parser;
 }
 
-int parser_parse(struct parser *parser, const char *source,
-		 struct scanner *scanner, struct ast **ast)
+int parser_parse(struct parser *parser, const char *source, GArray *token_list,
+		 struct ast **ast)
 {
-	GArray *tokens;
-	if (scanner_tokenize(scanner, source, false, &tokens) != 0)
-		return -1;
-
 	*parser = (struct parser){
-		.tokens = &g_array_index(tokens, struct token, 0),
-		.token_count = tokens->len,
+		.tokens = &g_array_index(token_list, struct token, 0),
+		.token_count = token_list->len,
 		.source = source,
 		.position = 0,
 		.parse_error = false,
 	};
 	struct ast_program *program = parse_program(parser);
 
-	g_array_free(tokens, true);
-
-	if (ast != NULL && !parser->parse_error) {
-		*ast = g_new0(struct ast, 1);
-		(*ast)->program = program;
-	} else {
+	if (ast != NULL && !parser->parse_error)
+		*ast = ast_new(program);
+	else
 		free_program(program);
-	}
 
 	return parser->parse_error ? -1 : 0;
 }

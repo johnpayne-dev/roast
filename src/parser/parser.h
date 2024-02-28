@@ -16,7 +16,7 @@ struct parser {
 
 struct parser *parser_new(void);
 
-int parser_parse(struct parser *parser, const char *source,
-		 struct scanner *scanner, struct ast **ast);
+int parser_parse(struct parser *parser, const char *source, GArray *token_list,
+		 struct ast **ast);
 
 void parser_free(struct parser *parser);

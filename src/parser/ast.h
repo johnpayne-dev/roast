@@ -8,6 +8,10 @@ struct ast {
 	struct ast_program *program;
 };
 
+struct ast *ast_new(struct ast_program *program);
+
+void ast_free(struct ast *ast);
+
 struct ast_program {
 	GArray *imports;
 	GArray *fields;

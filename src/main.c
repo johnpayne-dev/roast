@@ -100,25 +100,29 @@ static int get_input_file_contents(int argc, char *argv[], char **file_contents)
 	return 0;
 }
 
-static int run_scan_target(char *source)
+static int run_scan_target(char *source, bool print_output, GArray **token_list)
 {
 	struct scanner *scanner = scanner_new();
 
-	int result = scanner_tokenize(scanner, source, true, NULL);
+	int result =
+		scanner_tokenize(scanner, source, print_output, token_list);
 
 	scanner_free(scanner);
 	return result;
 }
 
-static int run_parse_target(char *source)
+static int run_parse_target(char *source, struct ast **ast)
 {
-	struct scanner *scanner = scanner_new();
+	GArray *tokens;
+	if (run_scan_target(source, false, &tokens) != 0)
+		return -1;
+
 	struct parser *parser = parser_new();
 
-	int result = parser_parse(parser, source, scanner, NULL);
+	int result = parser_parse(parser, source, tokens, ast);
 
 	parser_free(parser);
-	scanner_free(scanner);
+	g_array_free(tokens, true);
 	return result;
 }
 
@@ -140,9 +144,9 @@ static int run_target(char *target, char *source)
 		return run_assembly_target(source);
 
 	if (g_strcmp0(target, "scan") == 0)
-		return run_scan_target(source);
+		return run_scan_target(source, true, NULL);
 	if (g_strcmp0(target, "parse") == 0)
-		return run_parse_target(source);
+		return run_parse_target(source, NULL);
 	if (g_strcmp0(target, "inter") == 0)
 		return run_intermediate_target(source);
 	if (g_strcmp0(target, "assembly") == 0)
@@ -154,16 +158,17 @@ static int run_target(char *target, char *source)
 
 int main(int argc, char *argv[])
 {
-	struct options options;
+	struct options options = { 0 };
+	char *file_contents = NULL;
+
 	if (parse_options(&argc, &argv, &options) != 0)
-		return -1;
+		goto error_cleanup;
 
 	if (set_output_file(options.output_file) != 0)
-		goto error_cleanup_options;
+		goto error_cleanup;
 
-	char *file_contents;
 	if (get_input_file_contents(argc, argv, &file_contents) != 0)
-		goto error_cleanup_options;
+		goto error_cleanup;
 
 	if (run_target(options.target, file_contents) != 0)
 		goto error_cleanup;
@@ -172,7 +177,6 @@ int main(int argc, char *argv[])
 
 error_cleanup:
 	g_free(file_contents);
-error_cleanup_options:
 	free_options(&options);
 	return -1;
 }
