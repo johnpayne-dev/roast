@@ -3,18 +3,14 @@
 #include <glib.h>
 #include <stdbool.h>
 
-struct symbol_table {
-	struct symbol_table *parent;
-	GHashTable *method_table;
-	GHashTable *fields_table;
-};
+typedef struct symbol_table symbol_table_t;
 
 enum data_type { DATA_TYPE_INT, DATA_TYPE_BOOL, DATA_TYPE_VOID };
 
 struct method_descriptor {
 	bool imported;
 	enum data_type return_type;
-	GArray *arguments;
+	struct argument_descriptor *arguments;
 };
 
 struct argument_descriptor {
@@ -27,5 +23,23 @@ struct field_descriptor {
 	bool constant;
 	bool array;
 	size_t array_length;
-	GArray *initializers;
+	int *initializers;
 };
+
+symbol_table_t *symbol_table_new(struct symbol_table *parent_table);
+
+symbol_table_t *symbol_table_get_parent(symbol_table_t *symbols);
+
+int symbol_table_add_method(symbol_table_t *symbols, char *method_identifier,
+			    struct method_descriptor *method);
+
+struct method_descriptor *symbol_table_get_method(symbol_table_t *symbols,
+						  char *method_identifier);
+
+int symbol_table_add_field(symbol_table_t *symbols, char *field_identifier,
+			   struct method_descriptor *field);
+
+struct field_descriptor *symbol_table_get_field(symbol_table_t *symbols,
+						char *field_identifier);
+
+void symbol_table_free(symbol_table_t *symbols);
