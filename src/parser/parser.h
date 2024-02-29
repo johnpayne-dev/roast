@@ -17,6 +17,6 @@ struct parser {
 struct parser *parser_new(void);
 
 int parser_parse(struct parser *parser, const char *source, GArray *token_list,
-		 struct ast **ast);
+		 struct ast_node **ast);
 
 void parser_free(struct parser *parser);
