@@ -30,14 +30,14 @@ symbol_table_t *symbol_table_new(struct symbol_table *parent_table);
 
 symbol_table_t *symbol_table_get_parent(symbol_table_t *symbols);
 
-int symbol_table_add_method(symbol_table_t *symbols, char *method_identifier,
-			    struct method_descriptor *method);
+void symbol_table_add_method(symbol_table_t *symbols, char *method_identifier,
+			     struct method_descriptor *method);
 
 struct method_descriptor *symbol_table_get_method(symbol_table_t *symbols,
 						  char *method_identifier);
 
-int symbol_table_add_field(symbol_table_t *symbols, char *field_identifier,
-			   struct method_descriptor *field);
+void symbol_table_add_field(symbol_table_t *symbols, char *field_identifier,
+			    struct field_descriptor *field);
 
 struct field_descriptor *symbol_table_get_field(symbol_table_t *symbols,
 						char *field_identifier);

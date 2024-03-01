@@ -1,3 +1,3 @@
 #pragma once
 
-#include "symbol_table.h"
+#include "semantics/symbol_table.h"
