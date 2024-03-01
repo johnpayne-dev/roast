@@ -27,7 +27,6 @@ void symbol_table_add_method(symbol_table_t *symbols, char *method_identifier,
 	g_assert(method != NULL);
 	g_assert(g_hash_table_insert(symbols->methods_table, method_identifier,
 				     method));
-	return 0;
 }
 
 struct method_descriptor *symbol_table_get_method(symbol_table_t *symbols,
