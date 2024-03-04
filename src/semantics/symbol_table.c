@@ -22,7 +22,7 @@ symbol_table_t *symbol_table_get_parent(symbol_table_t *symbols)
 }
 
 void symbol_table_add_method(symbol_table_t *symbols, char *method_identifier,
-			     struct ir_method_descriptor *method)
+			     struct ir_method *method)
 {
 	g_assert(method_identifier != NULL || method_identifier[0] != '\0');
 	g_assert(method != NULL);
@@ -30,15 +30,15 @@ void symbol_table_add_method(symbol_table_t *symbols, char *method_identifier,
 				     method));
 }
 
-struct ir_method_descriptor *symbol_table_get_method(symbol_table_t *symbols,
-						     char *method_identifier)
+struct ir_method *symbol_table_get_method(symbol_table_t *symbols,
+					  char *method_identifier)
 {
 	g_assert(method_identifier != NULL || method_identifier[0] != '\0');
 	return g_hash_table_lookup(symbols->methods_table, method_identifier);
 }
 
 void symbol_table_add_field(symbol_table_t *symbols, char *field_identifier,
-			    struct ir_field_descriptor *field)
+			    struct ir_field *field)
 {
 	g_assert(field_identifier != NULL || field_identifier[0] != '\0');
 	g_assert(field != NULL);
@@ -46,8 +46,8 @@ void symbol_table_add_field(symbol_table_t *symbols, char *field_identifier,
 				     field));
 }
 
-struct ir_field_descriptor *symbol_table_get_field(symbol_table_t *symbols,
-						   char *field_identifier)
+struct ir_field *symbol_table_get_field(symbol_table_t *symbols,
+					char *field_identifier)
 {
 	g_assert(field_identifier != NULL || field_identifier[0] != '\0');
 	return g_hash_table_lookup(symbols->fields_table, field_identifier);
