@@ -143,6 +143,11 @@ uint32_t token_get_column_number(struct token *token, const char *source)
 	return token->offset;
 }
 
+char *token_get_string(struct token *token, const char *source)
+{
+	return g_strndup(source + token->offset, token->length);
+}
+
 void token_print(struct token *token, const char *source)
 {
 	uint32_t line_number = token_get_line_number(token, source);

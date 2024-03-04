@@ -95,6 +95,8 @@ uint32_t token_get_line_number(struct token *token, const char *source);
 
 uint32_t token_get_column_number(struct token *token, const char *source);
 
+char *token_get_string(struct token *token, const char *source);
+
 void token_print(struct token *token, const char *source);
 
 void token_print_error(struct token *token, const char *source);

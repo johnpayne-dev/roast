@@ -56,4 +56,8 @@ struct ast_node *ast_node_new_terminal(enum ast_node_type type,
 
 void ast_node_add_child(struct ast_node *node, struct ast_node *child);
 
+uint32_t ast_node_child_count(struct ast_node *node);
+
+struct ast_node *ast_node_get_child(struct ast_node *node, uint32_t i);
+
 void ast_node_free(struct ast_node *node);

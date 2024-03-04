@@ -23,6 +23,16 @@ void ast_node_add_child(struct ast_node *node, struct ast_node *child)
 	g_array_append_val(node->children, child);
 }
 
+uint32_t ast_node_child_count(struct ast_node *node)
+{
+	return node->children->len;
+}
+
+struct ast_node *ast_node_get_child(struct ast_node *node, uint32_t i)
+{
+	return g_array_index(node->children, struct ast_node *, i);
+}
+
 void ast_node_free(struct ast_node *node)
 {
 	if (node == NULL)
