@@ -1,4 +1,5 @@
 #include "semantics/symbol_table.h"
+#include "semantics/ir.h"
 
 struct symbol_table {
 	struct symbol_table *parent;
@@ -21,7 +22,7 @@ symbol_table_t *symbol_table_get_parent(symbol_table_t *symbols)
 }
 
 void symbol_table_add_method(symbol_table_t *symbols, char *method_identifier,
-			     struct method_descriptor *method)
+			     struct ir_method_descriptor *method)
 {
 	g_assert(method_identifier != NULL || method_identifier[0] != '\0');
 	g_assert(method != NULL);
@@ -29,15 +30,15 @@ void symbol_table_add_method(symbol_table_t *symbols, char *method_identifier,
 				     method));
 }
 
-struct method_descriptor *symbol_table_get_method(symbol_table_t *symbols,
-						  char *method_identifier)
+struct ir_method_descriptor *symbol_table_get_method(symbol_table_t *symbols,
+						     char *method_identifier)
 {
 	g_assert(method_identifier != NULL || method_identifier[0] != '\0');
 	return g_hash_table_lookup(symbols->methods_table, method_identifier);
 }
 
 void symbol_table_add_field(symbol_table_t *symbols, char *field_identifier,
-			    struct field_descriptor *field)
+			    struct ir_field_descriptor *field)
 {
 	g_assert(field_identifier != NULL || field_identifier[0] != '\0');
 	g_assert(field != NULL);
@@ -45,8 +46,8 @@ void symbol_table_add_field(symbol_table_t *symbols, char *field_identifier,
 				     field));
 }
 
-struct field_descriptor *symbol_table_get_field(symbol_table_t *symbols,
-						char *field_identifier)
+struct ir_field_descriptor *symbol_table_get_field(symbol_table_t *symbols,
+						   char *field_identifier)
 {
 	g_assert(field_identifier != NULL || field_identifier[0] != '\0');
 	return g_hash_table_lookup(symbols->fields_table, field_identifier);
