@@ -7,7 +7,7 @@
 #include "parser/ast.h"
 #include "semantics/symbol_table.h"
 
-bool ir_is_error(void);
+bool ir_has_error(void);
 
 enum ir_type {
 	IR_TYPE_VOID,
