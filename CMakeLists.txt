@@ -13,7 +13,13 @@ set(PROJECT_FILES
     src/scanner/scanner.c
     src/scanner/scanner.h
     src/scanner/token.c
-    src/scanner/token.h)
+    src/scanner/token.h
+    src/semantics/ir.c
+    src/semantics/ir.h
+    src/semantics/semantics.c
+    src/semantics/semantics.h
+    src/semantics/symbol_table.c
+    src/semantics/symbol_table.h)
 
 set(FLAGS
     "-Wall"
