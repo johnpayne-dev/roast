@@ -18,7 +18,7 @@ enum ir_type {
 
 enum ir_type ir_type_from_ast(struct semantics *semantics);
 
-int64_t ir_int_literal_from_ast(struct semantics *semantics);
+int64_t ir_int_literal_from_ast(struct semantics *semantics, bool negate);
 
 bool ir_bool_literal_from_ast(struct semantics *semantics);
 

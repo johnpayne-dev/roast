@@ -67,9 +67,33 @@ enum ir_type ir_type_from_ast(struct semantics *semantics)
 }
 
 // John
-int64_t ir_int_literal_from_ast(struct semantics *semantics)
+int64_t ir_int_literal_from_ast(struct semantics *semantics, bool negate)
 {
-	return 0;
+	g_assert(node->type == AST_NODE_TYPE_INT_LITERAL);
+	g_assert(node->token != NULL);
+
+	char *source_value = token_get_string(node->token, semantics->source);
+
+	uint64_t max_value = negate ? -INT64_MIN : INT64_MAX;
+
+	uint64_t value = 0;
+	uint64_t i = strlen(source_value);
+	uint64_t base = 1;
+	while (i-- > 0) {
+		uint64_t digit = source_value[i] - '0';
+		value += digit * base;
+
+		if (value > max_value) {
+			semantic_error(semantics, "Overflow in int literal",
+				       node);
+			break;
+		}
+
+		base *= 10;
+	}
+
+	g_free(source_value);
+	return (negate ? -1 : 1) * (int64_t)value;
 }
 
 bool ir_bool_literal_from_ast(struct semantics *semantics)
