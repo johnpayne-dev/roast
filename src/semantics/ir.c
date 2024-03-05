@@ -57,6 +57,27 @@ bool ir_bool_literal_from_ast(struct semantics *semantics)
 	return false;
 }
 
+static char handle_backslash_sequence(char *backlash_sequence)
+{
+	g_assert(backlash_sequence[0] == '\\');
+	switch (backlash_sequence[1]) {
+	case '\"':
+		return '\"';
+	case '\'':
+		return '\'';
+	case '\\':
+		return '\\';
+	case 't':
+		return '\t';
+	case 'n':
+		return '\n';
+	default:
+		break;
+	}
+	g_assert(!"Invalid backslash sequence");
+	return -1;
+}
+
 // John
 char ir_char_literal_from_ast(struct semantics *semantics)
 {
