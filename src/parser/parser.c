@@ -192,7 +192,7 @@ static struct ast_node *parse_type(struct parser *parser)
 				      &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_TYPE, token);
+	return ast_node_new_terminal(AST_NODE_TYPE_DATA_TYPE, token);
 }
 
 static struct ast_node *parse_binary_operator(struct parser *parser)

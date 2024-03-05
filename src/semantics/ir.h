@@ -10,13 +10,13 @@
 
 struct semantics;
 
-enum ir_type {
-	IR_TYPE_VOID,
-	IR_TYPE_BOOL,
-	IR_TYPE_INT,
+enum ir_data_type {
+	IR_DATA_TYPE_VOID,
+	IR_DATA_TYPE_BOOL,
+	IR_DATA_TYPE_INT,
 };
 
-enum ir_type ir_type_from_ast(struct semantics *semantics);
+enum ir_data_type ir_type_from_ast(struct semantics *semantics);
 
 int64_t ir_int_literal_from_ast(struct semantics *semantics, bool negate);
 
@@ -39,14 +39,14 @@ void ir_program_free(struct ir_program *program);
 
 struct ir_method {
 	bool imported;
-	enum ir_type return_type;
+	enum ir_data_type return_type;
 	char *identifier;
 	struct ir_method_argument *arguments;
 	struct ir_block *block;
 };
 
 struct ir_method_argument {
-	enum ir_type type;
+	enum ir_data_type type;
 	char *identifier;
 };
 
@@ -55,7 +55,7 @@ struct ir_method *ir_method_new_from_import(struct semantics *semantics);
 void ir_method_free(struct ir_method *method);
 
 struct ir_field {
-	enum ir_type type;
+	enum ir_data_type type;
 	bool constant;
 	char *identifier;
 	bool array;
@@ -64,7 +64,7 @@ struct ir_field {
 };
 
 struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
-			      enum ir_type type);
+			      enum ir_data_type type);
 void ir_field_free(struct ir_field *field);
 
 struct ir_block {
@@ -131,7 +131,7 @@ struct ir_method_call {
 };
 
 struct ir_method_call *ir_method_call_new(struct semantics *semantics,
-					  enum ir_type *out_data_type);
+					  enum ir_data_type *out_data_type);
 void ir_method_call_free(struct ir_method_call *method_call);
 
 struct ir_method_call_argument {
@@ -148,7 +148,7 @@ struct ir_method_call_argument {
 
 struct ir_method_call_argument *
 ir_method_call_argument_new(struct semantics *semantics,
-			    enum ir_type *out_data_type);
+			    enum ir_data_type *out_data_type);
 void ir_method_call_argument_free(struct ir_method_call_argument *argument);
 
 struct ir_if_statement {
@@ -185,7 +185,7 @@ struct ir_location {
 };
 
 struct ir_location *ir_location_new(struct semantics *semantics,
-				    enum ir_type *out_data_type);
+				    enum ir_data_type *out_data_type);
 void ir_location_free(struct ir_location *location);
 
 struct ir_expression {
@@ -211,7 +211,7 @@ struct ir_expression {
 };
 
 struct ir_expression *ir_expression_new(struct semantics *semantics,
-					enum ir_type *out_data_type);
+					enum ir_data_type *out_data_type);
 void ir_expression_free(struct ir_expression *expression);
 
 struct ir_binary_expression {
@@ -238,7 +238,7 @@ struct ir_binary_expression {
 
 struct ir_binary_expression *
 ir_binary_expression_new(struct semantics *semantics,
-			 enum ir_type *out_data_type);
+			 enum ir_data_type *out_data_type);
 void ir_binary_expression_free(struct ir_binary_expression *expression);
 
 struct ir_literal {
@@ -252,5 +252,5 @@ struct ir_literal {
 };
 
 struct ir_literal *ir_literal_new(struct semantics *semantics,
-				  enum ir_type *out_data_type);
+				  enum ir_data_type *out_data_type);
 void ir_literal_free(struct ir_literal *literal);

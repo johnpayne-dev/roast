@@ -45,19 +45,19 @@ static void declare_field(struct semantics *semantics, struct ir_field *field,
 		symbol_table_add_field(symbols, field->identifier, field);
 }
 
-enum ir_type ir_type_from_ast(struct semantics *semantics)
+enum ir_data_type ir_type_from_ast(struct semantics *semantics)
 {
 	struct ast_node *node = next_node(semantics);
 	g_assert(node->type == AST_NODE_TYPE_VOID ||
-		 node->type == AST_NODE_TYPE_TYPE);
+		 node->type == AST_NODE_TYPE_DATA_TYPE);
 	if (node->type == AST_NODE_TYPE_VOID) {
-		return IR_TYPE_VOID;
+		return IR_DATA_TYPE_VOID;
 	} else {
 		switch (node->token->type) {
 		case TOKEN_TYPE_KEYWORD_INT:
-			return IR_TYPE_INT;
+			return IR_DATA_TYPE_INT;
 		case TOKEN_TYPE_KEYWORD_BOOL:
-			return IR_TYPE_BOOL;
+			return IR_DATA_TYPE_BOOL;
 		default:
 			break;
 		}
@@ -219,7 +219,7 @@ static void iterate_fields(struct semantics *semantics, symbol_table_t *symbols,
 	if (constant)
 		node = next_node(semantics);
 
-	enum ir_type type = ir_type_from_ast(semantics);
+	enum ir_data_type type = ir_type_from_ast(semantics);
 
 	while (peek_node(semantics)->type == AST_NODE_TYPE_FIELD_IDENTIFIER) {
 		struct ir_field *field =
@@ -290,7 +290,7 @@ struct ir_method *ir_method_new_from_import(struct semantics *semantics)
 
 	struct ir_method *method = g_new(struct ir_method, 1);
 	method->imported = true;
-	method->return_type = IR_TYPE_INT;
+	method->return_type = IR_DATA_TYPE_INT;
 	method->identifier = ir_identifier_from_ast(semantics);
 	method->arguments = NULL;
 	method->block = NULL;
@@ -302,15 +302,15 @@ void ir_method_free(struct ir_method *method)
 }
 
 static int64_t *read_array_literal(struct semantics *semantics, size_t *length,
-				   enum ir_type *type)
+				   enum ir_data_type *type)
 {
 	g_assert(next_node(semantics)->type == AST_NODE_TYPE_ARRAY_LITERAL);
 
 	GArray *values_array = g_array_new(false, false, sizeof(int64_t));
-	enum ir_type array_type = -1;
+	enum ir_data_type array_type = -1;
 
 	while (peek_node(semantics)->type == AST_NODE_TYPE_LITERAL) {
-		enum ir_type literal_type;
+		enum ir_data_type literal_type;
 		struct ir_literal *literal =
 			ir_literal_new(semantics, &literal_type);
 
@@ -334,7 +334,7 @@ static int64_t *read_array_literal(struct semantics *semantics, size_t *length,
 }
 
 static int64_t *read_initializer(struct semantics *semantics, bool *array,
-				 size_t *length, enum ir_type *type)
+				 size_t *length, enum ir_data_type *type)
 {
 	g_assert(next_node(semantics)->type == AST_NODE_TYPE_INITIALIZER);
 
@@ -358,7 +358,7 @@ static int64_t *read_initializer(struct semantics *semantics, bool *array,
 }
 
 struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
-			      enum ir_type type)
+			      enum ir_data_type type)
 {
 	g_assert(next_node(semantics)->type == AST_NODE_TYPE_FIELD_IDENTIFIER);
 
@@ -388,7 +388,7 @@ struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
 	if (peek_node(semantics)->type == AST_NODE_TYPE_INITIALIZER) {
 		bool initializer_array;
 		size_t initializer_length;
-		enum ir_type initializer_type;
+		enum ir_data_type initializer_type;
 		int64_t *initializers = read_initializer(semantics,
 							 &initializer_array,
 							 &initializer_length,
@@ -530,7 +530,7 @@ void ir_assignment_free(struct ir_assignment *assignment)
 
 // John
 struct ir_method_call *ir_method_call_new(struct semantics *semantics,
-					  enum ir_type *out_data_type)
+					  enum ir_data_type *out_data_type)
 {
 	return NULL;
 }
@@ -571,7 +571,7 @@ void ir_while_statement_free(struct ir_while_statement *statement)
 
 // John
 struct ir_location *ir_location_new(struct semantics *semantics,
-				    enum ir_type *out_data_type)
+				    enum ir_data_type *out_data_type)
 {
 	return NULL;
 }
@@ -582,7 +582,7 @@ void ir_location_free(struct ir_location *location)
 
 // Karl
 struct ir_expression *ir_expression_new(struct semantics *semantics,
-					enum ir_type *out_data_type)
+					enum ir_data_type *out_data_type)
 {
 	return NULL;
 }
@@ -594,7 +594,7 @@ void ir_expression_free(struct ir_expression *expression)
 // John
 struct ir_binary_expression *
 ir_binary_expression_new(struct semantics *semantics,
-			 enum ir_type *out_data_type)
+			 enum ir_data_type *out_data_type)
 {
 	return NULL;
 }
@@ -604,7 +604,7 @@ void ir_binary_expression_free(struct ir_binary_expression *expression)
 }
 
 struct ir_literal *ir_literal_new(struct semantics *semantics,
-				  enum ir_type *out_data_type)
+				  enum ir_data_type *out_data_type)
 {
 	struct ast_node *node = next_node(semantics);
 	g_assert(node->type == AST_NODE_TYPE_INT_LITERAL ||
@@ -616,17 +616,17 @@ struct ir_literal *ir_literal_new(struct semantics *semantics,
 	case AST_NODE_TYPE_INT_LITERAL:
 		literal->type = IR_LITERAL_TYPE_INT;
 		literal->value = ir_int_literal_from_ast(semantics, false);
-		*out_data_type = IR_TYPE_INT;
+		*out_data_type = IR_DATA_TYPE_INT;
 		break;
 	case AST_NODE_TYPE_BOOL_LITERAL:
 		literal->type = IR_LITERAL_TYPE_BOOL;
 		literal->value = ir_bool_literal_from_ast(semantics);
-		*out_data_type = IR_TYPE_BOOL;
+		*out_data_type = IR_DATA_TYPE_BOOL;
 		break;
 	case AST_NODE_TYPE_CHAR_LITERAL:
 		literal->type = IR_LITERAL_TYPE_CHAR;
 		literal->value = ir_char_literal_from_ast(semantics);
-		*out_data_type = IR_TYPE_INT;
+		*out_data_type = IR_DATA_TYPE_INT;
 		break;
 	default:
 		g_assert(!"Couldn't extract literal from node");
