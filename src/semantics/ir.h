@@ -82,7 +82,8 @@ void ir_block_free(struct ir_block *block);
 
 struct ir_statement {
 	enum ir_statement_type {
-		IR_STATEMENT_TYPE_ASSIGN,
+		IR_STATEMENT_TYPE_ASSIGNMENT,
+		IR_STATEMENT_TYPE_METHOD_CALL,
 		IR_STATEMENT_TYPE_IF,
 		IR_STATEMENT_TYPE_FOR,
 		IR_STATEMENT_TYPE_WHILE,
@@ -92,12 +93,12 @@ struct ir_statement {
 	} type;
 
 	union {
-		struct ir_assignment *assign_statement;
-		struct ir_method_call *method_call_statement;
+		struct ir_assignment *assignment;
+		struct ir_method_call *method_call;
 		struct ir_if_statement *if_statement;
 		struct ir_for_statement *for_statement;
 		struct ir_while_statement *while_statement;
-		struct ir_expression *return_statement;
+		struct ir_expression *return_expression;
 	};
 };
 
