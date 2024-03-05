@@ -635,21 +635,6 @@ struct ir_literal *ir_literal_new(struct semantics *semantics,
 	return literal;
 }
 
-enum ir_type ir_literal_get_type(struct ir_literal *literal)
-{
-	switch (literal->type) {
-	case IR_LITERAL_TYPE_INT:
-		return IR_TYPE_INT;
-	case IR_LITERAL_TYPE_BOOL:
-		return IR_TYPE_BOOL;
-	case IR_LITERAL_TYPE_CHAR:
-		return IR_TYPE_INT;
-	default:
-		g_assert(!"Cannot get type of literal");
-		return -1;
-	}
-}
-
 void ir_literal_free(struct ir_literal *literal)
 {
 	g_free(literal);
