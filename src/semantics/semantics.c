@@ -20,7 +20,10 @@ int semantics_analyze(struct semantics *semantics, const char *source,
 	semantics->source = source;
 	semantics->nodes = g_array_new(false, false, sizeof(struct ast_node *));
 	semantics->position = 0;
+
 	linearize_ast(ast, semantics->nodes);
+	struct ast_node *terminating_node = ast_node_new(-1);
+	g_array_append_val(semantics->nodes, terminating_node);
 
 	struct ir_program *program = ir_program_new(semantics);
 
@@ -30,6 +33,7 @@ int semantics_analyze(struct semantics *semantics, const char *source,
 		*ir = program;
 
 	g_array_free(semantics->nodes, true);
+	ast_node_free(terminating_node);
 	return semantics->error ? -1 : 0;
 }
 

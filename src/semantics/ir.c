@@ -9,11 +9,27 @@ static void semantic_error(struct semantics *semantics, const char *message)
 
 static struct ast_node *next_node(struct semantics *semantics)
 {
-	if (semantics->position >= semantics->nodes->len)
-		return NULL;
-
+	g_assert(semantics->position < semantics->nodes->len);
 	return g_array_index(semantics->nodes, struct ast_node *,
 			     semantics->position++);
+}
+
+static void declare_method(struct semantics *semantics,
+			   struct ir_method *method, symbol_table_t *symbols)
+{
+	if (symbol_table_get_method(symbols, method->identifier))
+		semantic_error(semantics, "Redeclaration of method");
+	else
+		symbol_table_add_method(symbols, method->identifier, method);
+}
+
+static void declare_field(struct semantics *semantics, struct ir_field *field,
+			  symbol_table_t *symbols)
+{
+	if (symbol_table_get_field(symbols, field->identifier))
+		semantic_error(semantics, "Redeclaration of field");
+	else
+		symbol_table_add_field(symbols, field->identifier, field);
 }
 
 // Karl
