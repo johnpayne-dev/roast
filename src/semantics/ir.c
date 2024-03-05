@@ -176,10 +176,9 @@ char *ir_string_literal_from_ast(struct semantics *semantics)
 	g_assert(node->type == AST_NODE_TYPE_STRING_LITERAL);
 
 	char *token_string = token_get_string(node->token, semantics->source);
-	g_assert(token_string != NULL || token_string[0] == '\"');
+	g_assert(token_string[0] == '\"');
 
 	GString *string_literal = g_string_new(NULL);
-	g_assert(string_literal != NULL);
 
 	for (char *c = &token_string[1]; *c != '\"'; ++c) {
 		if (*c == '\\') {
@@ -196,8 +195,6 @@ char *ir_string_literal_from_ast(struct semantics *semantics)
 	char *char_data = string_literal->str;
 
 	g_string_free(string_literal, FALSE);
-
-	g_assert(char_data != NULL);
 
 	return char_data;
 }
@@ -605,32 +602,43 @@ void ir_binary_expression_free(struct ir_binary_expression *expression)
 struct ir_literal *ir_literal_new(struct semantics *semantics,
 				  enum ir_data_type *out_data_type)
 {
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_LITERAL);
+
 	struct ast_node *node = next_node(semantics);
-	g_assert(node->type == AST_NODE_TYPE_INT_LITERAL ||
-		 node->type == AST_NODE_TYPE_BOOL_LITERAL ||
-		 node->type == AST_NODE_TYPE_CHAR_LITERAL);
+
+	bool negate = false;
+
+	if (node->type == AST_NODE_TYPE_LITERAL_NEGATION) {
+		negate = true;
+		node = next_node(semantics);
+	}
+
 	struct ir_literal *literal = g_new(struct ir_literal, 1);
-	g_assert(literal != NULL);
+
 	switch (node->type) {
 	case AST_NODE_TYPE_INT_LITERAL:
 		literal->type = IR_LITERAL_TYPE_INT;
-		literal->value = ir_int_literal_from_ast(semantics, false);
+		literal->value = ir_int_literal_from_ast(semantics, negate);
 		*out_data_type = IR_DATA_TYPE_INT;
 		break;
+
 	case AST_NODE_TYPE_BOOL_LITERAL:
 		literal->type = IR_LITERAL_TYPE_BOOL;
 		literal->value = ir_bool_literal_from_ast(semantics);
 		*out_data_type = IR_DATA_TYPE_BOOL;
 		break;
+
 	case AST_NODE_TYPE_CHAR_LITERAL:
 		literal->type = IR_LITERAL_TYPE_CHAR;
 		literal->value = ir_char_literal_from_ast(semantics);
 		*out_data_type = IR_DATA_TYPE_INT;
 		break;
+
 	default:
 		g_assert(!"Couldn't extract literal from node");
 		return NULL;
 	}
+
 	return literal;
 }
 
