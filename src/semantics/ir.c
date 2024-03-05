@@ -153,10 +153,21 @@ static char handle_backslash_sequence(char *backlash_sequence)
 	return -1;
 }
 
-// John
 char ir_char_literal_from_ast(struct semantics *semantics)
 {
-	return '\0';
+	struct ast_node *node = next_node(semantics);
+	g_assert(node->type == AST_NODE_TYPE_CHAR_LITERAL);
+
+	char *source_value = token_get_string(node->token, semantics->source);
+
+	char value = '\0';
+	if (source_value[1] == '\\')
+		value = handle_backslash_sequence(source_value + 1);
+	else
+		value = source_value[1];
+
+	g_free(source_value);
+	return value;
 }
 
 char *ir_string_literal_from_ast(struct semantics *semantics)
