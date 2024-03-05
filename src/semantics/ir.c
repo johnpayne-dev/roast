@@ -200,17 +200,82 @@ char *ir_identifier_from_ast(struct semantics *semantics)
 
 struct ir_program *ir_program_new(struct semantics *semantics)
 {
-	return NULL;
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_PROGRAM);
+
+	struct ir_program *program = g_new(struct ir_program, 1);
+	program->symbols = symbol_table_new(NULL);
+	program->fields = g_array_new(false, false, sizeof(struct ir_field *));
+	program->methods =
+		g_array_new(false, false, sizeof(struct ir_method *));
+
+	struct ast_node *node = next_node(semantics);
+
+	while (node->type == AST_NODE_TYPE_IMPORT) {
+		struct ir_method *method = ir_method_new_from_import(semantics);
+		declare_method(semantics, method, program->symbols);
+		g_array_append_val(program->methods, method);
+		node = next_node(semantics);
+	}
+
+	while (node->type == AST_NODE_TYPE_FIELD) {
+		struct ir_field *field = ir_field_new(semantics);
+		declare_field(semantics, field, program->symbols);
+		g_array_append_val(program->fields, field);
+		node = next_node(semantics);
+	}
+
+	while (node->type == AST_NODE_TYPE_METHOD) {
+		struct ir_method *method = ir_method_new(semantics);
+		declare_method(semantics, method, program->symbols);
+		g_array_append_val(program->methods, method);
+		node = next_node(semantics);
+	}
+
+	g_assert(node->type == (uint32_t)-1);
+	return program;
 }
 
 void ir_program_free(struct ir_program *program)
 {
+	if (program == NULL)
+		return;
+
+	for (uint32_t i = 0; i < program->methods->len; i++) {
+		struct ir_method *method =
+			g_array_index(program->methods, struct ir_method *, i);
+		ir_method_free(method);
+	}
+	g_array_free(program->methods, true);
+
+	for (uint32_t i = 0; i < program->fields->len; i++) {
+		struct ir_field *field =
+			g_array_index(program->fields, struct ir_field *, i);
+		ir_field_free(field);
+	}
+	g_array_free(program->fields, true);
+
+	symbol_table_free(program->symbols);
+	g_free(program);
 }
 
 // Karl
 struct ir_method *ir_method_new(struct semantics *semantics)
 {
 	return NULL;
+}
+
+struct ir_method *ir_method_new_from_import(struct semantics *semantics)
+{
+	struct ast_node *node = next_node(semantics);
+	g_assert(node->type == AST_NODE_TYPE_IMPORT);
+
+	struct ir_method *method = g_new(struct ir_method, 1);
+	method->imported = true;
+	method->return_type = IR_TYPE_INT;
+	method->identifier = token_get_string(node->token, semantics->source);
+	method->arguments = NULL;
+	method->block = NULL;
+	return method;
 }
 
 void ir_method_free(struct ir_method *method)

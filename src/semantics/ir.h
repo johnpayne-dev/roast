@@ -30,15 +30,8 @@ char *ir_identifier_from_ast(struct semantics *semantics);
 
 struct ir_program {
 	symbol_table_t *symbols;
-
-	size_t import_count;
-	char **imports;
-
-	size_t field_count;
-	struct ir_field **fields;
-
-	size_t method_count;
-	struct ir_method **methods;
+	GArray *fields;
+	GArray *methods;
 };
 
 struct ir_program *ir_program_new(struct semantics *semantics);
@@ -58,6 +51,7 @@ struct ir_method_argument {
 };
 
 struct ir_method *ir_method_new(struct semantics *semantics);
+struct ir_method *ir_method_new_from_import(struct semantics *semantics);
 void ir_method_free(struct ir_method *method);
 
 struct ir_field {
