@@ -76,8 +76,7 @@ static uint64_t character_to_int(char character)
 		return character - '0';
 }
 
-static uint64_t string_to_int(struct semantics *semantics,
-			      struct ast_node *node, char *string,
+static uint64_t string_to_int(struct semantics *semantics, char *string,
 			      uint64_t max_value, uint64_t base)
 {
 	uint64_t value = 0;
@@ -89,8 +88,7 @@ static uint64_t string_to_int(struct semantics *semantics,
 		value += digit * place;
 
 		if (value > max_value) {
-			semantic_error(semantics, "Overflow in int literal",
-				       node);
+			semantic_error(semantics, "Overflow in int literal");
 			break;
 		}
 
@@ -102,6 +100,7 @@ static uint64_t string_to_int(struct semantics *semantics,
 
 int64_t ir_int_literal_from_ast(struct semantics *semantics, bool negate)
 {
+	struct ast_node *node = next_node(semantics);
 	g_assert(node->type == AST_NODE_TYPE_INT_LITERAL);
 	g_assert(node->token != NULL);
 
@@ -110,7 +109,7 @@ int64_t ir_int_literal_from_ast(struct semantics *semantics, bool negate)
 	uint64_t max_value = negate ? -INT64_MIN : INT64_MAX;
 	bool hex = node->token->type == TOKEN_TYPE_HEX_LITERAL;
 
-	uint64_t value = string_to_int(semantics, node,
+	uint64_t value = string_to_int(semantics,
 				       hex ? source_value : source_value + 2,
 				       max_value, hex ? 16 : 10);
 
