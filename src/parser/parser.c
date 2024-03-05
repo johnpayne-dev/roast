@@ -912,10 +912,18 @@ static struct ast_node *parse_method_argument(struct parser *parser)
 	return argument;
 }
 
+static struct ast_node *parse_void(struct parser *parser)
+{
+	if (!next_token(parser, TOKEN_TYPE_KEYWORD_VOID, NULL))
+		return NULL;
+
+	return ast_node_new(AST_NODE_TYPE_VOID);
+}
+
 static struct ast_node *parse_method(struct parser *parser)
 {
-	struct ast_node *type = NULL;
-	if (!next_token(parser, TOKEN_TYPE_KEYWORD_VOID, NULL)) {
+	struct ast_node *type = parse_void(parser);
+	if (type == NULL) {
 		type = parse_type(parser);
 		if (type == NULL)
 			return NULL;
