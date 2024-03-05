@@ -102,7 +102,6 @@ int64_t ir_int_literal_from_ast(struct semantics *semantics, bool negate)
 {
 	struct ast_node *node = next_node(semantics);
 	g_assert(node->type == AST_NODE_TYPE_INT_LITERAL);
-	g_assert(node->token != NULL);
 
 	char *source_value = token_get_string(node->token, semantics->source);
 
@@ -192,10 +191,31 @@ char *ir_string_literal_from_ast(struct semantics *semantics)
 	return char_data;
 }
 
-// John
 char *ir_identifier_from_ast(struct semantics *semantics)
 {
-	return NULL;
+	struct ast_node *node = next_node(semantics);
+	g_assert(node->type == AST_NODE_TYPE_IDENTIFIER);
+	return token_get_string(node->token, semantics->source);
+}
+
+static void iterate_fields(struct semantics *semantics, symbol_table_t *symbols,
+			   GArray *fields)
+{
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_FIELD);
+
+	struct ast_node *node = next_node(semantics);
+	bool constant = node->type == AST_NODE_TYPE_CONST;
+	if (constant)
+		node = next_node(semantics);
+
+	enum ir_type type = ir_type_from_ast(semantics);
+
+	while (peek_node(semantics)->type == AST_NODE_TYPE_FIELD_IDENTIFIER) {
+		struct ir_field *field =
+			ir_field_new(semantics, constant, type);
+		declare_field(semantics, field, symbols);
+		g_array_append_val(fields, field);
+	}
 }
 
 struct ir_program *ir_program_new(struct semantics *semantics)
@@ -214,11 +234,8 @@ struct ir_program *ir_program_new(struct semantics *semantics)
 		g_array_append_val(program->methods, method);
 	}
 
-	while (peek_node(semantics)->type == AST_NODE_TYPE_FIELD) {
-		struct ir_field *field = ir_field_new(semantics);
-		declare_field(semantics, field, program->symbols);
-		g_array_append_val(program->fields, field);
-	}
+	while (peek_node(semantics)->type == AST_NODE_TYPE_FIELD)
+		iterate_fields(semantics, program->symbols, program->fields);
 
 	while (peek_node(semantics)->type == AST_NODE_TYPE_METHOD) {
 		struct ir_method *method = ir_method_new(semantics);
@@ -232,9 +249,6 @@ struct ir_program *ir_program_new(struct semantics *semantics)
 
 void ir_program_free(struct ir_program *program)
 {
-	if (program == NULL)
-		return;
-
 	for (uint32_t i = 0; i < program->methods->len; i++) {
 		struct ir_method *method =
 			g_array_index(program->methods, struct ir_method *, i);
@@ -263,13 +277,10 @@ struct ir_method *ir_method_new_from_import(struct semantics *semantics)
 {
 	g_assert(next_node(semantics)->type == AST_NODE_TYPE_IMPORT);
 
-	struct ast_node *node = next_node(semantics);
-	g_assert(node->type == AST_NODE_TYPE_IDENTIFIER);
-
 	struct ir_method *method = g_new(struct ir_method, 1);
 	method->imported = true;
 	method->return_type = IR_TYPE_INT;
-	method->identifier = token_get_string(node->token, semantics->source);
+	method->identifier = ir_identifier_from_ast(semantics);
 	method->arguments = NULL;
 	method->block = NULL;
 	return method;
@@ -279,14 +290,134 @@ void ir_method_free(struct ir_method *method)
 {
 }
 
-// John
-struct ir_field *ir_field_new(struct semantics *semantics)
+static int64_t *read_array_literal(struct semantics *semantics, size_t *length,
+				   enum ir_type *type)
 {
-	return NULL;
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_ARRAY_LITERAL);
+
+	GArray *values_array = g_array_new(false, false, sizeof(int64_t));
+	enum ir_type array_type = -1;
+
+	while (peek_node(semantics)->type == AST_NODE_TYPE_LITERAL) {
+		struct ir_literal *literal = ir_literal_new(semantics);
+		enum ir_type literal_type = ir_literal_get_type(literal);
+		int64_t value = ir_literal_get_value(literal);
+
+		if (array_type == (uint32_t)-1)
+			array_type = literal_type;
+		else if (array_type != literal_type)
+			semantic_error(
+				semantics,
+				"Array literal does not contain uniform types");
+
+		g_array_append_val(values_array, value);
+		ir_literal_free(literal);
+	}
+
+	int64_t *values = &g_array_index(values_array, int64_t, 0);
+	*length = values_array->len;
+	*type = array_type;
+
+	g_array_free(values_array, false);
+	return values;
+}
+
+static int64_t *read_initializer(struct semantics *semantics, bool *array,
+				 size_t *length, enum ir_type *type)
+{
+	if (peek_node(semantics)->type == AST_NODE_TYPE_LITERAL) {
+		int64_t *value = g_new(int64_t, 1);
+
+		struct ir_literal *literal = ir_literal_new(semantics);
+		*type = literal->type;
+		*array = false;
+		*length = 1;
+		*value = ir_literal_get_value(literal);
+		ir_literal_free(literal);
+
+		return value;
+	} else if (peek_node(semantics)->type == AST_NODE_TYPE_ARRAY_LITERAL) {
+		*array = true;
+		return read_array_literal(semantics, length, type);
+	} else {
+		return NULL;
+	}
+}
+
+struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
+			      enum ir_type type)
+{
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_FIELD_IDENTIFIER);
+
+	struct ir_field *field = g_new(struct ir_field, 1);
+	field->constant = constant;
+	field->type = type;
+	field->identifier = ir_identifier_from_ast(semantics);
+
+	if (peek_node(semantics)->type == AST_NODE_TYPE_INT_LITERAL) {
+		field->array = true;
+		field->array_length = ir_int_literal_from_ast(semantics, false);
+		if (field->array_length < 1) {
+			semantic_error(semantics,
+				       "Array length must be greater than 0");
+			field->array_length = 1;
+		}
+	} else if (peek_node(semantics)->type ==
+		   AST_NODE_TYPE_EMPTY_ARRAY_LENGTH) {
+		field->array = true;
+		field->array_length = 0;
+		next_node(semantics);
+	} else {
+		field->array = false;
+		field->array_length = 0;
+	}
+
+	bool initializer_array;
+	size_t initializer_length;
+	enum ir_type initializer_type;
+	int64_t *initializers = read_initializer(semantics, &initializer_array,
+						 &initializer_length,
+						 &initializer_type);
+
+	if (initializers != NULL) {
+		if (initializer_array && field->array &&
+		    field->array_length > 0)
+			semantic_error(
+				semantics,
+				"Array initializer cannot be used to initialize field with declared length");
+		if (initializer_array && !field->array)
+			semantic_error(
+				semantics,
+				"Array initializer cannot be used to initialize non-array field");
+		if (!initializer_array && field->array)
+			semantic_error(
+				semantics,
+				"Non-array initializer cannot be used to initialize array field");
+		if (initializer_type != field->type)
+			semantic_error(
+				semantics,
+				"Initializer type does not match field type");
+
+		if (initializer_array)
+			field->array_length = initializer_length;
+		field->initializers = initializers;
+	} else {
+		if (field->array && field->array_length == 0)
+			semantic_error(
+				semantics,
+				"Missing array literal for field declaration");
+
+		field->initializers = NULL;
+	}
+
+	return field;
 }
 
 void ir_field_free(struct ir_field *field)
 {
+	g_free(field->identifier);
+	g_free(field->initializers);
+	g_free(field);
 }
 
 // Karl
@@ -420,6 +551,36 @@ struct ir_literal *ir_literal_new(struct semantics *semantics,
 		return NULL;
 	}
 	return literal;
+}
+
+int64_t ir_literal_get_value(struct ir_literal *literal)
+{
+	switch (literal->type) {
+	case IR_LITERAL_TYPE_INT:
+		return literal->int_literal;
+	case IR_LITERAL_TYPE_BOOL:
+		return literal->bool_literal;
+	case IR_LITERAL_TYPE_CHAR:
+		return literal->char_literal;
+	default:
+		g_assert(!"Cannot get value of literal");
+		return -1;
+	}
+}
+
+enum ir_type ir_literal_get_type(struct ir_literal *literal)
+{
+	switch (literal->type) {
+	case IR_LITERAL_TYPE_INT:
+		return IR_TYPE_INT;
+	case IR_LITERAL_TYPE_BOOL:
+		return IR_TYPE_BOOL;
+	case IR_LITERAL_TYPE_CHAR:
+		return IR_TYPE_INT;
+	default:
+		g_assert(!"Cannot get type of literal");
+		return -1;
+	}
 }
 
 void ir_literal_free(struct ir_literal *literal)

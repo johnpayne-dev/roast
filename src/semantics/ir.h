@@ -63,7 +63,8 @@ struct ir_field {
 	int64_t *initializers;
 };
 
-struct ir_field *ir_field_new(struct semantics *semantics);
+struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
+			      enum ir_type type);
 void ir_field_free(struct ir_field *field);
 
 struct ir_block {
@@ -234,6 +235,13 @@ struct ir_literal {
 	};
 };
 
+<<<<<<< HEAD
 struct ir_literal *ir_literal_new(struct semantics *semantics,
 				  enum ir_type *out_data_type);
 void ir_literal_free(struct ir_literal *literal);
+=======
+struct ir_literal *ir_literal_new(struct semantics *semantics);
+int64_t ir_literal_get_value(struct ir_literal *literal);
+enum ir_type ir_literal_get_type(struct ir_literal *literal);
+void ir_literal_free(struct ir_literal *expression);
+>>>>>>> 0e87203 (implement ir_field semantics)
