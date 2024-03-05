@@ -310,8 +310,9 @@ static int64_t *read_array_literal(struct semantics *semantics, size_t *length,
 	enum ir_type array_type = -1;
 
 	while (peek_node(semantics)->type == AST_NODE_TYPE_LITERAL) {
-		struct ir_literal *literal = ir_literal_new(semantics);
-		enum ir_type literal_type = ir_literal_get_type(literal);
+		enum ir_type literal_type;
+		struct ir_literal *literal =
+			ir_literal_new(semantics, &literal_type);
 		int64_t value = ir_literal_get_value(literal);
 
 		if (array_type == (uint32_t)-1)
@@ -336,11 +337,12 @@ static int64_t *read_array_literal(struct semantics *semantics, size_t *length,
 static int64_t *read_initializer(struct semantics *semantics, bool *array,
 				 size_t *length, enum ir_type *type)
 {
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_INITIALIZER);
+
 	if (peek_node(semantics)->type == AST_NODE_TYPE_LITERAL) {
 		int64_t *value = g_new(int64_t, 1);
 
-		struct ir_literal *literal = ir_literal_new(semantics);
-		*type = literal->type;
+		struct ir_literal *literal = ir_literal_new(semantics, type);
 		*array = false;
 		*length = 1;
 		*value = ir_literal_get_value(literal);
@@ -351,6 +353,7 @@ static int64_t *read_initializer(struct semantics *semantics, bool *array,
 		*array = true;
 		return read_array_literal(semantics, length, type);
 	} else {
+		g_assert(!"Invalid initializer type");
 		return NULL;
 	}
 }
@@ -383,14 +386,15 @@ struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
 		field->array_length = 0;
 	}
 
-	bool initializer_array;
-	size_t initializer_length;
-	enum ir_type initializer_type;
-	int64_t *initializers = read_initializer(semantics, &initializer_array,
-						 &initializer_length,
-						 &initializer_type);
+	if (peek_node(semantics)->type == AST_NODE_TYPE_INITIALIZER) {
+		bool initializer_array;
+		size_t initializer_length;
+		enum ir_type initializer_type;
+		int64_t *initializers = read_initializer(semantics,
+							 &initializer_array,
+							 &initializer_length,
+							 &initializer_type);
 
-	if (initializers != NULL) {
 		if (initializer_array && field->array &&
 		    field->array_length > 0)
 			semantic_error(
@@ -443,6 +447,8 @@ void ir_block_free(struct ir_block *block)
 
 struct ir_statement *ir_statement_new(struct semantics *semantics)
 {
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_STATEMENT);
+
 	struct ir_statement *statement = g_new(struct ir_statement, 1);
 
 	switch (peek_node(semantics)->type) {
@@ -605,7 +611,7 @@ struct ir_literal *ir_literal_new(struct semantics *semantics,
 	switch (node->type) {
 	case AST_NODE_TYPE_INT_LITERAL:
 		literal->type = IR_LITERAL_TYPE_INT;
-		literal->int_literal = ir_int_literal_from_ast(semantics);
+		literal->int_literal = ir_int_literal_from_ast(semantics, false);
 		*out_data_type = IR_TYPE_INT;
 		break;
 	case AST_NODE_TYPE_BOOL_LITERAL:

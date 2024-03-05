@@ -290,26 +290,37 @@ static struct ast_node *parse_array_literal(struct parser *parser)
 
 static struct ast_node *parse_initializer(struct parser *parser)
 {
-	struct ast_node *literal = NULL;
-	if ((literal = parse_array_literal(parser)))
-		return literal;
-	else if ((literal = parse_literal(parser)))
-		return literal;
-	else
+	struct ast_node *initializer = ast_node_new(AST_NODE_TYPE_INITIALIZER);
+
+	struct ast_node *child;
+	if ((child = parse_array_literal(parser))) {
+	} else if ((child = parse_literal(parser))) {
+	} else {
+		ast_node_free(initializer);
 		return NULL;
+	}
+
+	ast_node_add_child(initializer, child);
+	return initializer;
 }
 
 static struct ast_node *parse_expression(struct parser *parser);
 
 static struct ast_node *parse_method_call_argument(struct parser *parser)
 {
-	struct ast_node *argument = NULL;
-	if ((argument = parse_string_literal(parser)))
-		return argument;
-	else if ((argument = parse_expression(parser)))
-		return argument;
-	else
+	struct ast_node *argument =
+		ast_node_new(AST_NODE_TYPE_METHOD_CALL_ARGUMENT);
+
+	struct ast_node *child;
+	if ((child = parse_string_literal(parser))) {
+	} else if ((child = parse_expression(parser))) {
+	} else {
+		ast_node_free(argument);
 		return NULL;
+	}
+
+	ast_node_add_child(argument, child);
+	return argument;
 }
 
 static struct ast_node *parse_method_call(struct parser *parser)
@@ -565,13 +576,18 @@ static struct ast_node *parse_unary_expression(struct parser *parser)
 static struct ast_node *parse_expression_with_length(struct parser *parser,
 						     uint32_t length)
 {
-	struct ast_node *expression;
-	if ((expression = parse_binary_expression(parser, length)))
-		return expression;
-	else if ((expression = parse_unary_expression(parser)))
-		return expression;
-	else
+	struct ast_node *expression = ast_node_new(AST_NODE_TYPE_EXPRESSION);
+
+	struct ast_node *child;
+	if ((child = parse_binary_expression(parser, length))) {
+	} else if ((child = parse_unary_expression(parser))) {
+	} else {
+		ast_node_free(expression);
 		return NULL;
+	}
+
+	ast_node_add_child(expression, child);
+	return expression;
 }
 
 static struct ast_node *parse_expression(struct parser *parser)
@@ -851,25 +867,24 @@ static struct ast_node *parse_assign_statement(struct parser *parser)
 
 static struct ast_node *parse_statement(struct parser *parser)
 {
-	struct ast_node *statement;
-	if ((statement = parse_if_statement(parser)))
-		return statement;
-	else if ((statement = parse_for_statement(parser)))
-		return statement;
-	else if ((statement = parse_while_statement(parser)))
-		return statement;
-	else if ((statement = parse_return_statement(parser)))
-		return statement;
-	else if ((statement = parse_break_statement(parser)))
-		return statement;
-	else if ((statement = parse_continue_statement(parser)))
-		return statement;
-	else if ((statement = parse_method_call_statement(parser)))
-		return statement;
-	else if ((statement = parse_assign_statement(parser)))
-		return statement;
-	else
+	struct ast_node *statement = ast_node_new(AST_NODE_TYPE_STATEMENT);
+
+	struct ast_node *child;
+	if ((child = parse_if_statement(parser))) {
+	} else if ((child = parse_for_statement(parser))) {
+	} else if ((child = parse_while_statement(parser))) {
+	} else if ((child = parse_return_statement(parser))) {
+	} else if ((child = parse_break_statement(parser))) {
+	} else if ((child = parse_continue_statement(parser))) {
+	} else if ((child = parse_method_call_statement(parser))) {
+	} else if ((child = parse_assign_statement(parser))) {
+	} else {
+		ast_node_free(statement);
 		return NULL;
+	}
+
+	ast_node_add_child(statement, child);
+	return statement;
 }
 
 static struct ast_node *parse_field(struct parser *parser);
