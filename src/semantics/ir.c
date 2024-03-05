@@ -26,6 +26,9 @@ static void declare_method(struct semantics *semantics,
 {
 	if (symbol_table_get_method(symbols, method->identifier))
 		semantic_error(semantics, "Redeclaration of method");
+	else if (symbol_table_get_field(symbols, method->identifier))
+		semantic_error(semantics,
+			       "Identifier already declared as field");
 	else
 		symbol_table_add_method(symbols, method->identifier, method);
 }
@@ -35,6 +38,9 @@ static void declare_field(struct semantics *semantics, struct ir_field *field,
 {
 	if (symbol_table_get_field(symbols, field->identifier))
 		semantic_error(semantics, "Redeclaration of field");
+	else if (symbol_table_get_method(symbols, field->identifier))
+		semantic_error(semantics,
+			       "Identifier already declared as method");
 	else
 		symbol_table_add_field(symbols, field->identifier, field);
 }
