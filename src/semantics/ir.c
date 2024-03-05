@@ -14,6 +14,12 @@ static struct ast_node *next_node(struct semantics *semantics)
 			     semantics->position++);
 }
 
+static struct ast_node *peek_node(struct semantics *semantics)
+{
+	g_assert(semantics->position < semantics->nodes->len);
+	return g_array_index(semantics->nodes, struct ast_node *, semantics->position);
+}
+
 static void declare_method(struct semantics *semantics,
 			   struct ir_method *method, symbol_table_t *symbols)
 {

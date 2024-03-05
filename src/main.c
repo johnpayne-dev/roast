@@ -4,6 +4,7 @@
 
 #include "scanner/scanner.h"
 #include "parser/parser.h"
+#include "semantics/semantics.h"
 
 struct options {
 	char *target;
@@ -126,10 +127,19 @@ static int run_parse_target(char *source, struct ast_node **ast)
 	return result;
 }
 
-static int run_intermediate_target(char *source)
+static int run_intermediate_target(char *source, struct ir_program **ir)
 {
-	g_printerr("inter target not implemented yet.\n");
-	return -1;
+	struct ast_node *ast;
+	if (run_parse_target(source, &ast) != 0)
+		return -1;
+
+	struct semantics *semantics = semantics_new();
+
+	int result = semantics_analyze(semantics, source, ast, ir);
+
+	semantics_free(semantics);
+	ast_node_free(ast);
+	return result;
 }
 
 static int run_assembly_target(char *source)
@@ -148,7 +158,7 @@ static int run_target(char *target, char *source)
 	if (g_strcmp0(target, "parse") == 0)
 		return run_parse_target(source, NULL);
 	if (g_strcmp0(target, "inter") == 0)
-		return run_intermediate_target(source);
+		return run_intermediate_target(source, NULL);
 	if (g_strcmp0(target, "assembly") == 0)
 		return run_assembly_target(source);
 
