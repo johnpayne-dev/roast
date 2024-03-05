@@ -72,10 +72,20 @@ int64_t ir_int_literal_from_ast(struct semantics *semantics)
 	return 0;
 }
 
-// Karl
 bool ir_bool_literal_from_ast(struct semantics *semantics)
 {
-	return false;
+	struct ast_node *node = next_node(semantics);
+	g_assert(node->type == AST_NODE_TYPE_BOOL_LITERAL);
+	switch (node->token->type) {
+	case TOKEN_TYPE_KEYWORD_TRUE:
+		return true;
+	case TOKEN_TYPE_KEYWORD_FALSE:
+		return false;
+	default:
+		break;
+	}
+	g_assert(!"Couldn't extract bool literal from ast node");
+	return -1;
 }
 
 static char handle_backslash_sequence(char *backlash_sequence)
