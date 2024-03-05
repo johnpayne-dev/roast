@@ -45,10 +45,25 @@ static void declare_field(struct semantics *semantics, struct ir_field *field,
 		symbol_table_add_field(symbols, field->identifier, field);
 }
 
-// Karl
 enum ir_type ir_type_from_ast(struct semantics *semantics)
 {
-	return 0;
+	struct ast_node *node = next_node(semantics);
+	g_assert(node->type == AST_NODE_TYPE_VOID ||
+		 node->type == AST_NODE_TYPE_TYPE);
+	if (node->type == AST_NODE_TYPE_VOID) {
+		return IR_TYPE_VOID;
+	} else {
+		switch (node->token->type) {
+		case TOKEN_TYPE_KEYWORD_INT:
+			return IR_TYPE_INT;
+		case TOKEN_TYPE_KEYWORD_BOOL:
+			return IR_TYPE_BOOL;
+		default:
+			break;
+		}
+	}
+	g_assert(!"Couldn't extract data type from ast node");
+	return -1;
 }
 
 // John
