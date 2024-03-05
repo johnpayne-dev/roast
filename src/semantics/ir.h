@@ -50,6 +50,7 @@ void ir_program_free(struct ir_program *program);
 struct ir_method {
 	bool imported;
 	enum ir_type return_type;
+	char *identifier;
 	struct ir_method_argument *arguments;
 	struct ir_block *block;
 };
@@ -66,6 +67,7 @@ void ir_method_free(struct ir_method *method);
 struct ir_field {
 	enum ir_type type;
 	bool constant;
+	char *identifier;
 	bool array;
 	size_t array_length;
 	int64_t *initializers;
