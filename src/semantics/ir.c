@@ -214,10 +214,9 @@ static void iterate_fields(struct semantics *semantics, symbol_table_t *symbols,
 {
 	g_assert(next_node(semantics)->type == AST_NODE_TYPE_FIELD);
 
-	struct ast_node *node = next_node(semantics);
-	bool constant = node->type == AST_NODE_TYPE_CONST;
+	bool constant = peek_node(semantics)->type == AST_NODE_TYPE_CONST;
 	if (constant)
-		node = next_node(semantics);
+		next_node(semantics);
 
 	enum ir_data_type type = ir_type_from_ast(semantics);
 
