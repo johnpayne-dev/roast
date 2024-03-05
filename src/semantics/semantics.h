@@ -6,6 +6,8 @@
 struct semantics {
 	bool error;
 	const char *source;
+	GArray *nodes;
+	uint32_t position;
 };
 
 struct semantics *semantics_new(void);
