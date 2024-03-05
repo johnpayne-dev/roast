@@ -466,7 +466,8 @@ struct ir_statement *ir_statement_new(struct semantics *semantics)
 		break;
 	case AST_NODE_TYPE_RETURN_STATEMENT:
 		statement->type = IR_STATEMENT_TYPE_RETURN;
-		statement->return_expression = ir_expression_new(semantics);
+		statement->return_expression =
+			ir_expression_new(semantics, NULL);
 		break;
 	case AST_NODE_TYPE_BREAK_STATEMENT:
 		statement->type = IR_STATEMENT_TYPE_BREAK;
@@ -476,7 +477,7 @@ struct ir_statement *ir_statement_new(struct semantics *semantics)
 		break;
 	case AST_NODE_TYPE_METHOD_CALL:
 		statement->type = IR_STATEMENT_TYPE_METHOD_CALL;
-		statement->method_call = ir_method_call_new(semantics);
+		statement->method_call = ir_method_call_new(semantics, NULL);
 		break;
 	case AST_NODE_TYPE_ASSIGN_STATEMENT:
 		statement->type = IR_STATEMENT_TYPE_ASSIGNMENT;
@@ -529,7 +530,8 @@ void ir_assignment_free(struct ir_assignment *assignment)
 }
 
 // John
-struct ir_method_call *ir_method_call_new(struct semantics *semantics)
+struct ir_method_call *ir_method_call_new(struct semantics *semantics,
+					  enum ir_type *out_data_type)
 {
 	return NULL;
 }
@@ -569,7 +571,8 @@ void ir_while_statement_free(struct ir_while_statement *statement)
 }
 
 // John
-struct ir_location *ir_location_new(struct semantics *semantics)
+struct ir_location *ir_location_new(struct semantics *semantics,
+				    enum ir_type *out_data_type)
 {
 	return NULL;
 }
@@ -579,7 +582,8 @@ void ir_location_free(struct ir_location *location)
 }
 
 // Karl
-struct ir_expression *ir_expression_new(struct semantics *semantics)
+struct ir_expression *ir_expression_new(struct semantics *semantics,
+					enum ir_type *out_data_type)
 {
 	return NULL;
 }
@@ -590,7 +594,8 @@ void ir_expression_free(struct ir_expression *expression)
 
 // John
 struct ir_binary_expression *
-ir_binary_expression_new(struct semantics *semantics)
+ir_binary_expression_new(struct semantics *semantics,
+			 enum ir_type *out_data_type)
 {
 	return NULL;
 }

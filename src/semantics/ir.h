@@ -127,11 +127,29 @@ void ir_assignment_free(struct ir_assignment *assignment);
 
 struct ir_method_call {
 	char *identifier;
-	struct ir_expression **arguments;
+	GArray *arguments;
 };
 
-struct ir_method_call *ir_method_call_new(struct semantics *semantics);
+struct ir_method_call *ir_method_call_new(struct semantics *semantics,
+					  enum ir_type *out_data_type);
 void ir_method_call_free(struct ir_method_call *method_call);
+
+struct ir_method_call_argument {
+	enum {
+		IR_METHOD_CALL_ARGUMENT_TYPE_STRING,
+		IR_METHOD_CALL_ARGUMENT_TYPE_EXPRESSION,
+	} type;
+
+	union {
+		char *string;
+		struct ir_expression *expression;
+	};
+};
+
+struct ir_method_call_argument *
+ir_method_call_argument_new(struct semantics *semantics,
+			    enum ir_type *out_data_type);
+void ir_method_call_argument_free(struct ir_method_call_argument *argument);
 
 struct ir_if_statement {
 	struct ir_expression *condition;
@@ -166,7 +184,8 @@ struct ir_location {
 	struct ir_expression *index;
 };
 
-struct ir_location *ir_location_new(struct semantics *semantics);
+struct ir_location *ir_location_new(struct semantics *semantics,
+				    enum ir_type *out_data_type);
 void ir_location_free(struct ir_location *location);
 
 struct ir_expression {
@@ -191,7 +210,8 @@ struct ir_expression {
 	};
 };
 
-struct ir_expression *ir_expression_new(struct semantics *semantics);
+struct ir_expression *ir_expression_new(struct semantics *semantics,
+					enum ir_type *out_data_type);
 void ir_expression_free(struct ir_expression *expression);
 
 struct ir_binary_expression {
@@ -217,7 +237,8 @@ struct ir_binary_expression {
 };
 
 struct ir_binary_expression *
-ir_binary_expression_new(struct semantics *semantics);
+ir_binary_expression_new(struct semantics *semantics,
+			 enum ir_type *out_data_type);
 void ir_binary_expression_free(struct ir_binary_expression *expression);
 
 struct ir_literal {
