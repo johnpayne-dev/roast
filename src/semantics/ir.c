@@ -208,30 +208,25 @@ struct ir_program *ir_program_new(struct semantics *semantics)
 	program->methods =
 		g_array_new(false, false, sizeof(struct ir_method *));
 
-	struct ast_node *node = next_node(semantics);
-
-	while (node->type == AST_NODE_TYPE_IMPORT) {
+	while (peek_node(semantics)->type == AST_NODE_TYPE_IMPORT) {
 		struct ir_method *method = ir_method_new_from_import(semantics);
 		declare_method(semantics, method, program->symbols);
 		g_array_append_val(program->methods, method);
-		node = next_node(semantics);
 	}
 
-	while (node->type == AST_NODE_TYPE_FIELD) {
+	while (peek_node(semantics)->type == AST_NODE_TYPE_FIELD) {
 		struct ir_field *field = ir_field_new(semantics);
 		declare_field(semantics, field, program->symbols);
 		g_array_append_val(program->fields, field);
-		node = next_node(semantics);
 	}
 
-	while (node->type == AST_NODE_TYPE_METHOD) {
+	while (peek_node(semantics)->type == AST_NODE_TYPE_METHOD) {
 		struct ir_method *method = ir_method_new(semantics);
 		declare_method(semantics, method, program->symbols);
 		g_array_append_val(program->methods, method);
-		node = next_node(semantics);
 	}
 
-	g_assert(node->type == (uint32_t)-1);
+	g_assert(peek_node(semantics)->type == (uint32_t)-1);
 	return program;
 }
 
@@ -266,8 +261,10 @@ struct ir_method *ir_method_new(struct semantics *semantics)
 
 struct ir_method *ir_method_new_from_import(struct semantics *semantics)
 {
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_IMPORT);
+
 	struct ast_node *node = next_node(semantics);
-	g_assert(node->type == AST_NODE_TYPE_IMPORT);
+	g_assert(node->type == AST_NODE_TYPE_IDENTIFIER);
 
 	struct ir_method *method = g_new(struct ir_method, 1);
 	method->imported = true;
