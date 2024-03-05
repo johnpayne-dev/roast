@@ -70,6 +70,11 @@ char *ir_string_literal_from_ast(struct semantics *semantics)
 }
 
 // John
+char *ir_identifier_from_ast(struct semantics *semantics)
+{
+	return NULL;
+}
+
 struct ir_program *ir_program_new(struct semantics *semantics)
 {
 	return NULL;

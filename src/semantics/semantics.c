@@ -9,9 +9,6 @@ struct semantics *semantics_new(void)
 static void linearize_ast(struct ast_node *ast, GArray *nodes)
 {
 	g_array_append_val(nodes, ast);
-	if (ast == NULL)
-		return;
-
 	for (uint32_t i = 0; i < ast_node_child_count(ast); i++)
 		linearize_ast(ast_node_get_child(ast, i), nodes);
 }

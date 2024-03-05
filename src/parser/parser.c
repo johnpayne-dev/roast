@@ -977,6 +977,8 @@ static struct ast_node *parse_field_identifier(struct parser *parser)
 
 	if (next_token(parser, TOKEN_TYPE_OPEN_SQUARE_BRACKET, NULL)) {
 		struct ast_node *array_length = parse_int_literal(parser);
+		if (array_length == NULL)
+			array_length = ast_node_new(AST_NODE_TYPE_EMPTY_ARRAY_LENGTH);
 		ast_node_add_child(field_identifier, array_length);
 
 		if (!next_token(parser, TOKEN_TYPE_CLOSE_SQUARE_BRACKET, NULL))
@@ -1019,7 +1021,8 @@ static struct ast_node *parse_field(struct parser *parser)
 	}
 
 	struct ast_node *field = ast_node_new(AST_NODE_TYPE_FIELD);
-	ast_node_add_child(field, constant);
+	if (constant != NULL)
+		ast_node_add_child(field, constant);
 	ast_node_add_child(field, type);
 
 	while (true) {

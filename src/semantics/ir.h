@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <glib.h>
 
 #include "semantics/symbol_table.h"
 #include "parser/ast.h"
@@ -24,6 +25,8 @@ bool ir_bool_literal_from_ast(struct semantics *semantics);
 char ir_char_literal_from_ast(struct semantics *semantics);
 
 char *ir_string_literal_from_ast(struct semantics *semantics);
+
+char *ir_identifier_from_ast(struct semantics *semantics);
 
 struct ir_program {
 	symbol_table_t *symbols;
