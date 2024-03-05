@@ -441,14 +441,75 @@ void ir_block_free(struct ir_block *block)
 {
 }
 
-// John
 struct ir_statement *ir_statement_new(struct semantics *semantics)
 {
-	return NULL;
+	struct ir_statement *statement = g_new(struct ir_statement, 1);
+
+	switch (peek_node(semantics)->type) {
+	case AST_NODE_TYPE_IF_STATEMENT:
+		statement->type = IR_STATEMENT_TYPE_IF;
+		statement->if_statement = ir_if_statement_new(semantics);
+		break;
+	case AST_NODE_TYPE_FOR_STATEMENT:
+		statement->type = IR_STATEMENT_TYPE_FOR;
+		statement->for_statement = ir_for_statement_new(semantics);
+		break;
+	case AST_NODE_TYPE_WHILE_STATEMENT:
+		statement->type = IR_STATEMENT_TYPE_WHILE;
+		statement->while_statement = ir_while_statement_new(semantics);
+		break;
+	case AST_NODE_TYPE_RETURN_STATEMENT:
+		statement->type = IR_STATEMENT_TYPE_RETURN;
+		statement->return_expression = ir_expression_new(semantics);
+		break;
+	case AST_NODE_TYPE_BREAK_STATEMENT:
+		statement->type = IR_STATEMENT_TYPE_BREAK;
+		break;
+	case AST_NODE_TYPE_CONTINUE_STATEMENT:
+		statement->type = IR_STATEMENT_TYPE_CONTINUE;
+		break;
+	case AST_NODE_TYPE_METHOD_CALL:
+		statement->type = IR_STATEMENT_TYPE_METHOD_CALL;
+		statement->method_call = ir_method_call_new(semantics);
+		break;
+	case AST_NODE_TYPE_ASSIGN_STATEMENT:
+		statement->type = IR_STATEMENT_TYPE_ASSIGNMENT;
+		statement->assignment = ir_assignment_new(semantics);
+		break;
+	default:
+		statement->type = -1;
+		g_assert(!"Invalid statement type");
+		break;
+	}
+
+	return statement;
 }
 
 void ir_statement_free(struct ir_statement *statement)
 {
+	switch (statement->type) {
+	case IR_STATEMENT_TYPE_IF:
+		ir_if_statement_free(statement->if_statement);
+		break;
+	case IR_STATEMENT_TYPE_FOR:
+		ir_for_statement_free(statement->for_statement);
+		break;
+	case IR_STATEMENT_TYPE_WHILE:
+		ir_while_statement_free(statement->while_statement);
+		break;
+	case IR_STATEMENT_TYPE_RETURN:
+		ir_expression_free(statement->return_expression);
+		break;
+	case IR_STATEMENT_TYPE_METHOD_CALL:
+		ir_method_call_free(statement->method_call);
+		break;
+	case IR_STATEMENT_TYPE_ASSIGNMENT:
+		ir_assignment_free(statement->assignment);
+		break;
+	default:
+		break;
+	}
+	g_free(statement);
 }
 
 // Karl
