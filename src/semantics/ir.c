@@ -313,7 +313,6 @@ static int64_t *read_array_literal(struct semantics *semantics, size_t *length,
 		enum ir_type literal_type;
 		struct ir_literal *literal =
 			ir_literal_new(semantics, &literal_type);
-		int64_t value = ir_literal_get_value(literal);
 
 		if (array_type == (uint32_t)-1)
 			array_type = literal_type;
@@ -322,7 +321,7 @@ static int64_t *read_array_literal(struct semantics *semantics, size_t *length,
 				semantics,
 				"Array literal does not contain uniform types");
 
-		g_array_append_val(values_array, value);
+		g_array_append_val(values_array, literal->value);
 		ir_literal_free(literal);
 	}
 
@@ -345,7 +344,7 @@ static int64_t *read_initializer(struct semantics *semantics, bool *array,
 		struct ir_literal *literal = ir_literal_new(semantics, type);
 		*array = false;
 		*length = 1;
-		*value = ir_literal_get_value(literal);
+		*value = literal->value;
 		ir_literal_free(literal);
 
 		return value;
@@ -616,17 +615,17 @@ struct ir_literal *ir_literal_new(struct semantics *semantics,
 	switch (node->type) {
 	case AST_NODE_TYPE_INT_LITERAL:
 		literal->type = IR_LITERAL_TYPE_INT;
-		literal->int_literal = ir_int_literal_from_ast(semantics, false);
+		literal->value = ir_int_literal_from_ast(semantics, false);
 		*out_data_type = IR_TYPE_INT;
 		break;
 	case AST_NODE_TYPE_BOOL_LITERAL:
 		literal->type = IR_LITERAL_TYPE_BOOL;
-		literal->bool_literal = ir_bool_literal_from_ast(semantics);
+		literal->value = ir_bool_literal_from_ast(semantics);
 		*out_data_type = IR_TYPE_BOOL;
 		break;
 	case AST_NODE_TYPE_CHAR_LITERAL:
 		literal->type = IR_LITERAL_TYPE_CHAR;
-		literal->char_literal = ir_char_literal_from_ast(semantics);
+		literal->value = ir_char_literal_from_ast(semantics);
 		*out_data_type = IR_TYPE_INT;
 		break;
 	default:
@@ -634,21 +633,6 @@ struct ir_literal *ir_literal_new(struct semantics *semantics,
 		return NULL;
 	}
 	return literal;
-}
-
-int64_t ir_literal_get_value(struct ir_literal *literal)
-{
-	switch (literal->type) {
-	case IR_LITERAL_TYPE_INT:
-		return literal->int_literal;
-	case IR_LITERAL_TYPE_BOOL:
-		return literal->bool_literal;
-	case IR_LITERAL_TYPE_CHAR:
-		return literal->char_literal;
-	default:
-		g_assert(!"Cannot get value of literal");
-		return -1;
-	}
 }
 
 enum ir_type ir_literal_get_type(struct ir_literal *literal)

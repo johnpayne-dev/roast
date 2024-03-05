@@ -246,19 +246,11 @@ struct ir_literal {
 		IR_LITERAL_TYPE_BOOL,
 		IR_LITERAL_TYPE_CHAR,
 		IR_LITERAL_TYPE_INT,
-		IR_LITERAL_TYPE_STRING,
 	} type;
 
-	union {
-		bool bool_literal;
-		char char_literal;
-		int64_t int_literal;
-		char *string_literal;
-	};
+	int64_t value;
 };
 
 struct ir_literal *ir_literal_new(struct semantics *semantics,
 				  enum ir_type *out_data_type);
-int64_t ir_literal_get_value(struct ir_literal *literal);
-void ir_literal_free(struct ir_literal *expression);
 void ir_literal_free(struct ir_literal *literal);
