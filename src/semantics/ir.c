@@ -115,7 +115,6 @@ char ir_char_literal_from_ast(struct semantics *semantics)
 	return '\0';
 }
 
-// Karl
 char *ir_string_literal_from_ast(struct semantics *semantics)
 {
 	struct ast_node *node = next_node(semantics);
@@ -284,12 +283,39 @@ void ir_binary_expression_free(struct ir_binary_expression *expression)
 {
 }
 
-// Karl
-struct ir_literal *ir_literal_new(struct semantics *semantics)
+struct ir_literal *ir_literal_new(struct semantics *semantics,
+				  enum ir_type *out_data_type)
 {
-	return NULL;
+	struct ast_node *node = next_node(semantics);
+	g_assert(node->type == AST_NODE_TYPE_INT_LITERAL ||
+		 node->type == AST_NODE_TYPE_BOOL_LITERAL ||
+		 node->type == AST_NODE_TYPE_CHAR_LITERAL);
+	struct ir_literal *literal = g_new(struct ir_literal, 1);
+	g_assert(literal != NULL);
+	switch (node->type) {
+	case AST_NODE_TYPE_INT_LITERAL:
+		literal->type = IR_LITERAL_TYPE_INT;
+		literal->int_literal = ir_int_literal_from_ast(semantics);
+		*out_data_type = IR_TYPE_INT;
+		break;
+	case AST_NODE_TYPE_BOOL_LITERAL:
+		literal->type = IR_LITERAL_TYPE_BOOL;
+		literal->bool_literal = ir_bool_literal_from_ast(semantics);
+		*out_data_type = IR_TYPE_BOOL;
+		break;
+	case AST_NODE_TYPE_CHAR_LITERAL:
+		literal->type = IR_LITERAL_TYPE_CHAR;
+		literal->char_literal = ir_char_literal_from_ast(semantics);
+		*out_data_type = IR_TYPE_INT;
+		break;
+	default:
+		g_assert(!"Couldn't extract literal from node");
+		return NULL;
+	}
+	return literal;
 }
 
-void ir_literal_free(struct ir_literal *expression)
+void ir_literal_free(struct ir_literal *literal)
 {
+	g_free(literal);
 }

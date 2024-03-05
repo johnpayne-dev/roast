@@ -240,5 +240,6 @@ struct ir_literal {
 	};
 };
 
-struct ir_literal *ir_literal_new(struct semantics *semantics);
-void ir_literal_free(struct ir_literal *expression);
+struct ir_literal *ir_literal_new(struct semantics *semantics,
+				  enum ir_type *out_data_type);
+void ir_literal_free(struct ir_literal *literal);
