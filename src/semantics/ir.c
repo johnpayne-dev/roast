@@ -118,7 +118,34 @@ char ir_char_literal_from_ast(struct semantics *semantics)
 // Karl
 char *ir_string_literal_from_ast(struct semantics *semantics)
 {
-	return NULL;
+	struct ast_node *node = next_node(semantics);
+	g_assert(node->type == AST_NODE_TYPE_STRING_LITERAL);
+
+	char *token_string = token_get_string(node->token, semantics->source);
+	g_assert(token_string != NULL || token_string[0] == '\"');
+
+	GString *string_literal = g_string_new(NULL);
+	g_assert(string_literal != NULL);
+
+	for (char *c = &token_string[1]; *c != '\"'; ++c) {
+		if (*c == '\\') {
+			g_string_append_c(string_literal,
+					  handle_backslash_sequence(c));
+			++c;
+		} else {
+			g_string_append_c(string_literal, *c);
+		}
+	}
+
+	g_free(token_string);
+
+	char *char_data = string_literal->str;
+
+	g_string_free(string_literal, FALSE);
+
+	g_assert(char_data != NULL);
+
+	return char_data;
 }
 
 // John
