@@ -720,15 +720,47 @@ void ir_while_statement_free(struct ir_while_statement *statement)
 {
 }
 
-// John
 struct ir_location *ir_location_new(struct semantics *semantics,
 				    enum ir_data_type *out_data_type)
 {
-	return NULL;
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_LOCATION);
+
+	struct ir_location *location = g_new(struct ir_location, 1);
+	location->identifier = ir_identifier_from_ast(semantics);
+	location->index = NULL;
+
+	struct ir_field *field =
+		get_field_declaration(semantics, location->identifier);
+	if (field != NULL)
+		*out_data_type = field->type;
+	else
+		*out_data_type = IR_DATA_TYPE_VOID;
+
+	if (peek_node(semantics)->type == AST_NODE_TYPE_EXPRESSION) {
+		if (field != NULL && !field->array)
+			semantic_error(semantics,
+				       "Non-array field cannot be indexed");
+
+		enum ir_data_type expression_type;
+		location->index =
+			ir_expression_new(semantics, &expression_type);
+
+		if (expression_type != IR_DATA_TYPE_INT)
+			semantic_error(semantics,
+				       "Index expression must be of type int");
+	} else if (field != NULL && field->array) {
+		semantic_error(semantics, "Array field must be indexed");
+	}
+
+	return location;
 }
 
 void ir_location_free(struct ir_location *location)
 {
+	g_free(location->identifier);
+	if (location->index != NULL)
+		ir_expression_free(location->index);
+	g_free(location);
 }
 
 // Karl
