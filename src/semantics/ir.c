@@ -612,17 +612,14 @@ struct ir_method_call *ir_method_call_new(struct semantics *semantics,
 		g_array_append_val(data_types, data_type);
 	}
 
-	symbol_table_t *symbols = semantics_current_scope(semantics);
 	struct ir_method *method =
-		symbol_table_get_method(symbols, call->identifier);
-
-	if (method == NULL) {
-		semantic_error(semantics, "Undeclared method");
-		*out_data_type = IR_DATA_TYPE_VOID;
-	} else {
+		get_method_declaration(semantics, call->identifier);
+	if (method != NULL) {
 		*out_data_type = method->return_type;
 		type_check_arguments(semantics, method, call->arguments,
 				     data_types);
+	} else {
+		*out_data_type = IR_DATA_TYPE_VOID;
 	}
 
 	g_array_free(data_types, true);
@@ -691,14 +688,43 @@ void ir_if_statement_free(struct ir_if_statement *statement)
 {
 }
 
-// John
 struct ir_for_statement *ir_for_statement_new(struct semantics *semantics)
 {
-	return NULL;
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_FOR_STATEMENT);
+
+	struct ir_for_statement *statement = g_new(struct ir_for_statement, 1);
+
+	statement->identifier = ir_identifier_from_ast(semantics);
+	struct ir_field *field =
+		get_field_declaration(semantics, statement->identifier);
+
+	enum ir_data_type initializer_type;
+	statement->initializer =
+		ir_expression_new(semantics, &initializer_type);
+	if (field != NULL && field->type != initializer_type)
+		semantic_error(semantics,
+			       "Incorrect type in identifier assignment");
+
+	enum ir_data_type condition_type;
+	statement->condition = ir_expression_new(semantics, &condition_type);
+	if (condition_type != IR_DATA_TYPE_BOOL)
+		semantic_error(semantics,
+			       "Incorrect type in for loop condition");
+
+	statement->update = ir_assignment_new(semantics);
+	statement->block = ir_block_new(semantics);
+
+	return statement;
 }
 
 void ir_for_statement_free(struct ir_for_statement *statement)
 {
+	ir_block_free(statement->block);
+	ir_assignment_free(statement->update);
+	ir_expression_free(statement->condition);
+	ir_expression_free(statement->initializer);
+	g_free(statement->identifier);
+	g_free(statement);
 }
 
 // Karl
