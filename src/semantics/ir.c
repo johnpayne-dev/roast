@@ -352,13 +352,57 @@ void ir_statement_free(struct ir_statement *statement)
 // Karl
 struct ir_assignment *ir_assignment_new(struct ast_node **nodes)
 {
-	g_assert(0);
-	return NULL;
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_ASSIGN_EXPRESSION);
+
+	struct ir_assignment *assignment = g_new(struct ir_assignment, 1);
+
+	assignment->location = ir_location_new(nodes);
+
+	switch (next_node(nodes)->token->type) {
+	case TOKEN_TYPE_ASSIGN:
+		assignment->assign_operator = IR_ASSIGN_OPERATOR_SET;
+		break;
+	case TOKEN_TYPE_ADD_ASSIGN:
+		assignment->assign_operator = IR_ASSIGN_OPERATOR_ADD;
+		break;
+	case TOKEN_TYPE_SUB_ASSIGN:
+		assignment->assign_operator = IR_ASSIGN_OPERATOR_SUB;
+		break;
+	case TOKEN_TYPE_MUL_ASSIGN:
+		assignment->assign_operator = IR_ASSIGN_OPERATOR_MUL;
+		break;
+	case TOKEN_TYPE_DIV_ASSIGN:
+		assignment->assign_operator = IR_ASSIGN_OPERATOR_DIV;
+		break;
+	case TOKEN_TYPE_MOD_ASSIGN:
+		assignment->assign_operator = IR_ASSIGN_OPERATOR_MOD;
+		break;
+	case TOKEN_TYPE_INCREMENT:
+		assignment->assign_operator = IR_ASSIGN_OPERATOR_INCREMENT;
+		break;
+	case TOKEN_TYPE_DECREMENT:
+		assignment->assign_operator = IR_ASSIGN_OPERATOR_DECREMENT;
+		break;
+	default:
+		g_assert(!"Couldn't extract assign operator from token type");
+		assignment->assign_operator = -1;
+	}
+
+	if (assignment->assign_operator != IR_ASSIGN_OPERATOR_INCREMENT &&
+	    assignment->assign_operator != IR_ASSIGN_OPERATOR_DECREMENT)
+		assignment->expression = ir_expression_new(nodes);
+	else
+		assignment->expression = NULL;
+
+	return assignment;
 }
 
 void ir_assignment_free(struct ir_assignment *assignment)
 {
-	g_assert(0);
+	ir_location_free(assignment->location);
+	if (assignment->expression != NULL)
+		ir_expression_free(assignment->expression);
+	g_free(assignment);
 }
 
 struct ir_method_call *ir_method_call_new(struct ast_node **nodes)
