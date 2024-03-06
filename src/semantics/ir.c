@@ -269,7 +269,7 @@ void ir_block_free(struct ir_block *block)
 	for (uint32_t i = 0; i < block->statements->len; i++) {
 		struct ir_statement *statement = g_array_index(
 			block->statements, struct ir_statement *, i);
-		ir_field_free(statement);
+		ir_statement_free(statement);
 	}
 	g_array_free(block->statements, true);
 
