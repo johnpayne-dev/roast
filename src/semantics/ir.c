@@ -33,7 +33,8 @@ struct ir_program *ir_program_new(struct ast_node **nodes)
 	struct ir_program *program = g_new(struct ir_program, 1);
 	program->fields_table = fields_table_new(NULL);
 	program->methods_table = methods_table_new();
-	program->imports = g_array_new(false, false, sizeof(struct ir_method *));
+	program->imports =
+		g_array_new(false, false, sizeof(struct ir_method *));
 	program->fields = g_array_new(false, false, sizeof(struct ir_field *));
 	program->methods =
 		g_array_new(false, false, sizeof(struct ir_method *));

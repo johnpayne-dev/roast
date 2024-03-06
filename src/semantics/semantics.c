@@ -60,9 +60,9 @@ static struct ir_field *get_field_declaration(struct semantics *semantics,
 	return field;
 }
 
-static void analyze_program(struct semantics *semantics, struct ir_program *program)
+static void analyze_program(struct semantics *semantics,
+			    struct ir_program *program)
 {
-	
 }
 
 struct semantics *semantics_new(void)
