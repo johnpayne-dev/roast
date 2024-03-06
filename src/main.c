@@ -120,7 +120,7 @@ static int run_parse_target(char *source, struct ast_node **ast)
 
 	struct parser *parser = parser_new();
 
-	int result = parser_parse(parser, source, tokens, ast);
+	int result = parser_parse(parser, tokens, ast);
 
 	parser_free(parser);
 	g_array_free(tokens, true);
@@ -135,7 +135,7 @@ static int run_intermediate_target(char *source, struct ir_program **ir)
 
 	struct semantics *semantics = semantics_new();
 
-	int result = semantics_analyze(semantics, source, ast, ir);
+	int result = semantics_analyze(semantics, ast, ir);
 
 	semantics_free(semantics);
 	ast_node_free(ast);

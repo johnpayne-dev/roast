@@ -1,263 +1,34 @@
 #include "semantics/ir.h"
-#include "semantics/semantics.h"
 
-static void semantic_error(struct semantics *semantics, const char *message)
+static struct ast_node *next_node(struct ast_node **nodes)
 {
-	semantics->error = true;
-	g_printerr("ERROR at %i:%i: %s\n", 0, 0, message);
+	return (*nodes)++;
 }
 
-static struct ast_node *next_node(struct semantics *semantics)
+static struct ast_node *peek_node(struct ast_node **nodes)
 {
-	g_assert(semantics->position < semantics->nodes->len);
-	return g_array_index(semantics->nodes, struct ast_node *,
-			     semantics->position++);
+	return *nodes;
 }
 
-static struct ast_node *peek_node(struct semantics *semantics)
+static void iterate_fields(struct ast_node **nodes, GArray *fields)
 {
-	g_assert(semantics->position < semantics->nodes->len);
-	return g_array_index(semantics->nodes, struct ast_node *,
-			     semantics->position);
-}
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_FIELD);
 
-static void declare_method(struct semantics *semantics,
-			   struct ir_method *method)
-{
-	symbol_table_t *symbols = semantics_current_scope(semantics);
-
-	if (symbol_table_get_method(symbols, method->identifier))
-		semantic_error(semantics, "Redeclaration of method");
-	else if (symbol_table_get_field(symbols, method->identifier))
-		semantic_error(semantics,
-			       "Identifier already declared as field");
-	else
-		symbol_table_add_method(symbols, method->identifier, method);
-}
-
-static void declare_field(struct semantics *semantics, struct ir_field *field)
-{
-	symbol_table_t *symbols = semantics_current_scope(semantics);
-
-	if (symbol_table_get_field(symbols, field->identifier))
-		semantic_error(semantics, "Redeclaration of field");
-	else if (symbol_table_get_method(symbols, field->identifier))
-		semantic_error(semantics,
-			       "Identifier already declared as method");
-	else
-		symbol_table_add_field(symbols, field->identifier, field);
-}
-
-static struct ir_method *get_method_declaration(struct semantics *semantics,
-						char *identifier)
-{
-	symbol_table_t *symbols = semantics_current_scope(semantics);
-	struct ir_method *method = symbol_table_get_method(symbols, identifier);
-	if (method == NULL)
-		semantic_error(semantics, "Undeclared method");
-
-	return method;
-}
-
-static struct ir_field *get_field_declaration(struct semantics *semantics,
-					      char *identifier)
-{
-	symbol_table_t *symbols = semantics_current_scope(semantics);
-	struct ir_field *field = NULL;
-
-	while (field == NULL && symbols != NULL) {
-		field = symbol_table_get_field(symbols, identifier);
-		symbols = symbol_table_get_parent(symbols);
-	}
-
-	if (field == NULL)
-		semantic_error(semantics, "Undeclared field");
-
-	return field;
-}
-
-enum ir_data_type ir_type_from_ast(struct semantics *semantics)
-{
-	struct ast_node *node = next_node(semantics);
-	g_assert(node->type == AST_NODE_TYPE_VOID ||
-		 node->type == AST_NODE_TYPE_DATA_TYPE);
-	if (node->type == AST_NODE_TYPE_VOID) {
-		return IR_DATA_TYPE_VOID;
-	} else {
-		switch (node->token->type) {
-		case TOKEN_TYPE_KEYWORD_INT:
-			return IR_DATA_TYPE_INT;
-		case TOKEN_TYPE_KEYWORD_BOOL:
-			return IR_DATA_TYPE_BOOL;
-		default:
-			break;
-		}
-	}
-	g_assert(!"Couldn't extract data type from ast node");
-	return -1;
-}
-
-static uint64_t character_to_int(char character)
-{
-	if (character >= 'a' && character <= 'f')
-		return character - 'a';
-	else if (character >= 'A' && character <= 'F')
-		return character - 'A';
-	else
-		return character - '0';
-}
-
-static uint64_t string_to_int(struct semantics *semantics, char *string,
-			      uint64_t max_value, uint64_t base)
-{
-	uint64_t value = 0;
-	uint64_t i = strlen(string);
-	uint64_t place = 1;
-
-	while (i-- > 0) {
-		uint64_t digit = character_to_int(string[i]);
-		value += digit * place;
-
-		if (value > max_value) {
-			semantic_error(semantics, "Overflow in int literal");
-			break;
-		}
-
-		place *= base;
-	}
-
-	return value;
-}
-
-int64_t ir_int_literal_from_ast(struct semantics *semantics, bool negate)
-{
-	struct ast_node *node = next_node(semantics);
-	g_assert(node->type == AST_NODE_TYPE_INT_LITERAL);
-
-	char *source_value = token_get_string(node->token, semantics->source);
-
-	uint64_t max_value = negate ? -INT64_MIN : INT64_MAX;
-	bool hex = node->token->type == TOKEN_TYPE_HEX_LITERAL;
-
-	uint64_t value = string_to_int(semantics,
-				       hex ? source_value + 2 : source_value,
-				       max_value, hex ? 16 : 10);
-
-	g_free(source_value);
-	return (negate ? -1 : 1) * (int64_t)value;
-}
-
-bool ir_bool_literal_from_ast(struct semantics *semantics)
-{
-	struct ast_node *node = next_node(semantics);
-	g_assert(node->type == AST_NODE_TYPE_BOOL_LITERAL);
-	switch (node->token->type) {
-	case TOKEN_TYPE_KEYWORD_TRUE:
-		return true;
-	case TOKEN_TYPE_KEYWORD_FALSE:
-		return false;
-	default:
-		break;
-	}
-	g_assert(!"Couldn't extract bool literal from ast node");
-	return -1;
-}
-
-static char handle_backslash_sequence(char *backlash_sequence)
-{
-	g_assert(backlash_sequence[0] == '\\');
-	switch (backlash_sequence[1]) {
-	case '\"':
-		return '\"';
-	case '\'':
-		return '\'';
-	case '\\':
-		return '\\';
-	case 't':
-		return '\t';
-	case 'n':
-		return '\n';
-	default:
-		break;
-	}
-	g_assert(!"Invalid backslash sequence");
-	return -1;
-}
-
-char ir_char_literal_from_ast(struct semantics *semantics)
-{
-	struct ast_node *node = next_node(semantics);
-	g_assert(node->type == AST_NODE_TYPE_CHAR_LITERAL);
-
-	char *source_value = token_get_string(node->token, semantics->source);
-
-	char value = '\0';
-	if (source_value[1] == '\\')
-		value = handle_backslash_sequence(source_value + 1);
-	else
-		value = source_value[1];
-
-	g_free(source_value);
-	return value;
-}
-
-char *ir_string_literal_from_ast(struct semantics *semantics)
-{
-	struct ast_node *node = next_node(semantics);
-	g_assert(node->type == AST_NODE_TYPE_STRING_LITERAL);
-
-	char *token_string = token_get_string(node->token, semantics->source);
-	g_assert(token_string[0] == '\"');
-
-	GString *string_literal = g_string_new(NULL);
-
-	for (char *c = &token_string[1]; *c != '\"'; ++c) {
-		if (*c == '\\') {
-			g_string_append_c(string_literal,
-					  handle_backslash_sequence(c));
-			++c;
-		} else {
-			g_string_append_c(string_literal, *c);
-		}
-	}
-
-	g_free(token_string);
-
-	char *char_data = string_literal->str;
-
-	g_string_free(string_literal, FALSE);
-
-	return char_data;
-}
-
-char *ir_identifier_from_ast(struct semantics *semantics)
-{
-	struct ast_node *node = next_node(semantics);
-	g_assert(node->type == AST_NODE_TYPE_IDENTIFIER);
-	return token_get_string(node->token, semantics->source);
-}
-
-static void iterate_fields(struct semantics *semantics, GArray *fields)
-{
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_FIELD);
-
-	bool constant = peek_node(semantics)->type == AST_NODE_TYPE_CONST;
+	bool constant = peek_node(nodes)->type == AST_NODE_TYPE_CONST;
 	if (constant)
-		next_node(semantics);
+		next_node(nodes);
 
-	enum ir_data_type type = ir_type_from_ast(semantics);
+	enum ir_data_type type = ir_data_type_from_ast(nodes);
 
-	while (peek_node(semantics)->type == AST_NODE_TYPE_FIELD_IDENTIFIER) {
-		struct ir_field *field =
-			ir_field_new(semantics, constant, type);
-		declare_field(semantics, field);
+	while (peek_node(nodes)->type == AST_NODE_TYPE_FIELD_IDENTIFIER) {
+		struct ir_field *field = ir_field_new(nodes, constant, type);
 		g_array_append_val(fields, field);
 	}
 }
 
-struct ir_program *ir_program_new(struct semantics *semantics)
+struct ir_program *ir_program_new(struct ast_node **nodes)
 {
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_PROGRAM);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_PROGRAM);
 
 	struct ir_program *program = g_new(struct ir_program, 1);
 	program->symbols = symbol_table_new(NULL);
@@ -265,26 +36,20 @@ struct ir_program *ir_program_new(struct semantics *semantics)
 	program->methods =
 		g_array_new(false, false, sizeof(struct ir_method *));
 
-	semantics_push_scope(semantics, program->symbols);
-
-	while (peek_node(semantics)->type == AST_NODE_TYPE_IMPORT) {
-		struct ir_method *method = ir_method_new_from_import(semantics);
-		declare_method(semantics, method);
+	while (peek_node(nodes)->type == AST_NODE_TYPE_IMPORT) {
+		struct ir_method *method = ir_method_new_from_import(nodes);
 		g_array_append_val(program->methods, method);
 	}
 
-	while (peek_node(semantics)->type == AST_NODE_TYPE_FIELD)
-		iterate_fields(semantics, program->fields);
+	while (peek_node(nodes)->type == AST_NODE_TYPE_FIELD)
+		iterate_fields(nodes, program->fields);
 
-	while (peek_node(semantics)->type == AST_NODE_TYPE_METHOD) {
-		struct ir_method *method = ir_method_new(semantics);
-		declare_method(semantics, method);
+	while (peek_node(nodes)->type == AST_NODE_TYPE_METHOD) {
+		struct ir_method *method = ir_method_new(nodes);
 		g_array_append_val(program->methods, method);
 	}
 
-	semantics_pop_scope(semantics);
-
-	g_assert(peek_node(semantics)->type == (uint32_t)-1);
+	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_END);
 	return program;
 }
 
@@ -309,19 +74,20 @@ void ir_program_free(struct ir_program *program)
 }
 
 // Karl
-struct ir_method *ir_method_new(struct semantics *semantics)
+struct ir_method *ir_method_new(struct ast_node **nodes)
 {
+	g_assert(0);
 	return NULL;
 }
 
-struct ir_method *ir_method_new_from_import(struct semantics *semantics)
+struct ir_method *ir_method_new_from_import(struct ast_node **nodes)
 {
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_IMPORT);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_IMPORT);
 
 	struct ir_method *method = g_new(struct ir_method, 1);
 	method->imported = true;
 	method->return_type = IR_DATA_TYPE_INT;
-	method->identifier = ir_identifier_from_ast(semantics);
+	method->identifier = ir_identifier_from_ast(nodes);
 	method->arguments = NULL;
 	method->block = NULL;
 	return method;
@@ -329,67 +95,35 @@ struct ir_method *ir_method_new_from_import(struct semantics *semantics)
 
 void ir_method_free(struct ir_method *method)
 {
+	g_assert(0);
 }
 
-struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
+struct ir_field *ir_field_new(struct ast_node **nodes, bool constant,
 			      enum ir_data_type type)
 {
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_FIELD_IDENTIFIER);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_FIELD_IDENTIFIER);
 
 	struct ir_field *field = g_new(struct ir_field, 1);
 	field->constant = constant;
 	field->type = type;
-	field->identifier = ir_identifier_from_ast(semantics);
+	field->identifier = ir_identifier_from_ast(nodes);
 
-	if (peek_node(semantics)->type == AST_NODE_TYPE_INT_LITERAL) {
+	if (peek_node(nodes)->type == AST_NODE_TYPE_INT_LITERAL) {
 		field->array = true;
-		field->array_length = ir_int_literal_from_ast(semantics, false);
-		if (field->array_length <= 0)
-			semantic_error(semantics,
-				       "Array length must be greater than 0");
-	} else if (peek_node(semantics)->type ==
-		   AST_NODE_TYPE_EMPTY_ARRAY_LENGTH) {
+		field->array_length = ir_int_literal_from_ast(nodes, false);
+	} else if (peek_node(nodes)->type == AST_NODE_TYPE_EMPTY_ARRAY_LENGTH) {
 		field->array = true;
 		field->array_length = -1;
-		next_node(semantics);
+		next_node(nodes);
 	} else {
 		field->array = false;
 		field->array_length = 1;
 	}
 
-	if (peek_node(semantics)->type == AST_NODE_TYPE_INITIALIZER) {
-		enum ir_data_type initializer_type;
-		struct ir_initializer *initializer =
-			ir_initializer_new(semantics, &initializer_type);
-
-		if (initializer->array && field->array &&
-		    field->array_length != -1)
-			semantic_error(
-				semantics,
-				"Array initializer cannot be used to initialize field with declared length");
-		if (initializer->array && !field->array)
-			semantic_error(
-				semantics,
-				"Array initializer cannot be used to initialize non-array field");
-		if (!initializer->array && field->array)
-			semantic_error(
-				semantics,
-				"Non-array initializer cannot be used to initialize array field");
-		if (initializer_type != field->type)
-			semantic_error(
-				semantics,
-				"Initializer type does not match field type");
-
-		field->array_length = initializer->literals->len;
-		field->initializer = initializer;
-	} else {
-		if (field->array && field->array_length == -1)
-			semantic_error(
-				semantics,
-				"Missing array literal for field declaration");
-
+	if (peek_node(nodes)->type == AST_NODE_TYPE_INITIALIZER)
+		field->initializer = ir_initializer_new(nodes);
+	else
 		field->initializer = NULL;
-	}
 
 	return field;
 }
@@ -402,37 +136,23 @@ void ir_field_free(struct ir_field *field)
 	g_free(field);
 }
 
-struct ir_initializer *ir_initializer_new(struct semantics *semantics,
-					  enum ir_data_type *out_data_type)
+struct ir_initializer *ir_initializer_new(struct ast_node **nodes)
 {
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_INITIALIZER);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_INITIALIZER);
 
 	struct ir_initializer *initializer = g_new(struct ir_initializer, 1);
 	initializer->literals =
 		g_array_new(false, false, sizeof(struct ir_literal *));
-	initializer->array = peek_node(semantics)->type ==
+	initializer->array = peek_node(nodes)->type ==
 			     AST_NODE_TYPE_ARRAY_LITERAL;
 	if (initializer->array)
-		next_node(semantics);
+		next_node(nodes);
 
-	enum ir_data_type data_type = -1;
-
-	while (peek_node(semantics)->type == AST_NODE_TYPE_LITERAL) {
-		enum ir_data_type literal_type;
-		struct ir_literal *literal =
-			ir_literal_new(semantics, &literal_type);
-
-		if (data_type == (uint32_t)-1)
-			data_type = literal_type;
-		else if (literal_type != data_type)
-			semantic_error(
-				semantics,
-				"Array literal does not contain uniform types");
-
+	while (peek_node(nodes)->type == AST_NODE_TYPE_LITERAL) {
+		struct ir_literal *literal = ir_literal_new(nodes);
 		g_array_append_val(initializer->literals, literal);
 	}
 
-	*out_data_type = data_type;
 	return initializer;
 }
 
@@ -448,38 +168,39 @@ void ir_initializer_free(struct ir_initializer *initializer)
 }
 
 // Karl
-struct ir_block *ir_block_new(struct semantics *semantics)
+struct ir_block *ir_block_new(struct ast_node **nodes)
 {
+	g_assert(0);
 	return NULL;
 }
 
 void ir_block_free(struct ir_block *block)
 {
+	g_assert(0);
 }
 
-struct ir_statement *ir_statement_new(struct semantics *semantics)
+struct ir_statement *ir_statement_new(struct ast_node **nodes)
 {
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_STATEMENT);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_STATEMENT);
 
 	struct ir_statement *statement = g_new(struct ir_statement, 1);
 
-	switch (peek_node(semantics)->type) {
+	switch (peek_node(nodes)->type) {
 	case AST_NODE_TYPE_IF_STATEMENT:
 		statement->type = IR_STATEMENT_TYPE_IF;
-		statement->if_statement = ir_if_statement_new(semantics);
+		statement->if_statement = ir_if_statement_new(nodes);
 		break;
 	case AST_NODE_TYPE_FOR_STATEMENT:
 		statement->type = IR_STATEMENT_TYPE_FOR;
-		statement->for_statement = ir_for_statement_new(semantics);
+		statement->for_statement = ir_for_statement_new(nodes);
 		break;
 	case AST_NODE_TYPE_WHILE_STATEMENT:
 		statement->type = IR_STATEMENT_TYPE_WHILE;
-		statement->while_statement = ir_while_statement_new(semantics);
+		statement->while_statement = ir_while_statement_new(nodes);
 		break;
 	case AST_NODE_TYPE_RETURN_STATEMENT:
 		statement->type = IR_STATEMENT_TYPE_RETURN;
-		statement->return_expression =
-			ir_expression_new(semantics, NULL);
+		statement->return_expression = ir_expression_new(nodes);
 		break;
 	case AST_NODE_TYPE_BREAK_STATEMENT:
 		statement->type = IR_STATEMENT_TYPE_BREAK;
@@ -489,11 +210,11 @@ struct ir_statement *ir_statement_new(struct semantics *semantics)
 		break;
 	case AST_NODE_TYPE_METHOD_CALL:
 		statement->type = IR_STATEMENT_TYPE_METHOD_CALL;
-		statement->method_call = ir_method_call_new(semantics, NULL);
+		statement->method_call = ir_method_call_new(nodes);
 		break;
 	case AST_NODE_TYPE_ASSIGN_STATEMENT:
 		statement->type = IR_STATEMENT_TYPE_ASSIGNMENT;
-		statement->assignment = ir_assignment_new(semantics);
+		statement->assignment = ir_assignment_new(nodes);
 		break;
 	default:
 		statement->type = -1;
@@ -532,80 +253,32 @@ void ir_statement_free(struct ir_statement *statement)
 }
 
 // Karl
-struct ir_assignment *ir_assignment_new(struct semantics *semantics)
+struct ir_assignment *ir_assignment_new(struct ast_node **nodes)
 {
+	g_assert(0);
 	return NULL;
 }
 
 void ir_assignment_free(struct ir_assignment *assignment)
 {
+	g_assert(0);
 }
 
-static void type_check_arguments(struct semantics *semantics,
-				 struct ir_method *method, GArray *arguments,
-				 GArray *data_types)
+struct ir_method_call *ir_method_call_new(struct ast_node **nodes)
 {
-	if (method->imported)
-		return;
-
-	if (method->arguments->len != arguments->len) {
-		semantic_error(
-			semantics,
-			"Incorrect number of arguments passed into method call");
-		return;
-	}
-
-	for (uint32_t i = 0; i < arguments->len; i++) {
-		struct ir_method_call_argument *call_argument = g_array_index(
-			arguments, struct ir_method_call_argument *, i);
-		struct ir_method_argument *method_argument = g_array_index(
-			arguments, struct ir_method_argument *, i);
-		enum ir_data_type data_type =
-			g_array_index(data_types, enum ir_data_type, i);
-
-		if (call_argument->type == IR_METHOD_CALL_ARGUMENT_TYPE_STRING)
-			semantic_error(
-				semantics,
-				"Strings can only be passed into imported functions");
-		else if (data_type != method_argument->type)
-			semantic_error(
-				semantics,
-				"Incorrect argument type passed into method call");
-	}
-}
-
-struct ir_method_call *ir_method_call_new(struct semantics *semantics,
-					  enum ir_data_type *out_data_type)
-{
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_METHOD_CALL);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_METHOD_CALL);
 
 	struct ir_method_call *call = g_new(struct ir_method_call, 1);
-	call->identifier = ir_identifier_from_ast(semantics);
+	call->identifier = ir_identifier_from_ast(nodes);
 	call->arguments = g_array_new(false, false,
 				      sizeof(struct ir_method_call_argument *));
-	GArray *data_types =
-		g_array_new(false, false, sizeof(enum ir_data_type));
 
-	while (peek_node(semantics)->type ==
-	       AST_NODE_TYPE_METHOD_CALL_ARGUMENT) {
-		enum ir_data_type data_type;
+	while (peek_node(nodes)->type == AST_NODE_TYPE_METHOD_CALL_ARGUMENT) {
 		struct ir_method_call_argument *argument =
-			ir_method_call_argument_new(semantics, &data_type);
+			ir_method_call_argument_new(nodes);
 		g_array_append_val(call->arguments, argument);
-		g_array_append_val(data_types, data_type);
 	}
 
-	struct ir_method *method =
-		get_method_declaration(semantics, call->identifier);
-	if (method != NULL) {
-		*out_data_type = method->return_type;
-		type_check_arguments(semantics, method, call->arguments,
-				     data_types);
-	} else {
-		*out_data_type = IR_DATA_TYPE_VOID;
-	}
-
-	g_array_free(data_types, true);
 	return call;
 }
 
@@ -622,23 +295,19 @@ void ir_method_call_free(struct ir_method_call *call)
 }
 
 struct ir_method_call_argument *
-ir_method_call_argument_new(struct semantics *semantics,
-			    enum ir_data_type *out_data_type)
+ir_method_call_argument_new(struct ast_node **nodes)
 {
-	g_assert(next_node(semantics)->type ==
-		 AST_NODE_TYPE_METHOD_CALL_ARGUMENT);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_METHOD_CALL_ARGUMENT);
 
 	struct ir_method_call_argument *argument =
 		g_new(struct ir_method_call_argument, 1);
 
-	if (peek_node(semantics)->type == AST_NODE_TYPE_STRING_LITERAL) {
+	if (peek_node(nodes)->type == AST_NODE_TYPE_STRING_LITERAL) {
 		argument->type = IR_METHOD_CALL_ARGUMENT_TYPE_STRING;
-		argument->string = ir_string_literal_from_ast(semantics);
-		*out_data_type = IR_DATA_TYPE_VOID;
-	} else if (peek_node(semantics)->type == AST_NODE_TYPE_EXPRESSION) {
+		argument->string = ir_string_literal_from_ast(nodes);
+	} else if (peek_node(nodes)->type == AST_NODE_TYPE_EXPRESSION) {
 		argument->type = IR_METHOD_CALL_ARGUMENT_TYPE_EXPRESSION;
-		argument->expression =
-			ir_expression_new(semantics, out_data_type);
+		argument->expression = ir_expression_new(nodes);
 	} else {
 		g_assert(!"Invalid node type in method call argument");
 	}
@@ -662,40 +331,28 @@ void ir_method_call_argument_free(struct ir_method_call_argument *argument)
 }
 
 // Karl
-struct ir_if_statement *ir_if_statement_new(struct semantics *semantics)
+struct ir_if_statement *ir_if_statement_new(struct ast_node **nodes)
 {
+	g_assert(0);
 	return NULL;
 }
 
 void ir_if_statement_free(struct ir_if_statement *statement)
 {
+	g_assert(0);
 }
 
-struct ir_for_statement *ir_for_statement_new(struct semantics *semantics)
+struct ir_for_statement *ir_for_statement_new(struct ast_node **nodes)
 {
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_FOR_STATEMENT);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_FOR_STATEMENT);
 
 	struct ir_for_statement *statement = g_new(struct ir_for_statement, 1);
 
-	statement->identifier = ir_identifier_from_ast(semantics);
-	struct ir_field *field =
-		get_field_declaration(semantics, statement->identifier);
-
-	enum ir_data_type initializer_type;
-	statement->initializer =
-		ir_expression_new(semantics, &initializer_type);
-	if (field != NULL && field->type != initializer_type)
-		semantic_error(semantics,
-			       "Incorrect type in identifier assignment");
-
-	enum ir_data_type condition_type;
-	statement->condition = ir_expression_new(semantics, &condition_type);
-	if (condition_type != IR_DATA_TYPE_BOOL)
-		semantic_error(semantics,
-			       "Incorrect type in for loop condition");
-
-	statement->update = ir_assignment_new(semantics);
-	statement->block = ir_block_new(semantics);
+	statement->identifier = ir_identifier_from_ast(nodes);
+	statement->initializer = ir_expression_new(nodes);
+	statement->condition = ir_expression_new(nodes);
+	statement->update = ir_assignment_new(nodes);
+	statement->block = ir_block_new(nodes);
 
 	return statement;
 }
@@ -711,46 +368,27 @@ void ir_for_statement_free(struct ir_for_statement *statement)
 }
 
 // Karl
-struct ir_while_statement *ir_while_statement_new(struct semantics *semantics)
+struct ir_while_statement *ir_while_statement_new(struct ast_node **nodes)
 {
+	g_assert(0);
 	return NULL;
 }
 
 void ir_while_statement_free(struct ir_while_statement *statement)
 {
+	g_assert(0);
 }
 
-struct ir_location *ir_location_new(struct semantics *semantics,
-				    enum ir_data_type *out_data_type)
+struct ir_location *ir_location_new(struct ast_node **nodes)
 {
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_LOCATION);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_LOCATION);
 
 	struct ir_location *location = g_new(struct ir_location, 1);
-	location->identifier = ir_identifier_from_ast(semantics);
+	location->identifier = ir_identifier_from_ast(nodes);
 	location->index = NULL;
 
-	struct ir_field *field =
-		get_field_declaration(semantics, location->identifier);
-	if (field != NULL)
-		*out_data_type = field->type;
-	else
-		*out_data_type = IR_DATA_TYPE_VOID;
-
-	if (peek_node(semantics)->type == AST_NODE_TYPE_EXPRESSION) {
-		if (field != NULL && !field->array)
-			semantic_error(semantics,
-				       "Non-array field cannot be indexed");
-
-		enum ir_data_type expression_type;
-		location->index =
-			ir_expression_new(semantics, &expression_type);
-
-		if (expression_type != IR_DATA_TYPE_INT)
-			semantic_error(semantics,
-				       "Index expression must be of type int");
-	} else if (field != NULL && field->array) {
-		semantic_error(semantics, "Array field must be indexed");
-	}
+	if (peek_node(nodes)->type == AST_NODE_TYPE_EXPRESSION)
+		location->index = ir_expression_new(nodes);
 
 	return location;
 }
@@ -764,61 +402,58 @@ void ir_location_free(struct ir_location *location)
 }
 
 // Karl
-struct ir_expression *ir_expression_new(struct semantics *semantics,
-					enum ir_data_type *out_data_type)
+struct ir_expression *ir_expression_new(struct ast_node **nodes)
 {
+	g_assert(0);
 	return NULL;
 }
 
 void ir_expression_free(struct ir_expression *expression)
 {
+	g_assert(0);
 }
 
 // John
-struct ir_binary_expression *
-ir_binary_expression_new(struct semantics *semantics,
-			 enum ir_data_type *out_data_type)
+struct ir_binary_expression *ir_binary_expression_new(struct ast_node **nodes)
 {
+	g_assert(0);
 	return NULL;
 }
 
 void ir_binary_expression_free(struct ir_binary_expression *expression)
 {
+	g_assert(0);
 }
 
-struct ir_literal *ir_literal_new(struct semantics *semantics,
-				  enum ir_data_type *out_data_type)
+struct ir_literal *ir_literal_new(struct ast_node **nodes)
 {
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_LITERAL);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_LITERAL);
 
-	struct ast_node *node = peek_node(semantics);
-
-	bool negate = false;
-
-	if (node->type == AST_NODE_TYPE_LITERAL_NEGATION) {
-		negate = true;
-		next_node(semantics);
-	}
+	struct ast_node *node = peek_node(nodes);
 
 	struct ir_literal *literal = g_new(struct ir_literal, 1);
+	literal->negate = false;
 
-	switch (peek_node(semantics)->type) {
+	if (node->type == AST_NODE_TYPE_LITERAL_NEGATION) {
+		literal->negate = true;
+		next_node(nodes);
+	}
+
+	switch (peek_node(nodes)->type) {
 	case AST_NODE_TYPE_INT_LITERAL:
 		literal->type = IR_LITERAL_TYPE_INT;
-		literal->value = ir_int_literal_from_ast(semantics, negate);
-		*out_data_type = IR_DATA_TYPE_INT;
+		literal->value =
+			ir_int_literal_from_ast(nodes, literal->negate);
 		break;
 
 	case AST_NODE_TYPE_BOOL_LITERAL:
 		literal->type = IR_LITERAL_TYPE_BOOL;
-		literal->value = ir_bool_literal_from_ast(semantics);
-		*out_data_type = IR_DATA_TYPE_BOOL;
+		literal->value = ir_bool_literal_from_ast(nodes);
 		break;
 
 	case AST_NODE_TYPE_CHAR_LITERAL:
 		literal->type = IR_LITERAL_TYPE_CHAR;
-		literal->value = ir_char_literal_from_ast(semantics);
-		*out_data_type = IR_DATA_TYPE_INT;
+		literal->value = ir_char_literal_from_ast(nodes);
 		break;
 
 	default:
@@ -832,4 +467,161 @@ struct ir_literal *ir_literal_new(struct semantics *semantics,
 void ir_literal_free(struct ir_literal *literal)
 {
 	g_free(literal);
+}
+
+enum ir_data_type ir_data_type_from_ast(struct ast_node **nodes)
+{
+	struct ast_node *node = next_node(nodes);
+	g_assert(node->type == AST_NODE_TYPE_VOID ||
+		 node->type == AST_NODE_TYPE_DATA_TYPE);
+	if (node->type == AST_NODE_TYPE_VOID) {
+		return IR_DATA_TYPE_VOID;
+	} else {
+		switch (node->token->type) {
+		case TOKEN_TYPE_KEYWORD_INT:
+			return IR_DATA_TYPE_INT;
+		case TOKEN_TYPE_KEYWORD_BOOL:
+			return IR_DATA_TYPE_BOOL;
+		default:
+			break;
+		}
+	}
+	g_assert(!"Couldn't extract data type from ast node");
+	return -1;
+}
+
+static uint64_t character_to_int(char character)
+{
+	if (character >= 'a' && character <= 'f')
+		return character - 'a';
+	else if (character >= 'A' && character <= 'F')
+		return character - 'A';
+	else
+		return character - '0';
+}
+
+static uint64_t string_to_int(char *string, uint64_t max_value, uint64_t base)
+{
+	uint64_t value = 0;
+	uint64_t i = strlen(string);
+	uint64_t place = 1;
+
+	while (i-- > 0) {
+		uint64_t digit = character_to_int(string[i]);
+		value += digit * place;
+
+		if (value > max_value)
+			break;
+
+		place *= base;
+	}
+
+	return value;
+}
+
+uint64_t ir_int_literal_from_ast(struct ast_node **nodes, bool negate)
+{
+	struct ast_node *node = next_node(nodes);
+	g_assert(node->type == AST_NODE_TYPE_INT_LITERAL);
+
+	char *source_value = token_get_string(node->token);
+
+	uint64_t max_value = negate ? -INT64_MIN : INT64_MAX;
+	bool hex = node->token->type == TOKEN_TYPE_HEX_LITERAL;
+
+	uint64_t value = string_to_int(hex ? source_value + 2 : source_value,
+				       max_value, hex ? 16 : 10);
+
+	g_free(source_value);
+	return value;
+}
+
+bool ir_bool_literal_from_ast(struct ast_node **nodes)
+{
+	struct ast_node *node = next_node(nodes);
+	g_assert(node->type == AST_NODE_TYPE_BOOL_LITERAL);
+	switch (node->token->type) {
+	case TOKEN_TYPE_KEYWORD_TRUE:
+		return true;
+	case TOKEN_TYPE_KEYWORD_FALSE:
+		return false;
+	default:
+		break;
+	}
+	g_assert(!"Couldn't extract bool literal from ast node");
+	return -1;
+}
+
+static char handle_backslash_sequence(char *backlash_sequence)
+{
+	g_assert(backlash_sequence[0] == '\\');
+	switch (backlash_sequence[1]) {
+	case '\"':
+		return '\"';
+	case '\'':
+		return '\'';
+	case '\\':
+		return '\\';
+	case 't':
+		return '\t';
+	case 'n':
+		return '\n';
+	default:
+		break;
+	}
+	g_assert(!"Invalid backslash sequence");
+	return -1;
+}
+
+char ir_char_literal_from_ast(struct ast_node **nodes)
+{
+	struct ast_node *node = next_node(nodes);
+	g_assert(node->type == AST_NODE_TYPE_CHAR_LITERAL);
+
+	char *source_value = token_get_string(node->token);
+
+	char value = '\0';
+	if (source_value[1] == '\\')
+		value = handle_backslash_sequence(source_value + 1);
+	else
+		value = source_value[1];
+
+	g_free(source_value);
+	return value;
+}
+
+char *ir_string_literal_from_ast(struct ast_node **nodes)
+{
+	struct ast_node *node = next_node(nodes);
+	g_assert(node->type == AST_NODE_TYPE_STRING_LITERAL);
+
+	char *token_string = token_get_string(node->token);
+	g_assert(token_string[0] == '\"');
+
+	GString *string_literal = g_string_new(NULL);
+
+	for (char *c = &token_string[1]; *c != '\"'; ++c) {
+		if (*c == '\\') {
+			g_string_append_c(string_literal,
+					  handle_backslash_sequence(c));
+			++c;
+		} else {
+			g_string_append_c(string_literal, *c);
+		}
+	}
+
+	g_free(token_string);
+
+	char *char_data = string_literal->str;
+
+	g_string_free(string_literal, FALSE);
+
+	return char_data;
+}
+
+char *ir_identifier_from_ast(struct ast_node **nodes)
+{
+	struct ast_node *node = next_node(nodes);
+	g_assert(node->type == AST_NODE_TYPE_IDENTIFIER);
+	return token_get_string(node->token);
 }

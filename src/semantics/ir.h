@@ -8,25 +8,11 @@
 #include "semantics/symbol_table.h"
 #include "parser/ast.h"
 
-struct semantics;
-
 enum ir_data_type {
 	IR_DATA_TYPE_VOID,
 	IR_DATA_TYPE_BOOL,
 	IR_DATA_TYPE_INT,
 };
-
-enum ir_data_type ir_type_from_ast(struct semantics *semantics);
-
-int64_t ir_int_literal_from_ast(struct semantics *semantics, bool negate);
-
-bool ir_bool_literal_from_ast(struct semantics *semantics);
-
-char ir_char_literal_from_ast(struct semantics *semantics);
-
-char *ir_string_literal_from_ast(struct semantics *semantics);
-
-char *ir_identifier_from_ast(struct semantics *semantics);
 
 struct ir_program {
 	symbol_table_t *symbols;
@@ -34,7 +20,7 @@ struct ir_program {
 	GArray *methods;
 };
 
-struct ir_program *ir_program_new(struct semantics *semantics);
+struct ir_program *ir_program_new(struct ast_node **nodes);
 void ir_program_free(struct ir_program *program);
 
 struct ir_method {
@@ -50,8 +36,8 @@ struct ir_method_argument {
 	char *identifier;
 };
 
-struct ir_method *ir_method_new(struct semantics *semantics);
-struct ir_method *ir_method_new_from_import(struct semantics *semantics);
+struct ir_method *ir_method_new(struct ast_node **nodes);
+struct ir_method *ir_method_new_from_import(struct ast_node **nodes);
 void ir_method_free(struct ir_method *method);
 
 struct ir_field {
@@ -63,7 +49,7 @@ struct ir_field {
 	struct ir_initializer *initializer;
 };
 
-struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
+struct ir_field *ir_field_new(struct ast_node **nodes, bool constant,
 			      enum ir_data_type type);
 void ir_field_free(struct ir_field *field);
 
@@ -72,8 +58,7 @@ struct ir_initializer {
 	GArray *literals;
 };
 
-struct ir_initializer *ir_initializer_new(struct semantics *semantics,
-					  enum ir_data_type *out_data_type);
+struct ir_initializer *ir_initializer_new(struct ast_node **nodes);
 void ir_initializer_free(struct ir_initializer *initializer);
 
 struct ir_block {
@@ -86,7 +71,7 @@ struct ir_block {
 	struct ir_statement **statements;
 };
 
-struct ir_block *ir_block_new(struct semantics *semantics);
+struct ir_block *ir_block_new(struct ast_node **nodes);
 void ir_block_free(struct ir_block *block);
 
 struct ir_statement {
@@ -111,7 +96,7 @@ struct ir_statement {
 	};
 };
 
-struct ir_statement *ir_statement_new(struct semantics *semantics);
+struct ir_statement *ir_statement_new(struct ast_node **nodes);
 void ir_statement_free(struct ir_statement *statement);
 
 struct ir_assignment {
@@ -131,7 +116,7 @@ struct ir_assignment {
 	struct ir_expression *expression;
 };
 
-struct ir_assignment *ir_assignment_new(struct semantics *semantics);
+struct ir_assignment *ir_assignment_new(struct ast_node **nodes);
 void ir_assignment_free(struct ir_assignment *assignment);
 
 struct ir_method_call {
@@ -139,8 +124,7 @@ struct ir_method_call {
 	GArray *arguments;
 };
 
-struct ir_method_call *ir_method_call_new(struct semantics *semantics,
-					  enum ir_data_type *out_data_type);
+struct ir_method_call *ir_method_call_new(struct ast_node **nodes);
 void ir_method_call_free(struct ir_method_call *method_call);
 
 struct ir_method_call_argument {
@@ -156,8 +140,7 @@ struct ir_method_call_argument {
 };
 
 struct ir_method_call_argument *
-ir_method_call_argument_new(struct semantics *semantics,
-			    enum ir_data_type *out_data_type);
+ir_method_call_argument_new(struct ast_node **nodes);
 void ir_method_call_argument_free(struct ir_method_call_argument *argument);
 
 struct ir_if_statement {
@@ -166,7 +149,7 @@ struct ir_if_statement {
 	struct ir_block *else_block;
 };
 
-struct ir_if_statement *ir_if_statement_new(struct semantics *semantics);
+struct ir_if_statement *ir_if_statement_new(struct ast_node **nodes);
 void ir_if_statement_free(struct ir_if_statement *statement);
 
 struct ir_for_statement {
@@ -177,7 +160,7 @@ struct ir_for_statement {
 	struct ir_block *block;
 };
 
-struct ir_for_statement *ir_for_statement_new(struct semantics *semantics);
+struct ir_for_statement *ir_for_statement_new(struct ast_node **nodes);
 void ir_for_statement_free(struct ir_for_statement *statement);
 
 struct ir_while_statement {
@@ -185,7 +168,7 @@ struct ir_while_statement {
 	struct ir_block *block;
 };
 
-struct ir_while_statement *ir_while_statement_new(struct semantics *semantics);
+struct ir_while_statement *ir_while_statement_new(struct ast_node **nodes);
 void ir_while_statement_free(struct ir_while_statement *statement);
 
 struct ir_location {
@@ -193,8 +176,7 @@ struct ir_location {
 	struct ir_expression *index;
 };
 
-struct ir_location *ir_location_new(struct semantics *semantics,
-				    enum ir_data_type *out_data_type);
+struct ir_location *ir_location_new(struct ast_node **nodes);
 void ir_location_free(struct ir_location *location);
 
 struct ir_expression {
@@ -219,8 +201,7 @@ struct ir_expression {
 	};
 };
 
-struct ir_expression *ir_expression_new(struct semantics *semantics,
-					enum ir_data_type *out_data_type);
+struct ir_expression *ir_expression_new(struct ast_node **nodes);
 void ir_expression_free(struct ir_expression *expression);
 
 struct ir_binary_expression {
@@ -245,21 +226,32 @@ struct ir_binary_expression {
 	struct ir_expression *right;
 };
 
-struct ir_binary_expression *
-ir_binary_expression_new(struct semantics *semantics,
-			 enum ir_data_type *out_data_type);
+struct ir_binary_expression *ir_binary_expression_new(struct ast_node **nodes);
 void ir_binary_expression_free(struct ir_binary_expression *expression);
 
 struct ir_literal {
+	bool negate;
+
 	enum ir_literal_type {
 		IR_LITERAL_TYPE_BOOL,
 		IR_LITERAL_TYPE_CHAR,
 		IR_LITERAL_TYPE_INT,
 	} type;
 
-	int64_t value;
+	uint64_t value;
 };
 
-struct ir_literal *ir_literal_new(struct semantics *semantics,
-				  enum ir_data_type *out_data_type);
+struct ir_literal *ir_literal_new(struct ast_node **nodes);
 void ir_literal_free(struct ir_literal *literal);
+
+enum ir_data_type ir_data_type_from_ast(struct ast_node **nodes);
+
+uint64_t ir_int_literal_from_ast(struct ast_node **nodes, bool negate);
+
+bool ir_bool_literal_from_ast(struct ast_node **nodes);
+
+char ir_char_literal_from_ast(struct ast_node **nodes);
+
+char *ir_string_literal_from_ast(struct ast_node **nodes);
+
+char *ir_identifier_from_ast(struct ast_node **nodes);

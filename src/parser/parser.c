@@ -126,8 +126,8 @@ static void parse_error(struct parser *parser, const char *message)
 	uint32_t token_index = parser->position == 0 ? 0 : parser->position - 1;
 	struct token *token = &parser->tokens[token_index];
 
-	uint32_t line_number = token_get_line_number(token, parser->source);
-	uint32_t column_number = token_get_column_number(token, parser->source);
+	uint32_t line_number = token_get_line_number(token);
+	uint32_t column_number = token_get_column_number(token);
 
 	parser->parse_error = true;
 	g_printerr("ERROR at %i:%i: %s\n", line_number, column_number, message);
@@ -1121,13 +1121,12 @@ struct parser *parser_new(void)
 	return parser;
 }
 
-int parser_parse(struct parser *parser, const char *source, GArray *token_list,
+int parser_parse(struct parser *parser, GArray *token_list,
 		 struct ast_node **ast)
 {
 	*parser = (struct parser){
 		.tokens = &g_array_index(token_list, struct token, 0),
 		.token_count = token_list->len,
-		.source = source,
 		.position = 0,
 		.parse_error = false,
 	};

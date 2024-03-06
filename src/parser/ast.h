@@ -46,6 +46,7 @@ enum ast_node_type {
 	AST_NODE_TYPE_STRING_LITERAL,
 	AST_NODE_TYPE_BOOL_LITERAL,
 	AST_NODE_TYPE_INT_LITERAL,
+	AST_NODE_TYPE_END,
 };
 
 struct ast_node {
@@ -64,5 +65,7 @@ void ast_node_add_child(struct ast_node *node, struct ast_node *child);
 uint32_t ast_node_child_count(struct ast_node *node);
 
 struct ast_node *ast_node_get_child(struct ast_node *node, uint32_t i);
+
+struct ast_node *ast_node_linearize(struct ast_node *ast);
 
 void ast_node_free(struct ast_node *node);
