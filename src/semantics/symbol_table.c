@@ -42,7 +42,7 @@ void symbol_table_add_field(symbol_table_t *symbols, char *field_identifier,
 {
 	g_assert(field_identifier != NULL || field_identifier[0] != '\0');
 	g_assert(field != NULL);
-	g_assert(g_hash_table_insert(symbols->methods_table, field_identifier,
+	g_assert(g_hash_table_insert(symbols->fields_table, field_identifier,
 				     field));
 }
 

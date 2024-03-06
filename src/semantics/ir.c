@@ -616,12 +616,12 @@ struct ir_literal *ir_literal_new(struct semantics *semantics,
 
 	if (node->type == AST_NODE_TYPE_LITERAL_NEGATION) {
 		negate = true;
-		node = next_node(semantics);
+		next_node(semantics);
 	}
 
 	struct ir_literal *literal = g_new(struct ir_literal, 1);
 
-	switch (node->type) {
+	switch (peek_node(semantics)->type) {
 	case AST_NODE_TYPE_INT_LITERAL:
 		literal->type = IR_LITERAL_TYPE_INT;
 		literal->value = ir_int_literal_from_ast(semantics, negate);
