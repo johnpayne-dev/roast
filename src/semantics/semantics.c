@@ -10,35 +10,38 @@ static void semantic_error(struct semantics *semantics, const char *message)
 static void declare_method(struct semantics *semantics,
 			   struct ir_method *method)
 {
-	symbol_table_t *symbols = semantics_current_scope(semantics);
+	fields_table_t *fields_table = semantics_current_scope(semantics);
 
-	if (symbol_table_get_method(symbols, method->identifier))
+	g_assert(fields_table_get_parent(fields_table) == NULL);
+
+	if (methods_table_get(semantics->methods_table, method->identifier))
 		semantic_error(semantics, "Redeclaration of method");
-	else if (symbol_table_get_field(symbols, method->identifier))
+	else if (fields_table_get(fields_table, method->identifier, false))
 		semantic_error(semantics,
 			       "Identifier already declared as field");
 	else
-		symbol_table_add_method(symbols, method->identifier, method);
+		methods_table_add(semantics->methods_table, method->identifier,
+				  method);
 }
 
 static void declare_field(struct semantics *semantics, struct ir_field *field)
 {
-	symbol_table_t *symbols = semantics_current_scope(semantics);
+	fields_table_t *fields_table = semantics_current_scope(semantics);
 
-	if (symbol_table_get_field(symbols, field->identifier))
+	if (methods_table_get(semantics->methods_table, field->identifier))
 		semantic_error(semantics, "Redeclaration of field");
-	else if (symbol_table_get_method(symbols, field->identifier))
+	else if (fields_table_get(fields_table, field->identifier, true))
 		semantic_error(semantics,
 			       "Identifier already declared as method");
 	else
-		symbol_table_add_field(symbols, field->identifier, field);
+		fields_table_add(fields_table, field->identifier, field);
 }
 
 static struct ir_method *get_method_declaration(struct semantics *semantics,
 						char *identifier)
 {
-	symbol_table_t *symbols = semantics_current_scope(semantics);
-	struct ir_method *method = symbol_table_get_method(symbols, identifier);
+	struct ir_method *method =
+		methods_table_get(semantics->methods_table, identifier);
 	if (method == NULL)
 		semantic_error(semantics, "Undeclared method");
 
@@ -48,14 +51,9 @@ static struct ir_method *get_method_declaration(struct semantics *semantics,
 static struct ir_field *get_field_declaration(struct semantics *semantics,
 					      char *identifier)
 {
-	symbol_table_t *symbols = semantics_current_scope(semantics);
-	struct ir_field *field = NULL;
-
-	while (field == NULL && symbols != NULL) {
-		field = symbol_table_get_field(symbols, identifier);
-		symbols = symbol_table_get_parent(symbols);
-	}
-
+	fields_table_t *fields_table = semantics_current_scope(semantics);
+	struct ir_field *field =
+		fields_table_get(fields_table, identifier, true);
 	if (field == NULL)
 		semantic_error(semantics, "Undeclared field");
 
@@ -65,8 +63,8 @@ static struct ir_field *get_field_declaration(struct semantics *semantics,
 struct semantics *semantics_new(void)
 {
 	struct semantics *semantics = g_new(struct semantics, 1);
-	semantics->symbol_table_stack =
-		g_array_new(false, false, sizeof(symbol_table_t *));
+	semantics->fields_table_stack =
+		g_array_new(false, false, sizeof(fields_table_t *));
 	return semantics;
 }
 
@@ -82,6 +80,8 @@ int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 	struct ast_node *head = linear_nodes;
 	struct ir_program *program = ir_program_new(&head);
 
+	semantics->methods_table = program->methods_table;
+
 	if (semantics->error || ir == NULL)
 		ir_program_free(program);
 	else
@@ -91,25 +91,26 @@ int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 	return semantics->error ? -1 : 0;
 }
 
-void semantics_push_scope(struct semantics *semantics, symbol_table_t *table)
+void semantics_push_scope(struct semantics *semantics,
+			  fields_table_t *fields_table)
 {
-	g_array_append_val(semantics->symbol_table_stack, table);
+	g_array_append_val(semantics->fields_table_stack, fields_table);
 }
 
-symbol_table_t *semantics_current_scope(struct semantics *semantics)
+fields_table_t *semantics_current_scope(struct semantics *semantics)
 {
-	return g_array_index(semantics->symbol_table_stack, symbol_table_t *,
-			     semantics->symbol_table_stack->len - 1);
+	return g_array_index(semantics->fields_table_stack, fields_table_t *,
+			     semantics->fields_table_stack->len - 1);
 }
 
 void semantics_pop_scope(struct semantics *semantics)
 {
-	g_array_remove_index(semantics->symbol_table_stack,
-			     semantics->symbol_table_stack->len - 1);
+	g_array_remove_index(semantics->fields_table_stack,
+			     semantics->fields_table_stack->len - 1);
 }
 
 void semantics_free(struct semantics *semantics)
 {
-	g_array_free(semantics->symbol_table_stack, true);
+	g_array_free(semantics->fields_table_stack, true);
 	g_free(semantics);
 }

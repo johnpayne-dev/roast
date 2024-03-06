@@ -7,7 +7,8 @@ struct semantics {
 	bool error;
 	GArray *nodes;
 	uint32_t position;
-	GArray *symbol_table_stack;
+	GArray *fields_table_stack;
+	methods_table_t *methods_table;
 };
 
 struct semantics *semantics_new(void);
@@ -15,9 +16,10 @@ struct semantics *semantics_new(void);
 int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 		      struct ir_program **ir);
 
-void semantics_push_scope(struct semantics *semantics, symbol_table_t *table);
+void semantics_push_scope(struct semantics *semantics,
+			  fields_table_t *fields_table);
 
-symbol_table_t *semantics_current_scope(struct semantics *semantics);
+fields_table_t *semantics_current_scope(struct semantics *semantics);
 
 void semantics_pop_scope(struct semantics *semantics);
 

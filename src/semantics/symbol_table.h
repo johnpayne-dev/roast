@@ -9,15 +9,15 @@ typedef struct fields_table fields_table_t;
 
 fields_table_t *fields_table_new(fields_table_t *parent);
 
-void fields_table_free(fields_table_t *fields);
+void fields_table_free(fields_table_t *fields_table);
 
-fields_table_t *fields_table_get_parent(fields_table_t *fields);
+fields_table_t *fields_table_get_parent(fields_table_t *fields_table);
 
-void fields_table_add(fields_table_t *fields, char *identifier,
-		      struct ir_field *descriptor);
+void fields_table_add(fields_table_t *fields_table, char *identifier,
+		      struct ir_field *field);
 
-struct ir_field *fields_table_get(fields_table_t *fields, char *identifier,
-				  bool climb);
+struct ir_field *fields_table_get(fields_table_t *fields_table,
+				  char *identifier, bool climb);
 
 struct ir_method;
 
@@ -25,9 +25,10 @@ typedef struct methods_table methods_table_t;
 
 methods_table_t *methods_table_new(void);
 
-void methods_table_free(methods_table_t *methods);
+void methods_table_free(methods_table_t *methods_table);
 
-void methods_table_add(methods_table_t *methods, char *identifier,
+void methods_table_add(methods_table_t *methods_table, char *identifier,
 		       struct ir_method *descriptor);
 
-struct ir_method *methods_table_get(methods_table_t *methods, char *identifier);
+struct ir_method *methods_table_get(methods_table_t *methods_table,
+				    char *method);
