@@ -15,7 +15,8 @@ enum ir_data_type {
 };
 
 struct ir_program {
-	symbol_table_t *symbols;
+	fields_table_t *fields_table;
+	methods_table_t *methods_table;
 	GArray *fields;
 	GArray *methods;
 };
@@ -62,7 +63,7 @@ struct ir_initializer *ir_initializer_new(struct ast_node **nodes);
 void ir_initializer_free(struct ir_initializer *initializer);
 
 struct ir_block {
-	symbol_table_t *symbols;
+	fields_table_t *fields_table;
 
 	size_t field_count;
 	struct ir_field **fields;

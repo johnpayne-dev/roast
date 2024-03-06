@@ -31,8 +31,9 @@ struct ir_program *ir_program_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_PROGRAM);
 
 	struct ir_program *program = g_new(struct ir_program, 1);
-	program->symbols = symbol_table_new(NULL);
+	program->fields_table = fields_table_new(NULL);
 	program->fields = g_array_new(false, false, sizeof(struct ir_field *));
+	program->methods_table = methods_table_new();
 	program->methods =
 		g_array_new(false, false, sizeof(struct ir_method *));
 
@@ -69,7 +70,8 @@ void ir_program_free(struct ir_program *program)
 	}
 	g_array_free(program->fields, true);
 
-	symbol_table_free(program->symbols);
+	fields_table_free(program->fields_table);
+	methods_table_free(program->methods_table);
 	g_free(program);
 }
 
