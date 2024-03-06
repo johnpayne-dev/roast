@@ -17,6 +17,7 @@ enum ir_data_type {
 struct ir_program {
 	fields_table_t *fields_table;
 	methods_table_t *methods_table;
+	GArray *imports;
 	GArray *fields;
 	GArray *methods;
 };

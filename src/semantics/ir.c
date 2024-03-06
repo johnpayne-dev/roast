@@ -32,14 +32,15 @@ struct ir_program *ir_program_new(struct ast_node **nodes)
 
 	struct ir_program *program = g_new(struct ir_program, 1);
 	program->fields_table = fields_table_new(NULL);
-	program->fields = g_array_new(false, false, sizeof(struct ir_field *));
 	program->methods_table = methods_table_new();
+	program->imports = g_array_new(false, false, sizeof(struct ir_method *));
+	program->fields = g_array_new(false, false, sizeof(struct ir_field *));
 	program->methods =
 		g_array_new(false, false, sizeof(struct ir_method *));
 
 	while (peek_node(nodes)->type == AST_NODE_TYPE_IMPORT) {
 		struct ir_method *method = ir_method_new_from_import(nodes);
-		g_array_append_val(program->methods, method);
+		g_array_append_val(program->imports, method);
 	}
 
 	while (peek_node(nodes)->type == AST_NODE_TYPE_FIELD)
@@ -56,12 +57,12 @@ struct ir_program *ir_program_new(struct ast_node **nodes)
 
 void ir_program_free(struct ir_program *program)
 {
-	for (uint32_t i = 0; i < program->methods->len; i++) {
+	for (uint32_t i = 0; i < program->imports->len; i++) {
 		struct ir_method *method =
-			g_array_index(program->methods, struct ir_method *, i);
+			g_array_index(program->imports, struct ir_method *, i);
 		ir_method_free(method);
 	}
-	g_array_free(program->methods, true);
+	g_array_free(program->imports, true);
 
 	for (uint32_t i = 0; i < program->fields->len; i++) {
 		struct ir_field *field =
@@ -70,8 +71,16 @@ void ir_program_free(struct ir_program *program)
 	}
 	g_array_free(program->fields, true);
 
+	for (uint32_t i = 0; i < program->methods->len; i++) {
+		struct ir_method *method =
+			g_array_index(program->methods, struct ir_method *, i);
+		ir_method_free(method);
+	}
+	g_array_free(program->methods, true);
+
 	fields_table_free(program->fields_table);
 	methods_table_free(program->methods_table);
+
 	g_free(program);
 }
 

@@ -60,6 +60,11 @@ static struct ir_field *get_field_declaration(struct semantics *semantics,
 	return field;
 }
 
+static void analyze_program(struct semantics *semantics, struct ir_program *program)
+{
+	
+}
+
 struct semantics *semantics_new(void)
 {
 	struct semantics *semantics = g_new(struct semantics, 1);
@@ -71,23 +76,20 @@ struct semantics *semantics_new(void)
 int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 		      struct ir_program **ir)
 {
-	semantics->error = false;
-	semantics->nodes = g_array_new(false, false, sizeof(struct ast_node *));
-	semantics->position = 0;
-
 	struct ast_node *linear_nodes = ast_node_linearize(ast);
+	struct ir_program *program =
+		ir_program_new(&(struct ast_node *){ linear_nodes });
+	g_free(linear_nodes);
 
-	struct ast_node *head = linear_nodes;
-	struct ir_program *program = ir_program_new(&head);
-
+	semantics->error = false;
 	semantics->methods_table = program->methods_table;
+	analyze_program(semantics, program);
 
 	if (semantics->error || ir == NULL)
 		ir_program_free(program);
 	else
 		*ir = program;
 
-	g_free(linear_nodes);
 	return semantics->error ? -1 : 0;
 }
 

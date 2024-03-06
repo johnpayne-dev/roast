@@ -5,8 +5,6 @@
 
 struct semantics {
 	bool error;
-	GArray *nodes;
-	uint32_t position;
 	GArray *fields_table_stack;
 	methods_table_t *methods_table;
 };
