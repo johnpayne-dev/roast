@@ -23,10 +23,10 @@ static inline void validate_field_descriptor(struct ir_field *descriptor)
 	g_assert(descriptor != NULL);
 }
 
-fields_table_t *fields_table_new(fields_table_t *parent)
+fields_table_t *fields_table_new(void)
 {
 	struct fields_table *fields = g_new(struct fields_table, 1);
-	fields->parent = parent;
+	fields->parent = NULL;
 	fields->table = g_hash_table_new(g_str_hash, g_str_equal);
 	return fields;
 }
@@ -36,6 +36,12 @@ void fields_table_free(fields_table_t *fields)
 	validate_fields_table(fields);
 	g_hash_table_destroy(fields->table);
 	g_free(fields);
+}
+
+void fields_table_set_parent(fields_table_t *fields, fields_table_t *parent)
+{
+	validate_fields_table(fields);
+	fields->parent = parent;
 }
 
 fields_table_t *fields_table_get_parent(fields_table_t *fields)

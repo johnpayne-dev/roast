@@ -31,7 +31,7 @@ struct ir_program *ir_program_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_PROGRAM);
 
 	struct ir_program *program = g_new(struct ir_program, 1);
-	program->fields_table = fields_table_new(NULL);
+	program->fields_table = fields_table_new();
 	program->methods_table = methods_table_new();
 	program->imports =
 		g_array_new(false, false, sizeof(struct ir_method *));
@@ -98,10 +98,13 @@ struct ir_method *ir_method_new(struct ast_node **nodes)
 	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_IDENTIFIER);
 	method->identifier = ir_identifier_from_ast(nodes);
 
+	method->arguments =
+		g_array_new(false, false, sizeof(struct ir_method_argument *));
+
 	while (peek_node(nodes)->type == AST_NODE_TYPE_METHOD_ARGUMENT) {
-		struct ir_method_argument *ir_method_argument =
+		struct ir_method_argument *method_argument =
 			ir_method_argument_new(nodes);
-		g_array_append_val(method->arguments, ir_method_argument);
+		g_array_append_val(method->arguments, method_argument);
 	}
 
 	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_BLOCK);
@@ -230,17 +233,47 @@ void ir_initializer_free(struct ir_initializer *initializer)
 	g_free(initializer);
 }
 
-// Karl
 struct ir_block *ir_block_new(struct ast_node **nodes)
 {
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_BLOCK);
 
-	return NULL;
+	struct ir_block *block = g_new(struct ir_block, 1);
+
+	block->fields_table = fields_table_new();
+
+	block->fields = g_array_new(false, false, sizeof(struct ir_field *));
+	iterate_fields(nodes, block->fields);
+
+	block->statements =
+		g_array_new(false, false, sizeof(struct ir_statements *));
+
+	while (peek_node(nodes)->type == AST_NODE_TYPE_STATEMENT) {
+		struct ir_statement *statement = ir_statement_new(nodes);
+		g_array_append_val(block->statements, statement);
+	}
+
+	return block;
 }
 
 void ir_block_free(struct ir_block *block)
 {
-	g_assert(0);
+	fields_table_free(block->fields_table);
+
+	for (uint32_t i = 0; i < block->fields->len; i++) {
+		struct ir_field *field =
+			g_array_index(block->fields, struct ir_field *, i);
+		ir_field_free(field);
+	}
+	g_array_free(block->fields, true);
+
+	for (uint32_t i = 0; i < block->statements->len; i++) {
+		struct ir_statement *statement = g_array_index(
+			block->statements, struct ir_statement *, i);
+		ir_field_free(statement);
+	}
+	g_array_free(block->statements, true);
+
+	g_free(block);
 }
 
 struct ir_statement *ir_statement_new(struct ast_node **nodes)

@@ -7,9 +7,11 @@ struct ir_field;
 
 typedef struct fields_table fields_table_t;
 
-fields_table_t *fields_table_new(fields_table_t *parent);
+fields_table_t *fields_table_new(void);
 
 void fields_table_free(fields_table_t *fields_table);
+
+void fields_table_set_parent(fields_table_t *fields, fields_table_t *parent);
 
 fields_table_t *fields_table_get_parent(fields_table_t *fields_table);
 
