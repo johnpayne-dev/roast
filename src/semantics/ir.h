@@ -59,13 +59,22 @@ struct ir_field {
 	bool constant;
 	char *identifier;
 	bool array;
-	size_t array_length;
-	int64_t *initializers;
+	int64_t array_length;
+	struct ir_initializer *initializer;
 };
 
 struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
 			      enum ir_data_type type);
 void ir_field_free(struct ir_field *field);
+
+struct ir_initializer {
+	bool array;
+	GArray *literals;
+};
+
+struct ir_initializer *ir_initializer_new(struct semantics *semantics,
+					  enum ir_data_type *out_data_type);
+void ir_initializer_free(struct ir_initializer *initializer);
 
 struct ir_block {
 	symbol_table_t *symbols;

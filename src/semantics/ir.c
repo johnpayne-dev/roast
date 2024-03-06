@@ -331,62 +331,6 @@ void ir_method_free(struct ir_method *method)
 {
 }
 
-static int64_t *read_array_literal(struct semantics *semantics, size_t *length,
-				   enum ir_data_type *type)
-{
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_ARRAY_LITERAL);
-
-	GArray *values_array = g_array_new(false, false, sizeof(int64_t));
-	enum ir_data_type array_type = -1;
-
-	while (peek_node(semantics)->type == AST_NODE_TYPE_LITERAL) {
-		enum ir_data_type literal_type;
-		struct ir_literal *literal =
-			ir_literal_new(semantics, &literal_type);
-
-		if (array_type == (uint32_t)-1)
-			array_type = literal_type;
-		else if (array_type != literal_type)
-			semantic_error(
-				semantics,
-				"Array literal does not contain uniform types");
-
-		g_array_append_val(values_array, literal->value);
-		ir_literal_free(literal);
-	}
-
-	int64_t *values = &g_array_index(values_array, int64_t, 0);
-	*length = values_array->len;
-	*type = array_type;
-
-	g_array_free(values_array, false);
-	return values;
-}
-
-static int64_t *read_initializer(struct semantics *semantics, bool *array,
-				 size_t *length, enum ir_data_type *type)
-{
-	g_assert(next_node(semantics)->type == AST_NODE_TYPE_INITIALIZER);
-
-	if (peek_node(semantics)->type == AST_NODE_TYPE_LITERAL) {
-		int64_t *value = g_new(int64_t, 1);
-
-		struct ir_literal *literal = ir_literal_new(semantics, type);
-		*array = false;
-		*length = 1;
-		*value = literal->value;
-		ir_literal_free(literal);
-
-		return value;
-	} else if (peek_node(semantics)->type == AST_NODE_TYPE_ARRAY_LITERAL) {
-		*array = true;
-		return read_array_literal(semantics, length, type);
-	} else {
-		g_assert(!"Invalid initializer type");
-		return NULL;
-	}
-}
-
 struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
 			      enum ir_data_type type)
 {
@@ -400,40 +344,34 @@ struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
 	if (peek_node(semantics)->type == AST_NODE_TYPE_INT_LITERAL) {
 		field->array = true;
 		field->array_length = ir_int_literal_from_ast(semantics, false);
-		if (field->array_length < 1) {
+		if (field->array_length <= 0)
 			semantic_error(semantics,
 				       "Array length must be greater than 0");
-			field->array_length = 1;
-		}
 	} else if (peek_node(semantics)->type ==
 		   AST_NODE_TYPE_EMPTY_ARRAY_LENGTH) {
 		field->array = true;
-		field->array_length = 0;
+		field->array_length = -1;
 		next_node(semantics);
 	} else {
 		field->array = false;
-		field->array_length = 0;
+		field->array_length = 1;
 	}
 
 	if (peek_node(semantics)->type == AST_NODE_TYPE_INITIALIZER) {
-		bool initializer_array;
-		size_t initializer_length;
 		enum ir_data_type initializer_type;
-		int64_t *initializers = read_initializer(semantics,
-							 &initializer_array,
-							 &initializer_length,
-							 &initializer_type);
+		struct ir_initializer *initializer =
+			ir_initializer_new(semantics, &initializer_type);
 
-		if (initializer_array && field->array &&
-		    field->array_length > 0)
+		if (initializer->array && field->array &&
+		    field->array_length != -1)
 			semantic_error(
 				semantics,
 				"Array initializer cannot be used to initialize field with declared length");
-		if (initializer_array && !field->array)
+		if (initializer->array && !field->array)
 			semantic_error(
 				semantics,
 				"Array initializer cannot be used to initialize non-array field");
-		if (!initializer_array && field->array)
+		if (!initializer->array && field->array)
 			semantic_error(
 				semantics,
 				"Non-array initializer cannot be used to initialize array field");
@@ -442,16 +380,15 @@ struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
 				semantics,
 				"Initializer type does not match field type");
 
-		if (initializer_array)
-			field->array_length = initializer_length;
-		field->initializers = initializers;
+		field->array_length = initializer->literals->len;
+		field->initializer = initializer;
 	} else {
-		if (field->array && field->array_length == 0)
+		if (field->array && field->array_length == -1)
 			semantic_error(
 				semantics,
 				"Missing array literal for field declaration");
 
-		field->initializers = NULL;
+		field->initializer = NULL;
 	}
 
 	return field;
@@ -460,8 +397,54 @@ struct ir_field *ir_field_new(struct semantics *semantics, bool constant,
 void ir_field_free(struct ir_field *field)
 {
 	g_free(field->identifier);
-	g_free(field->initializers);
+	if (field->initializer != NULL)
+		ir_initializer_free(field->initializer);
 	g_free(field);
+}
+
+struct ir_initializer *ir_initializer_new(struct semantics *semantics,
+					  enum ir_data_type *out_data_type)
+{
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_INITIALIZER);
+
+	struct ir_initializer *initializer = g_new(struct ir_initializer, 1);
+	initializer->literals =
+		g_array_new(false, false, sizeof(struct ir_literal *));
+	initializer->array = peek_node(semantics)->type ==
+			     AST_NODE_TYPE_ARRAY_LITERAL;
+	if (initializer->array)
+		next_node(semantics);
+
+	enum ir_data_type data_type = -1;
+
+	while (peek_node(semantics)->type == AST_NODE_TYPE_LITERAL) {
+		enum ir_data_type literal_type;
+		struct ir_literal *literal =
+			ir_literal_new(semantics, &literal_type);
+
+		if (data_type == (uint32_t)-1)
+			data_type = literal_type;
+		else if (literal_type != data_type)
+			semantic_error(
+				semantics,
+				"Array literal does not contain uniform types");
+
+		g_array_append_val(initializer->literals, literal);
+	}
+
+	*out_data_type = data_type;
+	return initializer;
+}
+
+void ir_initializer_free(struct ir_initializer *initializer)
+{
+	for (uint32_t i = 0; i < initializer->literals->len; i++) {
+		struct ir_literal *literal = g_array_index(
+			initializer->literals, struct ir_literal *, i);
+		ir_literal_free(literal);
+	}
+	g_array_free(initializer->literals, true);
+	g_free(initializer);
 }
 
 // Karl
