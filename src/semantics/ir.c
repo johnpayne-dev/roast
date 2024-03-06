@@ -233,7 +233,8 @@ void ir_initializer_free(struct ir_initializer *initializer)
 // Karl
 struct ir_block *ir_block_new(struct ast_node **nodes)
 {
-	g_assert(0);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_BLOCK);
+
 	return NULL;
 }
 

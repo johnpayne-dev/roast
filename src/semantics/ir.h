@@ -42,7 +42,7 @@ struct ir_method_argument {
 	char *identifier;
 };
 
-struct ir_method *ir_method_argument_new(struct ast_node **nodes);
+struct ir_method_argument *ir_method_argument_new(struct ast_node **nodes);
 void ir_method_argument_free(struct ir_method_argument *method_argument);
 
 struct ir_field {
@@ -68,12 +68,8 @@ void ir_initializer_free(struct ir_initializer *initializer);
 
 struct ir_block {
 	fields_table_t *fields_table;
-
-	size_t field_count;
-	struct ir_field **fields;
-
-	size_t statement_count;
-	struct ir_statement **statements;
+	GArray *fields;
+	GArray *statements;
 };
 
 struct ir_block *ir_block_new(struct ast_node **nodes);
