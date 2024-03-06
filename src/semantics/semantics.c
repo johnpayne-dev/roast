@@ -3,7 +3,10 @@
 
 struct semantics *semantics_new(void)
 {
-	return g_new(struct semantics, 1);
+	struct semantics *semantics = g_new(struct semantics, 1);
+	semantics->symbol_table_stack =
+		g_array_new(false, false, sizeof(symbol_table_t *));
+	return semantics;
 }
 
 static void linearize_ast(struct ast_node *ast, GArray *nodes)
@@ -37,7 +40,25 @@ int semantics_analyze(struct semantics *semantics, const char *source,
 	return semantics->error ? -1 : 0;
 }
 
+void semantics_push_scope(struct semantics *semantics, symbol_table_t *table)
+{
+	g_array_append_val(semantics->symbol_table_stack, table);
+}
+
+symbol_table_t *semantics_current_scope(struct semantics *semantics)
+{
+	return g_array_index(semantics->symbol_table_stack, symbol_table_t *,
+			     semantics->symbol_table_stack->len - 1);
+}
+
+void semantics_pop_scope(struct semantics *semantics)
+{
+	g_array_remove_index(semantics->symbol_table_stack,
+			     semantics->symbol_table_stack->len - 1);
+}
+
 void semantics_free(struct semantics *semantics)
 {
+	g_array_free(semantics->symbol_table_stack, true);
 	g_free(semantics);
 }
