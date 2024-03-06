@@ -85,11 +85,29 @@ void ir_program_free(struct ir_program *program)
 	g_free(program);
 }
 
-// Karl
 struct ir_method *ir_method_new(struct ast_node **nodes)
 {
-	g_assert(0);
-	return NULL;
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_METHOD);
+
+	struct ir_method *method = g_new(struct ir_method, 1);
+	method->imported = false;
+
+	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_DATA_TYPE);
+	method->return_type = ir_data_type_from_ast(nodes);
+
+	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_IDENTIFIER);
+	method->identifier = ir_identifier_from_ast(nodes);
+
+	while (peek_node(nodes)->type == AST_NODE_TYPE_METHOD_ARGUMENT) {
+		struct ir_method_argument *ir_method_argument =
+			ir_method_argument_new(nodes);
+		g_array_append_val(method->arguments, ir_method_argument);
+	}
+
+	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_BLOCK);
+	method->block = ir_block_new(nodes);
+
+	return method;
 }
 
 struct ir_method *ir_method_new_from_import(struct ast_node **nodes)
@@ -107,7 +125,35 @@ struct ir_method *ir_method_new_from_import(struct ast_node **nodes)
 
 void ir_method_free(struct ir_method *method)
 {
-	g_assert(0);
+	g_free(method->identifier);
+	for (uint32_t i = 0; i < method->arguments->len; i++) {
+		struct ir_method_argument *method_argument = g_array_index(
+			method->arguments, struct ir_method_argument *, i);
+		ir_method_argument_free(method_argument);
+	}
+	g_array_free(method->arguments, true);
+	ir_block_free(method->block);
+	g_free(method);
+}
+
+struct ir_method *ir_method_argument_new(struct ast_node **nodes)
+{
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_METHOD_ARGUMENT);
+
+	struct ir_method_argument *method_arugment =
+		g_new(struct ir_method_argument, 1);
+
+	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_DATA_TYPE);
+	method_arugment->type = ir_data_type_from_ast(nodes);
+
+	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_IDENTIFIER);
+	method_arugment->type = ir_identifier_from_ast(nodes);
+}
+
+void ir_method_argument_free(struct ir_method_argument *method_argument)
+{
+	g_free(method_argument->identifier);
+	g_free(method_argument);
 }
 
 struct ir_field *ir_field_new(struct ast_node **nodes, bool constant,

@@ -33,14 +33,17 @@ struct ir_method {
 	struct ir_block *block;
 };
 
+struct ir_method *ir_method_new(struct ast_node **nodes);
+struct ir_method *ir_method_new_from_import(struct ast_node **nodes);
+void ir_method_free(struct ir_method *method);
+
 struct ir_method_argument {
 	enum ir_data_type type;
 	char *identifier;
 };
 
-struct ir_method *ir_method_new(struct ast_node **nodes);
-struct ir_method *ir_method_new_from_import(struct ast_node **nodes);
-void ir_method_free(struct ir_method *method);
+struct ir_method *ir_method_argument_new(struct ast_node **nodes);
+void ir_method_argument_free(struct ir_method_argument *method_argument);
 
 struct ir_field {
 	enum ir_data_type type;
