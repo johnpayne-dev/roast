@@ -22,8 +22,10 @@ static struct ast_node *peek_node(struct semantics *semantics)
 }
 
 static void declare_method(struct semantics *semantics,
-			   struct ir_method *method, symbol_table_t *symbols)
+			   struct ir_method *method)
 {
+	symbol_table_t *symbols = semantics_current_scope(semantics);
+
 	if (symbol_table_get_method(symbols, method->identifier))
 		semantic_error(semantics, "Redeclaration of method");
 	else if (symbol_table_get_field(symbols, method->identifier))
@@ -33,9 +35,10 @@ static void declare_method(struct semantics *semantics,
 		symbol_table_add_method(symbols, method->identifier, method);
 }
 
-static void declare_field(struct semantics *semantics, struct ir_field *field,
-			  symbol_table_t *symbols)
+static void declare_field(struct semantics *semantics, struct ir_field *field)
 {
+	symbol_table_t *symbols = semantics_current_scope(semantics);
+
 	if (symbol_table_get_field(symbols, field->identifier))
 		semantic_error(semantics, "Redeclaration of field");
 	else if (symbol_table_get_method(symbols, field->identifier))
@@ -206,8 +209,7 @@ char *ir_identifier_from_ast(struct semantics *semantics)
 	return token_get_string(node->token, semantics->source);
 }
 
-static void iterate_fields(struct semantics *semantics, symbol_table_t *symbols,
-			   GArray *fields)
+static void iterate_fields(struct semantics *semantics, GArray *fields)
 {
 	g_assert(next_node(semantics)->type == AST_NODE_TYPE_FIELD);
 
@@ -220,7 +222,7 @@ static void iterate_fields(struct semantics *semantics, symbol_table_t *symbols,
 	while (peek_node(semantics)->type == AST_NODE_TYPE_FIELD_IDENTIFIER) {
 		struct ir_field *field =
 			ir_field_new(semantics, constant, type);
-		declare_field(semantics, field, symbols);
+		declare_field(semantics, field);
 		g_array_append_val(fields, field);
 	}
 }
@@ -235,20 +237,24 @@ struct ir_program *ir_program_new(struct semantics *semantics)
 	program->methods =
 		g_array_new(false, false, sizeof(struct ir_method *));
 
+	semantics_push_scope(semantics, program->symbols);
+
 	while (peek_node(semantics)->type == AST_NODE_TYPE_IMPORT) {
 		struct ir_method *method = ir_method_new_from_import(semantics);
-		declare_method(semantics, method, program->symbols);
+		declare_method(semantics, method);
 		g_array_append_val(program->methods, method);
 	}
 
 	while (peek_node(semantics)->type == AST_NODE_TYPE_FIELD)
-		iterate_fields(semantics, program->symbols, program->fields);
+		iterate_fields(semantics, program->fields);
 
 	while (peek_node(semantics)->type == AST_NODE_TYPE_METHOD) {
 		struct ir_method *method = ir_method_new(semantics);
-		declare_method(semantics, method, program->symbols);
+		declare_method(semantics, method);
 		g_array_append_val(program->methods, method);
 	}
+
+	semantics_pop_scope(semantics);
 
 	g_assert(peek_node(semantics)->type == (uint32_t)-1);
 	return program;
