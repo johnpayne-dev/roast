@@ -471,16 +471,69 @@ void ir_expression_free(struct ir_expression *expression)
 	g_assert(0);
 }
 
-// John
 struct ir_binary_expression *ir_binary_expression_new(struct ast_node **nodes)
 {
-	g_assert(0);
-	return NULL;
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_BINARY_EXPRESSION);
+
+	struct ir_binary_expression *expression =
+		g_new(struct ir_binary_expression, 1);
+	expression->left = ir_expression_new(nodes);
+
+	switch (next_node(nodes)->token->type) {
+	case TOKEN_TYPE_OR:
+		expression->binary_operator = IR_BINARY_OPERATOR_OR;
+		break;
+	case TOKEN_TYPE_AND:
+		expression->binary_operator = IR_BINARY_OPERATOR_AND;
+		break;
+	case TOKEN_TYPE_EQUAL:
+		expression->binary_operator = IR_BINARY_OPERATOR_EQUAL;
+		break;
+	case TOKEN_TYPE_NOT_EQUAL:
+		expression->binary_operator = IR_BINARY_OPERATOR_NOT_EQUAL;
+		break;
+	case TOKEN_TYPE_LESS:
+		expression->binary_operator = IR_BINARY_OPERATOR_LESS;
+		break;
+	case TOKEN_TYPE_LESS_EQUAL:
+		expression->binary_operator = IR_BINARY_OPERATOR_LESS_EQUAL;
+		break;
+	case TOKEN_TYPE_GREATER_EQUAL:
+		expression->binary_operator = IR_BINARY_OPERATOR_GREATER_EQUAL;
+		break;
+	case TOKEN_TYPE_GREATER:
+		expression->binary_operator = IR_BINARY_OPERATOR_GREATER;
+		break;
+	case TOKEN_TYPE_ADD:
+		expression->binary_operator = IR_BINARY_OPERATOR_ADD;
+		break;
+	case TOKEN_TYPE_SUB:
+		expression->binary_operator = IR_BINARY_OPERATOR_SUB;
+		break;
+	case TOKEN_TYPE_MUL:
+		expression->binary_operator = IR_BINARY_OPERATOR_MUL;
+		break;
+	case TOKEN_TYPE_DIV:
+		expression->binary_operator = IR_BINARY_OPERATOR_DIV;
+		break;
+	case TOKEN_TYPE_MOD:
+		expression->binary_operator = IR_BINARY_OPERATOR_MOD;
+		break;
+	default:
+		g_assert(!"Invalid operator type in binary expression");
+		break;
+	}
+
+	expression->right = ir_expression_new(nodes);
+
+	return expression;
 }
 
 void ir_binary_expression_free(struct ir_binary_expression *expression)
 {
-	g_assert(0);
+	ir_expression_free(expression->left);
+	ir_expression_free(expression->right);
+	g_free(expression);
 }
 
 struct ir_literal *ir_literal_new(struct ast_node **nodes)
