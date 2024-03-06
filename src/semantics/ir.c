@@ -558,15 +558,127 @@ void ir_assignment_free(struct ir_assignment *assignment)
 {
 }
 
-// John
+static void type_check_arguments(struct semantics *semantics,
+				 struct ir_method *method, GArray *arguments,
+				 GArray *data_types)
+{
+	if (method->imported)
+		return;
+
+	if (method->arguments->len != arguments->len) {
+		semantic_error(
+			semantics,
+			"Incorrect number of arguments passed into method call");
+		return;
+	}
+
+	for (uint32_t i = 0; i < arguments->len; i++) {
+		struct ir_method_call_argument *call_argument = g_array_index(
+			arguments, struct ir_method_call_argument *, i);
+		struct ir_method_argument *method_argument = g_array_index(
+			arguments, struct ir_method_argument *, i);
+		enum ir_data_type data_type =
+			g_array_index(data_types, enum ir_data_type, i);
+
+		if (call_argument->type == IR_METHOD_CALL_ARGUMENT_TYPE_STRING)
+			semantic_error(
+				semantics,
+				"Strings can only be passed into imported functions");
+		else if (data_type != method_argument->type)
+			semantic_error(
+				semantics,
+				"Incorrect argument type passed into method call");
+	}
+}
+
 struct ir_method_call *ir_method_call_new(struct semantics *semantics,
 					  enum ir_data_type *out_data_type)
 {
-	return NULL;
+	g_assert(next_node(semantics)->type == AST_NODE_TYPE_METHOD_CALL);
+
+	struct ir_method_call *call = g_new(struct ir_method_call, 1);
+	call->identifier = ir_identifier_from_ast(semantics);
+	call->arguments = g_array_new(false, false,
+				      sizeof(struct ir_method_call_argument *));
+	GArray *data_types =
+		g_array_new(false, false, sizeof(enum ir_data_type));
+
+	while (peek_node(semantics)->type ==
+	       AST_NODE_TYPE_METHOD_CALL_ARGUMENT) {
+		enum ir_data_type data_type;
+		struct ir_method_call_argument *argument =
+			ir_method_call_argument_new(semantics, &data_type);
+		g_array_append_val(call->arguments, argument);
+		g_array_append_val(data_types, data_type);
+	}
+
+	symbol_table_t *symbols = semantics_current_scope(semantics);
+	struct ir_method *method =
+		symbol_table_get_method(symbols, call->identifier);
+
+	if (method == NULL) {
+		semantic_error(semantics, "Undeclared method");
+		*out_data_type = IR_DATA_TYPE_VOID;
+	} else {
+		*out_data_type = method->return_type;
+		type_check_arguments(semantics, method, call->arguments,
+				     data_types);
+	}
+
+	g_array_free(data_types, true);
+	return call;
 }
 
-void ir_method_call_free(struct ir_method_call *method_call)
+void ir_method_call_free(struct ir_method_call *call)
 {
+	g_free(call->identifier);
+	for (uint32_t i = 0; i < call->arguments->len; i++) {
+		struct ir_method_call_argument *argument = g_array_index(
+			call->arguments, struct ir_method_call_argument *, i);
+		ir_method_call_argument_free(argument);
+	}
+	g_array_free(call->arguments, true);
+	g_free(call);
+}
+
+struct ir_method_call_argument *
+ir_method_call_argument_new(struct semantics *semantics,
+			    enum ir_data_type *out_data_type)
+{
+	g_assert(next_node(semantics)->type ==
+		 AST_NODE_TYPE_METHOD_CALL_ARGUMENT);
+
+	struct ir_method_call_argument *argument =
+		g_new(struct ir_method_call_argument, 1);
+
+	if (peek_node(semantics)->type == AST_NODE_TYPE_STRING_LITERAL) {
+		argument->type = IR_METHOD_CALL_ARGUMENT_TYPE_STRING;
+		argument->string = ir_string_literal_from_ast(semantics);
+		*out_data_type = IR_DATA_TYPE_VOID;
+	} else if (peek_node(semantics)->type == AST_NODE_TYPE_EXPRESSION) {
+		argument->type = IR_METHOD_CALL_ARGUMENT_TYPE_EXPRESSION;
+		argument->expression =
+			ir_expression_new(semantics, out_data_type);
+	} else {
+		g_assert(!"Invalid node type in method call argument");
+	}
+
+	return argument;
+}
+
+void ir_method_call_argument_free(struct ir_method_call_argument *argument)
+{
+	switch (argument->type) {
+	case IR_METHOD_CALL_ARGUMENT_TYPE_STRING:
+		g_free(argument->string);
+		break;
+	case IR_METHOD_CALL_ARGUMENT_TYPE_EXPRESSION:
+		ir_expression_free(argument->expression);
+		break;
+	default:
+		break;
+	}
+	g_free(argument);
 }
 
 // Karl

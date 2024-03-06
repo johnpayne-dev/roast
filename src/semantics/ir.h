@@ -41,7 +41,7 @@ struct ir_method {
 	bool imported;
 	enum ir_data_type return_type;
 	char *identifier;
-	struct ir_method_argument *arguments;
+	GArray *arguments;
 	struct ir_block *block;
 };
 
