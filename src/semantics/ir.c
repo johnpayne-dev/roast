@@ -126,17 +126,20 @@ struct ir_method *ir_method_new_from_import(struct ast_node **nodes)
 void ir_method_free(struct ir_method *method)
 {
 	g_free(method->identifier);
-	for (uint32_t i = 0; i < method->arguments->len; i++) {
-		struct ir_method_argument *method_argument = g_array_index(
-			method->arguments, struct ir_method_argument *, i);
-		ir_method_argument_free(method_argument);
+	if (!method->imported) {
+		for (uint32_t i = 0; i < method->arguments->len; i++) {
+			struct ir_method_argument *method_argument =
+				g_array_index(method->arguments,
+					      struct ir_method_argument *, i);
+			ir_method_argument_free(method_argument);
+		}
+		g_array_free(method->arguments, true);
+		ir_block_free(method->block);
 	}
-	g_array_free(method->arguments, true);
-	ir_block_free(method->block);
 	g_free(method);
 }
 
-struct ir_method *ir_method_argument_new(struct ast_node **nodes)
+struct ir_method_argument *ir_method_argument_new(struct ast_node **nodes)
 {
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_METHOD_ARGUMENT);
 
@@ -148,6 +151,8 @@ struct ir_method *ir_method_argument_new(struct ast_node **nodes)
 
 	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_IDENTIFIER);
 	method_arugment->type = ir_identifier_from_ast(nodes);
+
+	return method_arugment;
 }
 
 void ir_method_argument_free(struct ir_method_argument *method_argument)
