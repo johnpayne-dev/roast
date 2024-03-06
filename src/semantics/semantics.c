@@ -78,52 +78,43 @@ static struct ir_field *get_field_declaration(struct semantics *semantics,
 	return field;
 }
 
-static enum ir_data_type evaluate_literal_type(struct ir_literal *literal)
+static enum ir_data_type analyze_literal(struct semantics *semantics,
+					 struct ir_literal *literal)
 {
-	g_assert(!"Unimplemented");
-	return -1;
-}
+	if (literal->type == IR_LITERAL_TYPE_INT) {
+		uint64_t max_value = literal->negate ? -INT64_MIN : INT64_MAX;
+		if (literal->value > max_value)
+			semantic_error(semantics, "Overflow in int literal");
+	}
 
-static enum ir_data_type evaluate_location_type(struct ir_location *location)
-{
-	g_assert(!"Unimplemented");
-	return -1;
+	switch (literal->type) {
+	case IR_LITERAL_TYPE_INT:
+		return IR_DATA_TYPE_INT;
+	case IR_LITERAL_TYPE_CHAR:
+		return IR_DATA_TYPE_INT;
+	case IR_LITERAL_TYPE_BOOL:
+		return IR_DATA_TYPE_BOOL;
+	default:
+		g_assert(!"Invalid literal type");
+		return -1;
+	}
 }
 
 static enum ir_data_type
-evaluate_binary_expression_type(struct ir_binary_expression *expression)
-{
-	g_assert(!"Unimplemented");
-	return -1;
-}
-
-static enum ir_data_type
-evaluate_expression_type(struct ir_expression *expression)
-{
-	g_assert(!"Unimplemented");
-	return -1;
-}
-
-static void analyze_literal(struct semantics *semantics,
-			    struct ir_literal *literal)
+analyze_binary_expression(struct semantics *semantics,
+			  struct ir_binary_expression *expression)
 {
 	g_assert(!"Unimplemented");
 }
 
-static void analyze_binary_expression(struct semantics *semantics,
-				      struct ir_binary_expression *expression)
+static enum ir_data_type analyze_expression(struct semantics *semantics,
+					    struct ir_expression *expression)
 {
 	g_assert(!"Unimplemented");
 }
 
-static void analyze_expression(struct semantics *semantics,
-			       struct ir_expression *expression)
-{
-	g_assert(!"Unimplemented");
-}
-
-static void analyze_location(struct semantics *semantics,
-			     struct ir_location *location)
+static enum ir_data_type analyze_location(struct semantics *semantics,
+					  struct ir_location *location)
 {
 	g_assert(!"Unimplemented");
 }
@@ -153,8 +144,8 @@ analyze_method_call_argument(struct semantics *semantics,
 	g_assert(!"Unimplemented");
 }
 
-static void analyze_method_call(struct semantics *semantics,
-				struct ir_method_call *call)
+static enum ir_data_type analyze_method_call(struct semantics *semantics,
+					     struct ir_method_call *call)
 {
 	g_assert(!"Unimplemented");
 }
