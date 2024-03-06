@@ -48,6 +48,34 @@ static void declare_field(struct semantics *semantics, struct ir_field *field)
 		symbol_table_add_field(symbols, field->identifier, field);
 }
 
+static struct ir_method *get_method_declaration(struct semantics *semantics,
+						char *identifier)
+{
+	symbol_table_t *symbols = semantics_current_scope(semantics);
+	struct ir_method *method = symbol_table_get_method(symbols, identifier);
+	if (method == NULL)
+		semantic_error(semantics, "Undeclared method");
+
+	return method;
+}
+
+static struct ir_field *get_field_declaration(struct semantics *semantics,
+					      char *identifier)
+{
+	symbol_table_t *symbols = semantics_current_scope(semantics);
+	struct ir_field *field = NULL;
+
+	while (field == NULL && symbols != NULL) {
+		field = symbol_table_get_field(symbols, identifier);
+		symbols = symbol_table_get_parent(symbols);
+	}
+
+	if (field == NULL)
+		semantic_error(semantics, "Undeclared field");
+
+	return field;
+}
+
 enum ir_data_type ir_type_from_ast(struct semantics *semantics)
 {
 	struct ast_node *node = next_node(semantics);
