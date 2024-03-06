@@ -150,7 +150,7 @@ struct ir_method_argument *ir_method_argument_new(struct ast_node **nodes)
 	method_arugment->type = ir_data_type_from_ast(nodes);
 
 	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_IDENTIFIER);
-	method_arugment->type = ir_identifier_from_ast(nodes);
+	method_arugment->identifier = ir_identifier_from_ast(nodes);
 
 	return method_arugment;
 }
