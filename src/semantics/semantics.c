@@ -7,10 +7,28 @@ static void semantic_error(struct semantics *semantics, const char *message)
 	g_printerr("ERROR at %i:%i: %s\n", 0, 0, message);
 }
 
+static void push_scope(struct semantics *semantics,
+		       fields_table_t *fields_table)
+{
+	g_array_append_val(semantics->fields_table_stack, fields_table);
+}
+
+static fields_table_t *current_scope(struct semantics *semantics)
+{
+	return g_array_index(semantics->fields_table_stack, fields_table_t *,
+			     semantics->fields_table_stack->len - 1);
+}
+
+static void pop_scope(struct semantics *semantics)
+{
+	g_array_remove_index(semantics->fields_table_stack,
+			     semantics->fields_table_stack->len - 1);
+}
+
 static void declare_method(struct semantics *semantics,
 			   struct ir_method *method)
 {
-	fields_table_t *fields_table = semantics_current_scope(semantics);
+	fields_table_t *fields_table = current_scope(semantics);
 
 	g_assert(fields_table_get_parent(fields_table) == NULL);
 
@@ -26,7 +44,7 @@ static void declare_method(struct semantics *semantics,
 
 static void declare_field(struct semantics *semantics, struct ir_field *field)
 {
-	fields_table_t *fields_table = semantics_current_scope(semantics);
+	fields_table_t *fields_table = current_scope(semantics);
 
 	if (methods_table_get(semantics->methods_table, field->identifier))
 		semantic_error(semantics, "Redeclaration of field");
@@ -51,7 +69,7 @@ static struct ir_method *get_method_declaration(struct semantics *semantics,
 static struct ir_field *get_field_declaration(struct semantics *semantics,
 					      char *identifier)
 {
-	fields_table_t *fields_table = semantics_current_scope(semantics);
+	fields_table_t *fields_table = current_scope(semantics);
 	struct ir_field *field =
 		fields_table_get(fields_table, identifier, true);
 	if (field == NULL)
@@ -60,9 +78,137 @@ static struct ir_field *get_field_declaration(struct semantics *semantics,
 	return field;
 }
 
+static enum ir_data_type evaluate_literal_type(struct ir_literal *literal)
+{
+	g_assert(!"Unimplemented");
+	return -1;
+}
+
+static enum ir_data_type evaluate_location_type(struct ir_location *location)
+{
+	g_assert(!"Unimplemented");
+	return -1;
+}
+
+static enum ir_data_type
+evaluate_binary_expression_type(struct ir_binary_expression *expression)
+{
+	g_assert(!"Unimplemented");
+	return -1;
+}
+
+static enum ir_data_type
+evaluate_expression_type(struct ir_expression *expression)
+{
+	g_assert(!"Unimplemented");
+	return -1;
+}
+
+static void analyze_literal(struct semantics *semantics,
+			    struct ir_literal *literal)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_binary_expression(struct semantics *semantics,
+				      struct ir_binary_expression *expression)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_expression(struct semantics *semantics,
+			       struct ir_expression *expression)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_location(struct semantics *semantics,
+			     struct ir_location *location)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_while_statement(struct semantics *semantics,
+				    struct ir_while_statement *statement)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_for_statement(struct semantics *semantics,
+				  struct ir_for_statement *statement)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_if_statement(struct semantics *semantics,
+				 struct ir_if_statement *statement)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void
+analyze_method_call_argument(struct semantics *semantics,
+			     struct ir_method_call_argument *argument)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_method_call(struct semantics *semantics,
+				struct ir_method_call *call)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_assignment(struct semantics *semantics,
+			       struct ir_assignment *assignment)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_statement(struct semantics *semantics,
+			      struct ir_statement *statement)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_block(struct semantics *semantics, struct ir_block *block)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_method_argument(struct semantics *semantics,
+				    struct ir_method_argument *argument)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_method(struct semantics *semantics,
+			   struct ir_method *method)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_initializer(struct semantics *semantics,
+				struct ir_initializer *initializer)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_field(struct semantics *semantics, struct ir_field *field)
+{
+	g_assert(!"Unimplemented");
+}
+
+static void analyze_import(struct semantics *semantics,
+			   struct ir_method *import)
+{
+	g_assert(!"Unimplemented");
+}
+
 static void analyze_program(struct semantics *semantics,
 			    struct ir_program *program)
 {
+	g_assert(!"Unimplemented");
 }
 
 struct semantics *semantics_new(void)
@@ -91,24 +237,6 @@ int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 		*ir = program;
 
 	return semantics->error ? -1 : 0;
-}
-
-void semantics_push_scope(struct semantics *semantics,
-			  fields_table_t *fields_table)
-{
-	g_array_append_val(semantics->fields_table_stack, fields_table);
-}
-
-fields_table_t *semantics_current_scope(struct semantics *semantics)
-{
-	return g_array_index(semantics->fields_table_stack, fields_table_t *,
-			     semantics->fields_table_stack->len - 1);
-}
-
-void semantics_pop_scope(struct semantics *semantics)
-{
-	g_array_remove_index(semantics->fields_table_stack,
-			     semantics->fields_table_stack->len - 1);
 }
 
 void semantics_free(struct semantics *semantics)

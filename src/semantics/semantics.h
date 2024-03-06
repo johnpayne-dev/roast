@@ -14,11 +14,4 @@ struct semantics *semantics_new(void);
 int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 		      struct ir_program **ir);
 
-void semantics_push_scope(struct semantics *semantics,
-			  fields_table_t *fields_table);
-
-fields_table_t *semantics_current_scope(struct semantics *semantics);
-
-void semantics_pop_scope(struct semantics *semantics);
-
 void semantics_free(struct semantics *semantics);
