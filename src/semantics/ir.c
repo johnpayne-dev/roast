@@ -112,7 +112,7 @@ int64_t ir_int_literal_from_ast(struct semantics *semantics, bool negate)
 	bool hex = node->token->type == TOKEN_TYPE_HEX_LITERAL;
 
 	uint64_t value = string_to_int(semantics,
-				       hex ? source_value : source_value + 2,
+				       hex ? source_value + 2 : source_value,
 				       max_value, hex ? 16 : 10);
 
 	g_free(source_value);
@@ -610,7 +610,7 @@ struct ir_literal *ir_literal_new(struct semantics *semantics,
 {
 	g_assert(next_node(semantics)->type == AST_NODE_TYPE_LITERAL);
 
-	struct ast_node *node = next_node(semantics);
+	struct ast_node *node = peek_node(semantics);
 
 	bool negate = false;
 
