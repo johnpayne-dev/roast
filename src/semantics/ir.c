@@ -427,16 +427,29 @@ void ir_method_call_argument_free(struct ir_method_call_argument *argument)
 	g_free(argument);
 }
 
-// Karl
 struct ir_if_statement *ir_if_statement_new(struct ast_node **nodes)
 {
-	g_assert(0);
-	return NULL;
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_IF_STATEMENT);
+
+	struct ir_if_statement *statement = g_new(struct ir_if_statement, 1);
+	statement->condition = ir_expression_new(nodes);
+	statement->if_block = ir_block_new(nodes);
+
+	if (peek_node(nodes)->type == AST_NODE_TYPE_BLOCK)
+		statement->else_block = ir_block_new(nodes);
+	else
+		statement->else_block = NULL;
+
+	return statement;
 }
 
 void ir_if_statement_free(struct ir_if_statement *statement)
 {
-	g_assert(0);
+	ir_expression_free(statement->condition);
+	ir_block_free(statement->if_block);
+	if (statement->else_block != NULL)
+		ir_block_free(statement->else_block);
+	g_free(statement);
 }
 
 struct ir_for_statement *ir_for_statement_new(struct ast_node **nodes)
@@ -464,16 +477,22 @@ void ir_for_statement_free(struct ir_for_statement *statement)
 	g_free(statement);
 }
 
-// Karl
 struct ir_while_statement *ir_while_statement_new(struct ast_node **nodes)
 {
-	g_assert(0);
-	return NULL;
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_WHILE_STATEMENT);
+
+	struct ir_while_statement *statement =
+		g_new(struct ir_while_statement, 1);
+	statement->condition = ir_expression_new(nodes);
+	statement->block = ir_block_new(nodes);
+	return statement;
 }
 
 void ir_while_statement_free(struct ir_while_statement *statement)
 {
-	g_assert(0);
+	ir_block_free(statement->block);
+	ir_expression_free(statement->condition);
+	g_free(statement);
 }
 
 struct ir_location *ir_location_new(struct ast_node **nodes)
