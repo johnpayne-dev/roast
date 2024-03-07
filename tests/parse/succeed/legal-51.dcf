@@ -1,0 +1,7 @@
+const int a = 'a';
+
+void main() {
+    // Semantically bad, but grammatically okay
+    const bool b;
+    const int c[];
+}

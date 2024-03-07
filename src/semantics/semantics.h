@@ -5,12 +5,13 @@
 
 struct semantics {
 	bool error;
-	const char *source;
+	GArray *fields_table_stack;
+	methods_table_t *methods_table;
 };
 
 struct semantics *semantics_new(void);
 
-int semantics_analyze(struct semantics *semantics, const char *source,
-		      struct ast_node *ast, struct ir_program **ir);
+int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
+		      struct ir_program **ir);
 
 void semantics_free(struct semantics *semantics);

@@ -1,61 +1,123 @@
 #include "semantics/symbol_table.h"
 #include "semantics/ir.h"
 
-struct symbol_table {
-	struct symbol_table *parent;
-	GHashTable *methods_table;
-	GHashTable *fields_table;
+static inline void validate_identifier(char *identifier)
+{
+	g_assert(identifier != NULL);
+	g_assert(identifier[0] != '\0');
+}
+
+struct fields_table {
+	struct fields_table *parent;
+	GHashTable *table;
 };
 
-symbol_table_t *symbol_table_new(symbol_table_t *parent_table)
+static inline void validate_fields_table(fields_table_t *fields)
 {
-	struct symbol_table *symbols = g_new(struct symbol_table, 1);
-	symbols->parent = parent_table;
-	symbols->methods_table = g_hash_table_new(g_str_hash, g_str_equal);
-	symbols->fields_table = g_hash_table_new(g_str_hash, g_str_equal);
-	return symbols;
+	g_assert(fields != NULL);
+	g_assert(fields->table != NULL);
 }
 
-symbol_table_t *symbol_table_get_parent(symbol_table_t *symbols)
+static inline void validate_field_descriptor(struct ir_field *descriptor)
 {
-	return symbols->parent;
+	g_assert(descriptor != NULL);
 }
 
-void symbol_table_add_method(symbol_table_t *symbols, char *method_identifier,
-			     struct ir_method *method)
+fields_table_t *fields_table_new(void)
 {
-	g_assert(method_identifier != NULL || method_identifier[0] != '\0');
-	g_assert(method != NULL);
-	g_assert(g_hash_table_insert(symbols->methods_table, method_identifier,
-				     method));
+	struct fields_table *fields = g_new(struct fields_table, 1);
+	fields->parent = NULL;
+	fields->table = g_hash_table_new(g_str_hash, g_str_equal);
+	return fields;
 }
 
-struct ir_method *symbol_table_get_method(symbol_table_t *symbols,
-					  char *method_identifier)
+void fields_table_free(fields_table_t *fields)
 {
-	g_assert(method_identifier != NULL || method_identifier[0] != '\0');
-	return g_hash_table_lookup(symbols->methods_table, method_identifier);
+	validate_fields_table(fields);
+	g_hash_table_destroy(fields->table);
+	g_free(fields);
 }
 
-void symbol_table_add_field(symbol_table_t *symbols, char *field_identifier,
-			    struct ir_field *field)
+void fields_table_set_parent(fields_table_t *fields, fields_table_t *parent)
 {
-	g_assert(field_identifier != NULL || field_identifier[0] != '\0');
-	g_assert(field != NULL);
-	g_assert(g_hash_table_insert(symbols->methods_table, field_identifier,
-				     field));
+	validate_fields_table(fields);
+	fields->parent = parent;
 }
 
-struct ir_field *symbol_table_get_field(symbol_table_t *symbols,
-					char *field_identifier)
+fields_table_t *fields_table_get_parent(fields_table_t *fields)
 {
-	g_assert(field_identifier != NULL || field_identifier[0] != '\0');
-	return g_hash_table_lookup(symbols->fields_table, field_identifier);
+	validate_fields_table(fields);
+	return fields->parent;
 }
 
-void symbol_table_free(symbol_table_t *symbols)
+void fields_table_add(fields_table_t *fields, char *identifier,
+		      struct ir_field *descriptor)
 {
-	g_hash_table_destroy(symbols->methods_table);
-	g_hash_table_destroy(symbols->fields_table);
-	g_free(symbols);
+	validate_fields_table(fields);
+	validate_identifier(identifier);
+	validate_field_descriptor(descriptor);
+	g_assert(g_hash_table_insert(fields->table, identifier, descriptor));
+}
+
+struct ir_field *fields_table_get(fields_table_t *fields, char *identifier,
+				  bool climb)
+{
+	validate_fields_table(fields);
+	validate_identifier(identifier);
+	fields_table_t *current_scope = fields;
+	struct ir_field *descriptor = NULL;
+	while (((descriptor = g_hash_table_lookup(current_scope->table,
+						  identifier)) == NULL) &&
+	       climb) {
+		current_scope = fields_table_get_parent(current_scope);
+		if (current_scope == NULL)
+			break;
+		validate_fields_table(current_scope);
+	}
+	return descriptor;
+}
+
+struct methods_table {
+	GHashTable *table;
+};
+
+static inline void validate_methods_table(methods_table_t *methods)
+{
+	g_assert(methods != NULL);
+	g_assert(methods->table != NULL);
+}
+
+static inline void validate_method_descriptor(struct ir_method *descriptor)
+{
+	g_assert(descriptor != NULL);
+}
+
+methods_table_t *methods_table_new(void)
+{
+	struct methods_table *methods = g_new(struct methods_table, 1);
+	methods->table = g_hash_table_new(g_str_hash, g_str_equal);
+	return methods;
+}
+
+void methods_table_free(methods_table_t *methods)
+{
+	validate_methods_table(methods);
+	g_hash_table_destroy(methods->table);
+	g_free(methods);
+}
+
+void methods_table_add(methods_table_t *methods, char *identifier,
+		       struct ir_method *descriptor)
+{
+	validate_methods_table(methods);
+	validate_identifier(identifier);
+	validate_method_descriptor(descriptor);
+	g_assert(g_hash_table_insert(methods->table, identifier, descriptor));
+}
+
+struct ir_method *methods_table_get(methods_table_t *methods, char *identifier)
+{
+	validate_methods_table(methods);
+	validate_identifier(identifier);
+	return g_hash_table_lookup(methods->table, identifier);
 }

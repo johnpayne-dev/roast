@@ -118,34 +118,39 @@ const char *token_type_regex_pattern(enum token_type token_type)
 	return REGEX_PATTERNS[token_type];
 }
 
-uint32_t token_get_line_number(struct token *token, const char *source)
+uint32_t token_get_line_number(struct token *token)
 {
 	uint32_t line_number = 1;
 
 	for (uint32_t i = 0; i < token->offset; i++) {
-		if (source[i] == '\n')
+		if (token->source[i] == '\n')
 			line_number++;
 
-		if (source[i] == '\0')
+		if (token->source[i] == '\0')
 			return 0;
 	}
 
 	return line_number;
 }
 
-uint32_t token_get_column_number(struct token *token, const char *source)
+uint32_t token_get_column_number(struct token *token)
 {
 	for (int32_t i = token->offset; i >= 0; i--) {
-		if (i == 0 || source[i - 1] == '\n')
+		if (i == 0 || token->source[i - 1] == '\n')
 			return token->offset - i;
 	}
 
 	return token->offset;
 }
 
-void token_print(struct token *token, const char *source)
+char *token_get_string(struct token *token)
 {
-	uint32_t line_number = token_get_line_number(token, source);
+	return g_strndup(token->source + token->offset, token->length);
+}
+
+void token_print(struct token *token)
+{
+	uint32_t line_number = token_get_line_number(token);
 
 	g_print("%i ", line_number);
 	if (token->type == TOKEN_TYPE_CHAR_LITERAL)
@@ -160,14 +165,14 @@ void token_print(struct token *token, const char *source)
 		g_print("STRINGLITERAL ");
 	if (token->type == TOKEN_TYPE_IDENTIFIER)
 		g_print("IDENTIFIER ");
-	g_print("%.*s\n", token->length, &source[token->offset]);
+	g_print("%.*s\n", token->length, &token->source[token->offset]);
 }
 
-void token_print_error(struct token *token, const char *source)
+void token_print_error(struct token *token)
 {
-	uint32_t line_number = token_get_line_number(token, source);
-	uint32_t column_number = token_get_column_number(token, source);
+	uint32_t line_number = token_get_line_number(token);
+	uint32_t column_number = token_get_column_number(token);
 	const char *error_message = token_type_error_message(token->type);
 	g_printerr("ERROR: %s at %i:%i: %.*s\n", error_message, line_number,
-		   column_number, token->length, &source[token->offset]);
+		   column_number, token->length, &token->source[token->offset]);
 }

@@ -82,6 +82,7 @@ bool scanner_next_token(struct scanner *scanner, struct token *token)
 
 	token->type = match_token(scanner, &token->length);
 	token->offset = scanner->position;
+	token->source = scanner->source;
 	scanner->position += token->length;
 	return true;
 }
@@ -100,13 +101,13 @@ int scanner_tokenize(struct scanner *scanner, const char *source,
 			continue;
 
 		if (token_type_is_error(token.type)) {
-			token_print_error(&token, source);
+			token_print_error(&token);
 			result = -1;
 			continue;
 		}
 
 		if (print_output)
-			token_print(&token, source);
+			token_print(&token);
 
 		g_array_append_val(tokens, token);
 	}

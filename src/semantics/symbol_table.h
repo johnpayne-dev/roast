@@ -3,25 +3,34 @@
 #include <glib.h>
 #include <stdbool.h>
 
-typedef struct symbol_table symbol_table_t;
-
-struct ir_method;
 struct ir_field;
 
-symbol_table_t *symbol_table_new(struct symbol_table *parent_table);
+typedef struct fields_table fields_table_t;
 
-symbol_table_t *symbol_table_get_parent(symbol_table_t *symbols);
+fields_table_t *fields_table_new(void);
 
-void symbol_table_add_method(symbol_table_t *symbols, char *method_identifier,
-			     struct ir_method *method);
+void fields_table_free(fields_table_t *fields_table);
 
-struct ir_method *symbol_table_get_method(symbol_table_t *symbols,
-					  char *method_identifier);
+void fields_table_set_parent(fields_table_t *fields, fields_table_t *parent);
 
-void symbol_table_add_field(symbol_table_t *symbols, char *field_identifier,
-			    struct ir_field *field);
+fields_table_t *fields_table_get_parent(fields_table_t *fields_table);
 
-struct ir_field *symbol_table_get_field(symbol_table_t *symbols,
-					char *field_identifier);
+void fields_table_add(fields_table_t *fields_table, char *identifier,
+		      struct ir_field *field);
 
-void symbol_table_free(symbol_table_t *symbols);
+struct ir_field *fields_table_get(fields_table_t *fields_table,
+				  char *identifier, bool climb);
+
+struct ir_method;
+
+typedef struct methods_table methods_table_t;
+
+methods_table_t *methods_table_new(void);
+
+void methods_table_free(methods_table_t *methods_table);
+
+void methods_table_add(methods_table_t *methods_table, char *identifier,
+		       struct ir_method *descriptor);
+
+struct ir_method *methods_table_get(methods_table_t *methods_table,
+				    char *method);

@@ -1,0 +1,13 @@
+int a;
+int b = 0;
+int c = 0, d, e = 0;
+int f[] = {1, 2, 3}, g = 0, h[] = {4, 5, 6};
+int k[] = {1, -2, 3};
+
+void main() {
+  int a;
+  int b = 0;
+  int c = 0, d, e = 0;
+  int f[] = {1, 2, 3}, g = 0, h[] = {4, 5, 6};
+  int k[] = {1, -2, 3};
+}
