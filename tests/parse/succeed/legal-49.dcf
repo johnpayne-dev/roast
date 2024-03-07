@@ -1,0 +1,5 @@
+void main() {
+    const int a = 5;
+    const bool b = true;
+    const int c[] = {1, 2, 3};
+}

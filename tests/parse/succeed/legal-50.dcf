@@ -1,0 +1,6 @@
+const int a = 'a';
+
+void main() {
+    const bool b = true;
+    const int c[] = {1, 2, 3, 'd'};
+}

@@ -289,7 +289,9 @@ int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 
 	semantics->error = false;
 	semantics->methods_table = program->methods_table;
+#if 0
 	analyze_program(semantics, program);
+#endif
 
 	if (semantics->error || ir == NULL)
 		ir_program_free(program);

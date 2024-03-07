@@ -1,0 +1,13 @@
+bool a;
+bool b = true;
+bool c = true, d, e = false;
+bool f[] = {true, false, false}, g = true, h[] = {true, true, true};
+bool k[] = {true, false, false};
+
+void main() {
+  bool a;
+  bool b = true;
+  bool c = true, d, e = true;
+  bool f[] = {true, false, false}, g = true, h[] = {true, true, true};
+  bool k[] = {true, false, false};
+}
