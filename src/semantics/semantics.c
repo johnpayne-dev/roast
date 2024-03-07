@@ -261,7 +261,7 @@ static void analyze_program(struct semantics *semantics,
 		analyze_field(semantics, field);
 	}
 
-	for (uint32_t i = 0; i < program->fields->len; i++) {
+	for (uint32_t i = 0; i < program->methods->len; i++) {
 		struct ir_method *method =
 			g_array_index(program->methods, struct ir_method *, i);
 		analyze_method(semantics, method);

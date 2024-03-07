@@ -91,11 +91,7 @@ struct ir_method *ir_method_new(struct ast_node **nodes)
 
 	struct ir_method *method = g_new(struct ir_method, 1);
 	method->imported = false;
-
-	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_DATA_TYPE);
 	method->return_type = ir_data_type_from_ast(nodes);
-
-	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_IDENTIFIER);
 	method->identifier = ir_identifier_from_ast(nodes);
 
 	method->arguments =
@@ -107,7 +103,6 @@ struct ir_method *ir_method_new(struct ast_node **nodes)
 		g_array_append_val(method->arguments, method_argument);
 	}
 
-	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_BLOCK);
 	method->block = ir_block_new(nodes);
 
 	return method;
@@ -298,20 +293,23 @@ struct ir_statement *ir_statement_new(struct ast_node **nodes)
 		statement->while_statement = ir_while_statement_new(nodes);
 		break;
 	case AST_NODE_TYPE_RETURN_STATEMENT:
+		next_node(nodes);
 		statement->type = IR_STATEMENT_TYPE_RETURN;
 		statement->return_expression = ir_expression_new(nodes);
 		break;
 	case AST_NODE_TYPE_BREAK_STATEMENT:
+		next_node(nodes);
 		statement->type = IR_STATEMENT_TYPE_BREAK;
 		break;
 	case AST_NODE_TYPE_CONTINUE_STATEMENT:
+		next_node(nodes);
 		statement->type = IR_STATEMENT_TYPE_CONTINUE;
 		break;
 	case AST_NODE_TYPE_METHOD_CALL:
 		statement->type = IR_STATEMENT_TYPE_METHOD_CALL;
 		statement->method_call = ir_method_call_new(nodes);
 		break;
-	case AST_NODE_TYPE_ASSIGN_STATEMENT:
+	case AST_NODE_TYPE_ASSIGNMENT:
 		statement->type = IR_STATEMENT_TYPE_ASSIGNMENT;
 		statement->assignment = ir_assignment_new(nodes);
 		break;
@@ -353,7 +351,7 @@ void ir_statement_free(struct ir_statement *statement)
 
 struct ir_assignment *ir_assignment_new(struct ast_node **nodes)
 {
-	g_assert(next_node(nodes)->type == AST_NODE_TYPE_ASSIGN_EXPRESSION);
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_ASSIGNMENT);
 
 	struct ir_assignment *assignment = g_new(struct ir_assignment, 1);
 
@@ -506,7 +504,7 @@ struct ir_for_statement *ir_for_statement_new(struct ast_node **nodes)
 	statement->identifier = ir_identifier_from_ast(nodes);
 	statement->initializer = ir_expression_new(nodes);
 	statement->condition = ir_expression_new(nodes);
-	statement->update = ir_assignment_new(nodes);
+	statement->update = ir_for_update_new(nodes);
 	statement->block = ir_block_new(nodes);
 
 	return statement;
@@ -515,11 +513,46 @@ struct ir_for_statement *ir_for_statement_new(struct ast_node **nodes)
 void ir_for_statement_free(struct ir_for_statement *statement)
 {
 	ir_block_free(statement->block);
-	ir_assignment_free(statement->update);
+	ir_for_update_free(statement->update);
 	ir_expression_free(statement->condition);
 	ir_expression_free(statement->initializer);
 	g_free(statement->identifier);
 	g_free(statement);
+}
+
+struct ir_for_update *ir_for_update_new(struct ast_node **nodes)
+{
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_FOR_UPDATE);
+
+	struct ir_for_update *update = g_new(struct ir_for_update, 1);
+
+	if (peek_node(nodes)->type == AST_NODE_TYPE_METHOD_CALL) {
+		update->type = IR_FOR_UPDATE_TYPE_METHOD_CALL;
+		update->method_call = ir_method_call_new(nodes);
+	} else if (peek_node(nodes)->type == AST_NODE_TYPE_ASSIGNMENT) {
+		update->type = IR_FOR_UPDATE_TYPE_ASSIGNMENT;
+		update->assignment = ir_assignment_new(nodes);
+	} else {
+		update->type = -1;
+		g_assert(!"Invalid for update type");
+	}
+
+	return update;
+}
+
+void ir_for_update_free(struct ir_for_update *update)
+{
+	switch (update->type) {
+	case IR_FOR_UPDATE_TYPE_METHOD_CALL:
+		ir_method_call_free(update->method_call);
+		break;
+	case IR_FOR_UPDATE_TYPE_ASSIGNMENT:
+		ir_assignment_free(update->assignment);
+		break;
+	default:
+		break;
+	}
+	g_free(update);
 }
 
 struct ir_while_statement *ir_while_statement_new(struct ast_node **nodes)
@@ -600,9 +633,6 @@ struct ir_expression *ir_expression_new(struct ast_node **nodes)
 		expression->type = IR_EXPRESSION_TYPE_LOCATION;
 		expression->location = ir_location_new(nodes);
 		break;
-	case AST_NODE_TYPE_EXPRESSION:
-		expression->type = IR_EXPRESSION_TYPE_SUB_EXPRESSION;
-		expression->sub_expression = ir_expression_new(nodes);
 	default:
 		g_free(expression);
 		g_assert(!"Couldn't extract sub expression from ast node");
@@ -635,9 +665,6 @@ void ir_expression_free(struct ir_expression *expression)
 		break;
 	case IR_EXPRESSION_TYPE_LOCATION:
 		ir_location_free(expression->location);
-		break;
-	case IR_EXPRESSION_TYPE_SUB_EXPRESSION:
-		ir_expression_free(expression->sub_expression);
 		break;
 	default:
 		g_assert(!"Invalid expression type");

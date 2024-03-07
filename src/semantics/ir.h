@@ -129,7 +129,7 @@ struct ir_method_call *ir_method_call_new(struct ast_node **nodes);
 void ir_method_call_free(struct ir_method_call *method_call);
 
 struct ir_method_call_argument {
-	enum {
+	enum ir_method_call_argument_type {
 		IR_METHOD_CALL_ARGUMENT_TYPE_STRING,
 		IR_METHOD_CALL_ARGUMENT_TYPE_EXPRESSION,
 	} type;
@@ -157,12 +157,27 @@ struct ir_for_statement {
 	char *identifier;
 	struct ir_expression *initializer;
 	struct ir_expression *condition;
-	struct ir_assignment *update;
+	struct ir_for_update *update;
 	struct ir_block *block;
 };
 
 struct ir_for_statement *ir_for_statement_new(struct ast_node **nodes);
 void ir_for_statement_free(struct ir_for_statement *statement);
+
+struct ir_for_update {
+	enum ir_for_update_type {
+		IR_FOR_UPDATE_TYPE_METHOD_CALL,
+		IR_FOR_UPDATE_TYPE_ASSIGNMENT,
+	} type;
+
+	union {
+		struct ir_method_call *method_call;
+		struct ir_assignment *assignment;
+	};
+};
+
+struct ir_for_update *ir_for_update_new(struct ast_node **nodes);
+void ir_for_update_free(struct ir_for_update *update);
 
 struct ir_while_statement {
 	struct ir_expression *condition;
@@ -189,7 +204,6 @@ struct ir_expression {
 		IR_EXPRESSION_TYPE_METHOD_CALL,
 		IR_EXPRESSION_TYPE_LITERAL,
 		IR_EXPRESSION_TYPE_LOCATION,
-		IR_EXPRESSION_TYPE_SUB_EXPRESSION,
 	} type;
 
 	union {
@@ -200,7 +214,6 @@ struct ir_expression {
 		struct ir_method_call *method_call;
 		struct ir_literal *literal;
 		struct ir_location *location;
-		struct ir_expression *sub_expression;
 	};
 };
 
