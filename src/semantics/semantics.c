@@ -120,6 +120,9 @@ static enum ir_data_type analyze_location(struct semantics *semantics,
 	g_assert(!"Unimplemented");
 }
 
+static void analyze_block(struct semantics *semantics, struct ir_block *block,
+			  GArray *initial_fields);
+
 static void analyze_while_statement(struct semantics *semantics,
 				    struct ir_while_statement *statement)
 {
@@ -165,9 +168,18 @@ static void analyze_statement(struct semantics *semantics,
 
 static void analyze_field(struct semantics *semantics, struct ir_field *field);
 
-static void analyze_block(struct semantics *semantics, struct ir_block *block)
+static void analyze_block(struct semantics *semantics, struct ir_block *block,
+			  GArray *initial_fields)
 {
 	push_scope(semantics, block->fields_table);
+
+	if (initial_fields != NULL) {
+		for (uint32_t i = 0; i < initial_fields->len; i++) {
+			struct ir_field *field = g_array_index(
+				initial_fields, struct ir_field *, i);
+			analyze_field(semantics, field);
+		}
+	}
 
 	for (uint32_t i = 0; i < block->fields->len; i++) {
 		struct ir_field *field =
@@ -188,7 +200,7 @@ static void analyze_method(struct semantics *semantics,
 			   struct ir_method *method)
 {
 	declare_method(semantics, method);
-	analyze_block(semantics, method->block);
+	analyze_block(semantics, method->block, method->arguments);
 }
 
 static enum ir_data_type analyze_initializer(struct semantics *semantics,

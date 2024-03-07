@@ -96,22 +96,15 @@ struct ir_method *ir_method_new(struct ast_node **nodes)
 
 	method->arguments =
 		g_array_new(false, false, sizeof(struct ir_method_argument *));
-	GArray *initial_fields =
-		g_array_new(false, false, sizeof(struct ir_field *));
 
 	while (peek_node(nodes)->type == AST_NODE_TYPE_METHOD_ARGUMENT) {
-		struct ir_method_argument *method_argument =
-			ir_method_argument_new(nodes);
-		g_array_append_val(method->arguments, method_argument);
-
-		struct ir_field *field =
-			ir_field_new_from_argument(method_argument);
-		g_array_append_val(initial_fields, field);
+		struct ir_field *argument =
+			ir_field_new_from_method_argument(nodes);
+		g_array_append_val(method->arguments, argument);
 	}
 
-	method->block = ir_block_new(nodes, initial_fields);
+	method->block = ir_block_new(nodes);
 
-	g_array_free(initial_fields, true);
 	return method;
 }
 
@@ -133,37 +126,14 @@ void ir_method_free(struct ir_method *method)
 	g_free(method->identifier);
 	if (!method->imported) {
 		for (uint32_t i = 0; i < method->arguments->len; i++) {
-			struct ir_method_argument *method_argument =
-				g_array_index(method->arguments,
-					      struct ir_method_argument *, i);
-			ir_method_argument_free(method_argument);
+			struct ir_field *argument = g_array_index(
+				method->arguments, struct ir_field *, i);
+			ir_field_free(argument);
 		}
 		g_array_free(method->arguments, true);
 		ir_block_free(method->block);
 	}
 	g_free(method);
-}
-
-struct ir_method_argument *ir_method_argument_new(struct ast_node **nodes)
-{
-	g_assert(next_node(nodes)->type == AST_NODE_TYPE_METHOD_ARGUMENT);
-
-	struct ir_method_argument *method_arugment =
-		g_new(struct ir_method_argument, 1);
-
-	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_DATA_TYPE);
-	method_arugment->type = ir_data_type_from_ast(nodes);
-
-	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_IDENTIFIER);
-	method_arugment->identifier = ir_identifier_from_ast(nodes);
-
-	return method_arugment;
-}
-
-void ir_method_argument_free(struct ir_method_argument *method_argument)
-{
-	g_free(method_argument->identifier);
-	g_free(method_argument);
 }
 
 struct ir_field *ir_field_new(struct ast_node **nodes, bool constant,
@@ -196,16 +166,18 @@ struct ir_field *ir_field_new(struct ast_node **nodes, bool constant,
 	return field;
 }
 
-struct ir_field *ir_field_new_from_argument(struct ir_method_argument *argument)
+struct ir_field *ir_field_new_from_method_argument(struct ast_node **nodes)
 {
-	struct ir_field *field = g_new(struct ir_field, 1);
-	field->constant = false;
-	field->type = argument->type;
-	field->identifier = g_strdup(argument->identifier);
-	field->array = false;
-	field->array_length = 1;
-	field->initializer = NULL;
-	return field;
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_METHOD_ARGUMENT);
+
+	struct ir_field *argument = g_new(struct ir_field, 1);
+	argument->constant = false;
+	argument->type = ir_data_type_from_ast(nodes);
+	argument->identifier = ir_identifier_from_ast(nodes);
+	argument->array = false;
+	argument->array_length = 1;
+	argument->initializer = NULL;
+	return argument;
 }
 
 void ir_field_free(struct ir_field *field)
@@ -247,21 +219,13 @@ void ir_initializer_free(struct ir_initializer *initializer)
 	g_free(initializer);
 }
 
-struct ir_block *ir_block_new(struct ast_node **nodes, GArray *initial_fields)
+struct ir_block *ir_block_new(struct ast_node **nodes)
 {
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_BLOCK);
 
 	struct ir_block *block = g_new(struct ir_block, 1);
 	block->fields_table = fields_table_new();
 	block->fields = g_array_new(false, false, sizeof(struct ir_field *));
-
-	if (initial_fields != NULL) {
-		for (uint32_t i = 0; i < initial_fields->len; i++) {
-			struct ir_field *field = g_array_index(
-				initial_fields, struct ir_field *, i);
-			g_array_append_val(block->fields, field);
-		}
-	}
 
 	while (peek_node(nodes)->type == AST_NODE_TYPE_FIELD)
 		iterate_fields(nodes, block->fields);
@@ -501,10 +465,10 @@ struct ir_if_statement *ir_if_statement_new(struct ast_node **nodes)
 
 	struct ir_if_statement *statement = g_new(struct ir_if_statement, 1);
 	statement->condition = ir_expression_new(nodes);
-	statement->if_block = ir_block_new(nodes, NULL);
+	statement->if_block = ir_block_new(nodes);
 
 	if (peek_node(nodes)->type == AST_NODE_TYPE_BLOCK)
-		statement->else_block = ir_block_new(nodes, NULL);
+		statement->else_block = ir_block_new(nodes);
 	else
 		statement->else_block = NULL;
 
@@ -530,7 +494,7 @@ struct ir_for_statement *ir_for_statement_new(struct ast_node **nodes)
 	statement->initializer = ir_expression_new(nodes);
 	statement->condition = ir_expression_new(nodes);
 	statement->update = ir_for_update_new(nodes);
-	statement->block = ir_block_new(nodes, NULL);
+	statement->block = ir_block_new(nodes);
 
 	return statement;
 }
@@ -587,7 +551,7 @@ struct ir_while_statement *ir_while_statement_new(struct ast_node **nodes)
 	struct ir_while_statement *statement =
 		g_new(struct ir_while_statement, 1);
 	statement->condition = ir_expression_new(nodes);
-	statement->block = ir_block_new(nodes, NULL);
+	statement->block = ir_block_new(nodes);
 	return statement;
 }
 

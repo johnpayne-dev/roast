@@ -37,14 +37,6 @@ struct ir_method *ir_method_new(struct ast_node **nodes);
 struct ir_method *ir_method_new_from_import(struct ast_node **nodes);
 void ir_method_free(struct ir_method *method);
 
-struct ir_method_argument {
-	enum ir_data_type type;
-	char *identifier;
-};
-
-struct ir_method_argument *ir_method_argument_new(struct ast_node **nodes);
-void ir_method_argument_free(struct ir_method_argument *method_argument);
-
 struct ir_field {
 	enum ir_data_type type;
 	bool constant;
@@ -56,8 +48,7 @@ struct ir_field {
 
 struct ir_field *ir_field_new(struct ast_node **nodes, bool constant,
 			      enum ir_data_type type);
-struct ir_field *
-ir_field_new_from_argument(struct ir_method_argument *argument);
+struct ir_field *ir_field_new_from_method_argument(struct ast_node **nodes);
 void ir_field_free(struct ir_field *field);
 
 struct ir_initializer {
@@ -74,7 +65,7 @@ struct ir_block {
 	GArray *statements;
 };
 
-struct ir_block *ir_block_new(struct ast_node **nodes, GArray *initial_fields);
+struct ir_block *ir_block_new(struct ast_node **nodes);
 void ir_block_free(struct ir_block *block);
 
 struct ir_statement {
