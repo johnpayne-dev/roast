@@ -189,6 +189,7 @@ struct ir_expression {
 		IR_EXPRESSION_TYPE_METHOD_CALL,
 		IR_EXPRESSION_TYPE_LITERAL,
 		IR_EXPRESSION_TYPE_LOCATION,
+		IR_EXPRESSION_TYPE_SUB_EXPRESSION,
 	} type;
 
 	union {
@@ -199,6 +200,7 @@ struct ir_expression {
 		struct ir_method_call *method_call;
 		struct ir_literal *literal;
 		struct ir_location *location;
+		struct ir_expression *sub_expression;
 	};
 };
 

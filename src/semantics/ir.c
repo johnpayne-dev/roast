@@ -349,7 +349,6 @@ void ir_statement_free(struct ir_statement *statement)
 	g_free(statement);
 }
 
-// Karl
 struct ir_assignment *ir_assignment_new(struct ast_node **nodes)
 {
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_ASSIGN_EXPRESSION);
@@ -561,16 +560,88 @@ void ir_location_free(struct ir_location *location)
 	g_free(location);
 }
 
-// Karl
 struct ir_expression *ir_expression_new(struct ast_node **nodes)
 {
-	g_assert(0);
-	return NULL;
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_EXPRESSION);
+
+	struct ir_expression *expression = g_new(struct ir_expression, 1);
+
+	switch (peek_node(nodes)->type) {
+	case AST_NODE_TYPE_BINARY_EXPRESSION:
+		expression->type = IR_EXPRESSION_TYPE_BINARY;
+		expression->binary_expression = ir_binary_expression_new(nodes);
+		break;
+	case AST_NODE_TYPE_NOT_EXPRESSION:
+		next_node(nodes);
+		expression->type = IR_EXPRESSION_TYPE_NOT;
+		expression->not_expression = ir_expression_new(nodes);
+		break;
+	case AST_NODE_TYPE_NEGATE_EXPRESSION:
+		next_node(nodes);
+		expression->type = IR_EXPRESSION_TYPE_NEGATE;
+		expression->negate_expression = ir_expression_new(nodes);
+		break;
+	case AST_NODE_TYPE_LEN_EXPRESSION:
+		next_node(nodes);
+		expression->type = IR_EXPRESSION_TYPE_LEN;
+		expression->len_identifier = ir_identifier_from_ast(nodes);
+		break;
+	case AST_NODE_TYPE_METHOD_CALL:
+		expression->type = IR_EXPRESSION_TYPE_METHOD_CALL;
+		expression->method_call = ir_method_call_new(nodes);
+		break;
+	case AST_NODE_TYPE_LITERAL:
+		expression->type = IR_EXPRESSION_TYPE_LITERAL;
+		expression->literal = ir_literal_new(nodes);
+		break;
+	case AST_NODE_TYPE_LOCATION:
+		expression->type = IR_EXPRESSION_TYPE_LOCATION;
+		expression->location = ir_location_new(nodes);
+		break;
+	case AST_NODE_TYPE_EXPRESSION:
+		expression->type = IR_EXPRESSION_TYPE_SUB_EXPRESSION;
+		expression->sub_expression = ir_expression_new(nodes);
+	default:
+		g_free(expression);
+		g_assert(!"Couldn't extract sub expression from ast node");
+		return NULL;
+	}
+
+	return expression;
 }
 
 void ir_expression_free(struct ir_expression *expression)
 {
-	g_assert(0);
+	switch (expression->type) {
+	case IR_EXPRESSION_TYPE_BINARY:
+		ir_binary_expression_free(expression->binary_expression);
+		break;
+	case IR_EXPRESSION_TYPE_NOT:
+		ir_expression_free(expression->not_expression);
+		break;
+	case IR_EXPRESSION_TYPE_NEGATE:
+		ir_expression_free(expression->negate_expression);
+		break;
+	case IR_EXPRESSION_TYPE_LEN:
+		g_free(expression->len_identifier);
+		break;
+	case IR_EXPRESSION_TYPE_METHOD_CALL:
+		ir_method_call_free(expression->method_call);
+		break;
+	case IR_EXPRESSION_TYPE_LITERAL:
+		ir_literal_free(expression->literal);
+		break;
+	case IR_EXPRESSION_TYPE_LOCATION:
+		ir_location_free(expression->location);
+		break;
+	case IR_EXPRESSION_TYPE_SUB_EXPRESSION:
+		ir_expression_free(expression->sub_expression);
+		break;
+	default:
+		g_assert(!"Invalid expression type");
+		break;
+	}
+	g_free(expression);
 }
 
 struct ir_binary_expression *ir_binary_expression_new(struct ast_node **nodes)
