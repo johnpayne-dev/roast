@@ -636,11 +636,14 @@ static struct ast_node *parse_location(struct parser *parser)
 	ast_node_add_child(location, identifier);
 
 	if (next_token(parser, TOKEN_TYPE_OPEN_SQUARE_BRACKET, NULL)) {
+		struct ast_node *index =
+			ast_node_new(AST_NODE_TYPE_LOCATION_INDEX);
 		struct ast_node *expression = parse_expression(parser);
 		if (expression == NULL)
 			parse_error(parser,
 				    "Expected expression in identifier index");
-		ast_node_add_child(location, expression);
+		ast_node_add_child(index, expression);
+		ast_node_add_child(location, index);
 
 		if (!next_token(parser, TOKEN_TYPE_CLOSE_SQUARE_BRACKET, NULL))
 			parse_error(

@@ -581,8 +581,10 @@ struct ir_location *ir_location_new(struct ast_node **nodes)
 	location->identifier = ir_identifier_from_ast(nodes);
 	location->index = NULL;
 
-	if (peek_node(nodes)->type == AST_NODE_TYPE_EXPRESSION)
+	if (peek_node(nodes)->type == AST_NODE_TYPE_LOCATION_INDEX) {
+		next_node(nodes);
 		location->index = ir_expression_new(nodes);
+	}
 
 	return location;
 }
