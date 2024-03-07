@@ -839,7 +839,7 @@ uint64_t ir_int_literal_from_ast(struct ast_node **nodes, bool negate)
 
 	char *source_value = token_get_string(node->token);
 
-	uint64_t max_value = negate ? -INT64_MIN : INT64_MAX;
+	uint64_t max_value = (uint64_t)INT64_MAX + (uint64_t)negate;
 	bool hex = node->token->type == TOKEN_TYPE_HEX_LITERAL;
 
 	uint64_t value = string_to_int(hex ? source_value + 2 : source_value,

@@ -82,7 +82,8 @@ static enum ir_data_type analyze_literal(struct semantics *semantics,
 					 struct ir_literal *literal)
 {
 	if (literal->type == IR_LITERAL_TYPE_INT) {
-		uint64_t max_value = literal->negate ? -INT64_MIN : INT64_MAX;
+		uint64_t max_value =
+			(uint64_t)INT64_MAX + (uint64_t)literal->negate;
 		if (literal->value > max_value)
 			semantic_error(semantics, "Overflow in int literal");
 	}
