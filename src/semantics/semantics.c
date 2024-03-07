@@ -179,27 +179,95 @@ static void analyze_method(struct semantics *semantics,
 	g_assert(!"Unimplemented");
 }
 
-static void analyze_initializer(struct semantics *semantics,
-				struct ir_initializer *initializer)
+static enum ir_data_type analyze_initializer(struct semantics *semantics,
+					     struct ir_initializer *initializer)
 {
-	g_assert(!"Unimplemented");
+	enum ir_data_type type = IR_DATA_TYPE_VOID;
+	for (uint32_t i = 0; i < initializer->literals->len; i++) {
+		struct ir_literal *literal = g_array_index(
+			initializer->literals, struct ir_literal *, i);
+		enum ir_data_type literal_type =
+			analyze_literal(semantics, literal);
+
+		if (type == IR_DATA_TYPE_VOID)
+			type = literal_type;
+		else if (literal_type != type)
+			semantic_error(
+				semantics,
+				"Inconsistent types in array initializer");
+	}
+
+	return type;
 }
 
 static void analyze_field(struct semantics *semantics, struct ir_field *field)
 {
-	g_assert(!"Unimplemented");
+	declare_field(semantics, field);
+
+	if (field->initializer != NULL) {
+		enum ir_data_type type =
+			analyze_initializer(semantics, field->initializer);
+
+		if (field->initializer->array && !field->array)
+			semantic_error(
+				semantics,
+				"Cannot initialize non-array field with array initializer");
+		if (!field->initializer->array && field->array)
+			semantic_error(
+				semantics,
+				"Cannot initialize array field with non-array initializer");
+		if (field->initializer->array && field->array &&
+		    field->array_length != -1)
+			semantic_error(
+				semantics,
+				"Array initializer cannot be provided when length is declared");
+		if (type != field->type)
+			semantic_error(
+				semantics,
+				"Initializer type does not match field type");
+
+		field->array_length = field->initializer->literals->len;
+	} else if (field->array) {
+		if (field->array_length == -1)
+			semantic_error(
+				semantics,
+				"Array fields without initializers must have a declared length");
+		else if (field->array_length == 0)
+			semantic_error(semantics,
+				       "Array length must be greater than 0");
+	}
 }
 
 static void analyze_import(struct semantics *semantics,
 			   struct ir_method *import)
 {
-	g_assert(!"Unimplemented");
+	declare_method(semantics, import);
 }
 
 static void analyze_program(struct semantics *semantics,
 			    struct ir_program *program)
 {
-	g_assert(!"Unimplemented");
+	push_scope(semantics, program->fields_table);
+
+	for (uint32_t i = 0; i < program->imports->len; i++) {
+		struct ir_method *import =
+			g_array_index(program->imports, struct ir_method *, i);
+		analyze_import(semantics, import);
+	}
+
+	for (uint32_t i = 0; i < program->fields->len; i++) {
+		struct ir_field *field =
+			g_array_index(program->fields, struct ir_field *, i);
+		analyze_field(semantics, field);
+	}
+
+	for (uint32_t i = 0; i < program->fields->len; i++) {
+		struct ir_method *method =
+			g_array_index(program->methods, struct ir_method *, i);
+		analyze_method(semantics, method);
+	}
+
+	pop_scope(semantics);
 }
 
 struct semantics *semantics_new(void)

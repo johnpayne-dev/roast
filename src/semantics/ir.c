@@ -242,7 +242,9 @@ struct ir_block *ir_block_new(struct ast_node **nodes)
 	block->fields_table = fields_table_new();
 
 	block->fields = g_array_new(false, false, sizeof(struct ir_field *));
-	iterate_fields(nodes, block->fields);
+
+	while (peek_node(nodes)->type == AST_NODE_TYPE_FIELD)
+		iterate_fields(nodes, block->fields);
 
 	block->statements =
 		g_array_new(false, false, sizeof(struct ir_statements *));
