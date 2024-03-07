@@ -35,7 +35,7 @@ for stage_dir in "./tests/"{"scan","parse","inter"}"/"; do
 
         for test_file in "$expected_result_dir"*; do
             result_message="didn't pass!"
-            ./run.sh "$build_system" "$compiler" "$test_file" -t "$stage_name" > /dev/null 2>&1
+            ./run_extended.sh "-b" "$build_system" "-c" "$compiler" "--" "$test_file" -t "$stage_name" > /dev/null 2>&1
             actual_result=$?
 
             if [ "$expected_result" = "fail" ] && [ "${actual_result}" -ne 0 ]; then
