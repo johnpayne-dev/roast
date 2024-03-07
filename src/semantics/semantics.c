@@ -46,9 +46,9 @@ static void declare_field(struct semantics *semantics, struct ir_field *field)
 {
 	fields_table_t *fields_table = current_scope(semantics);
 
-	if (methods_table_get(semantics->methods_table, field->identifier))
+	if (fields_table_get(fields_table, field->identifier, false))
 		semantic_error(semantics, "Redeclaration of field");
-	else if (fields_table_get(fields_table, field->identifier, true))
+	else if (methods_table_get(semantics->methods_table, field->identifier))
 		semantic_error(semantics,
 			       "Identifier already declared as method");
 	else
@@ -163,21 +163,32 @@ static void analyze_statement(struct semantics *semantics,
 	g_assert(!"Unimplemented");
 }
 
+static void analyze_field(struct semantics *semantics, struct ir_field *field);
+
 static void analyze_block(struct semantics *semantics, struct ir_block *block)
 {
-	g_assert(!"Unimplemented");
-}
+	push_scope(semantics, block->fields_table);
 
-static void analyze_method_argument(struct semantics *semantics,
-				    struct ir_method_argument *argument)
-{
-	g_assert(!"Unimplemented");
+	for (uint32_t i = 0; i < block->fields->len; i++) {
+		struct ir_field *field =
+			g_array_index(block->fields, struct ir_field *, i);
+		analyze_field(semantics, field);
+	}
+
+	for (uint32_t i = 0; i < block->statements->len; i++) {
+		struct ir_statement *statement = g_array_index(
+			block->statements, struct ir_statement *, i);
+		analyze_statement(semantics, statement);
+	}
+
+	pop_scope(semantics);
 }
 
 static void analyze_method(struct semantics *semantics,
 			   struct ir_method *method)
 {
-	g_assert(!"Unimplemented");
+	declare_method(semantics, method);
+	analyze_block(semantics, method->block);
 }
 
 static enum ir_data_type analyze_initializer(struct semantics *semantics,
@@ -289,9 +300,7 @@ int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 
 	semantics->error = false;
 	semantics->methods_table = program->methods_table;
-#if 0
 	analyze_program(semantics, program);
-#endif
 
 	if (semantics->error || ir == NULL)
 		ir_program_free(program);

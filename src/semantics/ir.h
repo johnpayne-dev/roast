@@ -56,6 +56,8 @@ struct ir_field {
 
 struct ir_field *ir_field_new(struct ast_node **nodes, bool constant,
 			      enum ir_data_type type);
+struct ir_field *
+ir_field_new_from_argument(struct ir_method_argument *argument);
 void ir_field_free(struct ir_field *field);
 
 struct ir_initializer {
@@ -72,7 +74,7 @@ struct ir_block {
 	GArray *statements;
 };
 
-struct ir_block *ir_block_new(struct ast_node **nodes);
+struct ir_block *ir_block_new(struct ast_node **nodes, GArray *initial_fields);
 void ir_block_free(struct ir_block *block);
 
 struct ir_statement {
