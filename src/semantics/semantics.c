@@ -101,47 +101,109 @@ static enum ir_data_type analyze_literal(struct semantics *semantics,
 	}
 }
 
-static enum ir_data_type
-analyze_binary_expression(struct semantics *semantics,
-			  struct ir_binary_expression *expression)
-{
-	g_assert(!"Unimplemented");
-}
-
 static enum ir_data_type analyze_expression(struct semantics *semantics,
-					    struct ir_expression *expression)
-{
-	g_assert(!"Unimplemented");
-}
+					    struct ir_expression *expression);
 
 static enum ir_data_type analyze_location(struct semantics *semantics,
 					  struct ir_location *location)
 {
-	g_assert(!"Unimplemented");
-}
+	struct ir_field *field =
+		get_field_declaration(semantics, location->identifier);
+	if (field == NULL)
+		return IR_DATA_TYPE_VOID;
 
-static void analyze_block(struct semantics *semantics, struct ir_block *block,
-			  GArray *initial_fields);
+	if (location->index != NULL) {
+		if (!field->array)
+			semantic_error(semantics,
+				       "Cannot index into a non-array field");
 
-static void analyze_assignment(struct semantics *semantics,
-			       struct ir_assignment *assignment)
-{
-	enum ir_data_type location_type =
-		analyze_location(semantics, assignment->location);
-	if (assignment->assign_operator != IR_ASSIGN_OPERATOR_SET &&
-	    location_type != IR_DATA_TYPE_INT)
-		semantic_error(
-			semantics,
-			"Arithmetic assignment cannot be applied to field that is not of type int");
-
-	if (assignment->expression != NULL) {
-		enum ir_data_type expression_type =
-			analyze_expression(semantics, assignment->expression);
-		if (expression_type != location_type)
+		enum ir_data_type type =
+			analyze_expression(semantics, location->index);
+		if (type != IR_DATA_TYPE_INT)
 			semantic_error(
 				semantics,
-				"Expression is not the same type as field");
+				"Indexing expression must be of type int");
 	}
+
+	return field->type;
+}
+
+static enum ir_data_type
+analyze_binary_expression(struct semantics *semantics,
+			  struct ir_binary_expression *expression)
+{
+	enum ir_data_type left_type =
+		analyze_expression(semantics, expression->left);
+	enum ir_data_type right_type =
+		analyze_expression(semantics, expression->right);
+
+	if (expression->binary_operator == IR_BINARY_OPERATOR_OR ||
+	    expression->binary_operator == IR_BINARY_OPERATOR_AND) {
+		if (left_type != IR_DATA_TYPE_BOOL ||
+		    right_type != IR_DATA_TYPE_BOOL)
+			semantic_error(
+				semantics,
+				"boolean operators can only operate on expressions of type bool");
+		return IR_DATA_TYPE_BOOL;
+	}
+
+	if (expression->binary_operator == IR_BINARY_OPERATOR_ADD ||
+	    expression->binary_operator == IR_BINARY_OPERATOR_SUB ||
+	    expression->binary_operator == IR_BINARY_OPERATOR_MUL ||
+	    expression->binary_operator == IR_BINARY_OPERATOR_DIV ||
+	    expression->binary_operator == IR_BINARY_OPERATOR_MOD) {
+		if (left_type != IR_DATA_TYPE_INT ||
+		    right_type != IR_DATA_TYPE_INT)
+			semantic_error(
+				semantics,
+				"arithmetic operators can only operate on expressions of type int");
+		return IR_DATA_TYPE_INT;
+	}
+
+	if (left_type != right_type)
+		semantic_error(semantics,
+			       "Mismatching types in binary expression");
+
+	return IR_DATA_TYPE_BOOL;
+}
+
+static enum ir_data_type
+analyze_not_expression(struct semantics *semantics,
+		       struct ir_expression *expression)
+{
+	enum ir_data_type type = analyze_expression(semantics, expression);
+	if (type != IR_DATA_TYPE_BOOL)
+		semantic_error(
+			semantics,
+			"Cannot not an expression that is not of type bool");
+
+	return IR_DATA_TYPE_BOOL;
+}
+
+static enum ir_data_type
+analyze_negate_expression(struct semantics *semantics,
+			  struct ir_expression *expression)
+{
+	enum ir_data_type type = analyze_expression(semantics, expression);
+	if (type != IR_DATA_TYPE_INT)
+		semantic_error(
+			semantics,
+			"Cannot negate an expression that is not of type int");
+
+	return IR_DATA_TYPE_INT;
+}
+
+static enum ir_data_type analyze_len_expression(struct semantics *semantics,
+						char *identifier)
+{
+	struct ir_field *field = get_field_declaration(semantics, identifier);
+	if (field == NULL)
+		return IR_DATA_TYPE_INT;
+
+	if (!field->array)
+		semantic_error(semantics, "Cannot take len of non-array field");
+
+	return IR_DATA_TYPE_INT;
 }
 
 static void
@@ -176,6 +238,8 @@ static enum ir_data_type analyze_method_call(struct semantics *semantics,
 {
 	struct ir_method *method =
 		get_method_declaration(semantics, call->identifier);
+	if (method == NULL)
+		return IR_DATA_TYPE_VOID;
 
 	if (method->imported) {
 		for (uint32_t i = 0; i < call->arguments->len; i++) {
@@ -207,6 +271,58 @@ static enum ir_data_type analyze_method_call(struct semantics *semantics,
 	}
 
 	return method->return_type;
+}
+
+static enum ir_data_type analyze_expression(struct semantics *semantics,
+					    struct ir_expression *expression)
+{
+	switch (expression->type) {
+	case IR_EXPRESSION_TYPE_LEN:
+		return analyze_len_expression(semantics,
+					      expression->len_identifier);
+	case IR_EXPRESSION_TYPE_NEGATE:
+		return analyze_negate_expression(semantics,
+						 expression->negate_expression);
+	case IR_EXPRESSION_TYPE_NOT:
+		return analyze_not_expression(semantics,
+					      expression->not_expression);
+	case IR_EXPRESSION_TYPE_LITERAL:
+		return analyze_literal(semantics, expression->literal);
+	case IR_EXPRESSION_TYPE_LOCATION:
+		return analyze_location(semantics, expression->location);
+	case IR_EXPRESSION_TYPE_METHOD_CALL:
+		return analyze_method_call(semantics, expression->method_call);
+	case IR_EXPRESSION_TYPE_BINARY:
+		return analyze_binary_expression(semantics,
+						 expression->binary_expression);
+	default:
+		g_assert(!"Invalid expression type");
+		return IR_DATA_TYPE_VOID;
+	}
+}
+
+static void analyze_block(struct semantics *semantics, struct ir_block *block,
+			  GArray *initial_fields);
+
+static void analyze_assignment(struct semantics *semantics,
+			       struct ir_assignment *assignment)
+{
+	enum ir_data_type location_type =
+		analyze_location(semantics, assignment->location);
+	if (assignment->assign_operator != IR_ASSIGN_OPERATOR_SET &&
+	    location_type != IR_DATA_TYPE_INT)
+		semantic_error(
+			semantics,
+			"Arithmetic assignment cannot be applied to field that is not of type int");
+
+	if (assignment->expression != NULL) {
+		enum ir_data_type expression_type =
+			analyze_expression(semantics, assignment->expression);
+		if (expression_type != location_type)
+			semantic_error(
+				semantics,
+				"Expression is not the same type as field");
+	}
 }
 
 static void analyze_while_statement(struct semantics *semantics,
@@ -290,6 +406,7 @@ static void analyze_field(struct semantics *semantics, struct ir_field *field);
 static void analyze_block(struct semantics *semantics, struct ir_block *block,
 			  GArray *initial_fields)
 {
+	fields_table_set_parent(block->fields_table, current_scope(semantics));
 	push_scope(semantics, block->fields_table);
 
 	if (initial_fields != NULL) {
