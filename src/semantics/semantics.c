@@ -439,24 +439,24 @@ static void analyze_if_statement(struct semantics *semantics,
 static void analyze_return_statement(struct semantics *semantics,
 				     struct ir_expression *expression)
 {
-	if (expression == NULL) {
-		if (semantics->current_method->return_type != IR_DATA_TYPE_VOID)
-			semantic_error(
-				semantics,
-				"non-void method must have a value in return statement");
-		return;
-	}
+	enum ir_data_type type = IR_DATA_TYPE_VOID;
+	if (expression != NULL)
+		type = analyze_expression(semantics, expression);
 
-	if (semantics->current_method->return_type == IR_DATA_TYPE_VOID) {
-		semantic_error(semantics,
-			       "Cannot have return value in void method");
-		return;
-	}
-
-	enum ir_data_type type = analyze_expression(semantics, expression);
 	if (type != semantics->current_method->return_type)
-		semantic_error(semantics,
-			       "Expression does not match method return type");
+		semantic_error(
+			semantics,
+			"return expression does not match method return type");
+
+	fields_table_t *fields = current_scope(semantics);
+	bool in_body = fields_table_get_parent(
+			       fields_table_get_parent(fields)) == NULL;
+	if (!in_body &&
+	    semantics->current_method->return_type != IR_DATA_TYPE_VOID) {
+		semantic_error(
+			semantics,
+			"return statements cannot return values unless it is in the body of the method");
+	}
 }
 
 static void analyze_continue_statement(struct semantics *semantics)
