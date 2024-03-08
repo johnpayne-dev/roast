@@ -830,10 +830,19 @@ static uint64_t string_to_int(char *string, uint64_t max_value, uint64_t base)
 
 	while (i-- > 0) {
 		uint64_t digit = character_to_int(string[i]);
-		value += digit * place;
+		uint64_t increment = digit * place;
 
+		if (increment / place != digit)
+			return (uint64_t)-1;
+		if (value + increment < value)
+			return (uint64_t)-1;
+
+		value += increment;
 		if (value > max_value)
-			break;
+			return (uint64_t)-1;
+
+		if (i != 0 && (place * base) / place != base)
+			return (uint64_t)-1;
 
 		place *= base;
 	}
