@@ -363,6 +363,8 @@ static void analyze_assignment(struct semantics *semantics,
 
 	if (constant)
 		semantic_error(semantics, "Cannot assign to constant field");
+	if (ir_data_type_is_array(location_type))
+		semantic_error(semantics, "Cannot assign to array type");
 
 	if (assignment->assign_operator != IR_ASSIGN_OPERATOR_SET &&
 	    location_type != IR_DATA_TYPE_INT)
