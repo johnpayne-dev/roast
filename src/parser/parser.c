@@ -513,6 +513,10 @@ static struct ast_node *parse_not_expression(struct parser *parser)
 
 static struct ast_node *parse_negate_expression(struct parser *parser)
 {
+	if (peek_token(parser, 0, TOKEN_TYPE_SUB) &&
+	    (peek_token(parser, 1, TOKEN_TYPE_HEX_LITERAL) ||
+	     peek_token(parser, 1, TOKEN_TYPE_DECIMAL_LITERAL)))
+		return NULL;
 	if (!next_token(parser, TOKEN_TYPE_SUB, NULL))
 		return NULL;
 

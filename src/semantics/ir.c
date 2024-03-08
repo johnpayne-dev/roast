@@ -815,9 +815,9 @@ enum ir_data_type ir_data_type_from_ast(struct ast_node **nodes)
 static uint64_t character_to_int(char character)
 {
 	if (character >= 'a' && character <= 'f')
-		return character - 'a';
+		return character - 'a' + 10;
 	else if (character >= 'A' && character <= 'F')
-		return character - 'A';
+		return character - 'A' + 10;
 	else
 		return character - '0';
 }
