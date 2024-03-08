@@ -45,10 +45,12 @@ static void declare_method(struct semantics *semantics,
 static void declare_field(struct semantics *semantics, struct ir_field *field)
 {
 	fields_table_t *fields_table = current_scope(semantics);
+	bool global = fields_table_get_parent(fields_table) == NULL;
 
 	if (fields_table_get(fields_table, field->identifier, false))
 		semantic_error(semantics, "Redeclaration of field");
-	else if (methods_table_get(semantics->methods_table, field->identifier))
+	else if (global &&
+		 methods_table_get(semantics->methods_table, field->identifier))
 		semantic_error(semantics,
 			       "Identifier already declared as method");
 	else
@@ -58,6 +60,14 @@ static void declare_field(struct semantics *semantics, struct ir_field *field)
 static struct ir_method *get_method_declaration(struct semantics *semantics,
 						char *identifier)
 {
+	fields_table_t *fields_table = current_scope(semantics);
+	struct ir_field *field =
+		fields_table_get(fields_table, identifier, true);
+	if (field != NULL) {
+		semantic_error(semantics, "Identifier is field");
+		return NULL;
+	}
+
 	struct ir_method *method =
 		methods_table_get(semantics->methods_table, identifier);
 	if (method == NULL)
