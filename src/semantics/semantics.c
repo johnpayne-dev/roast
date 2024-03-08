@@ -451,6 +451,7 @@ static void analyze_return_statement(struct semantics *semantics,
 	if (type != semantics->current_method->return_type)
 		semantic_error(semantics,
 			       "Expression does not match method return type");
+	semantics->has_return = true;
 }
 
 static void analyze_continue_statement(struct semantics *semantics)
@@ -536,8 +537,14 @@ static void analyze_method(struct semantics *semantics,
 			   struct ir_method *method)
 {
 	declare_method(semantics, method);
+
 	semantics->current_method = method;
+	semantics->has_return = false;
 	analyze_block(semantics, method->block, method->arguments);
+
+	if (!semantics->has_return && method->return_type != IR_DATA_TYPE_VOID)
+		semantic_error(semantics,
+			       "Non-void method must return a value");
 }
 
 static enum ir_data_type analyze_initializer(struct semantics *semantics,
@@ -663,6 +670,7 @@ int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 	semantics->error = false;
 	semantics->methods_table = program->methods_table;
 	semantics->current_method = NULL;
+	semantics->has_return = false;
 	semantics->loop_depth = 0;
 	analyze_program(semantics, program);
 
