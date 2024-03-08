@@ -10,6 +10,11 @@ static struct ast_node *peek_node(struct ast_node **nodes)
 	return *nodes;
 }
 
+static struct ast_node *last_node(struct ast_node **nodes)
+{
+	return *nodes - 1;
+}
+
 bool ir_data_type_is_array(enum ir_data_type type)
 {
 	return type % 2 == 1;
@@ -36,6 +41,7 @@ struct ir_program *ir_program_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_PROGRAM);
 
 	struct ir_program *program = g_new(struct ir_program, 1);
+	program->token = last_node(nodes)->token;
 	program->fields_table = fields_table_new();
 	program->methods_table = methods_table_new();
 	program->imports =
@@ -95,6 +101,7 @@ struct ir_method *ir_method_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_METHOD);
 
 	struct ir_method *method = g_new(struct ir_method, 1);
+	method->token = last_node(nodes)->token;
 	method->imported = false;
 	method->return_type = ir_data_type_from_ast(nodes);
 	method->identifier = ir_identifier_from_ast(nodes);
@@ -118,6 +125,7 @@ struct ir_method *ir_method_new_from_import(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_IMPORT);
 
 	struct ir_method *method = g_new(struct ir_method, 1);
+	method->token = last_node(nodes)->token;
 	method->imported = true;
 	method->return_type = IR_DATA_TYPE_INT;
 	method->identifier = ir_identifier_from_ast(nodes);
@@ -147,6 +155,7 @@ struct ir_field *ir_field_new(struct ast_node **nodes, bool constant,
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_FIELD_IDENTIFIER);
 
 	struct ir_field *field = g_new(struct ir_field, 1);
+	field->token = last_node(nodes)->token;
 	field->constant = constant;
 	field->type = type;
 	field->identifier = ir_identifier_from_ast(nodes);
@@ -196,6 +205,7 @@ struct ir_initializer *ir_initializer_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_INITIALIZER);
 
 	struct ir_initializer *initializer = g_new(struct ir_initializer, 1);
+	initializer->token = last_node(nodes)->token;
 	initializer->literals =
 		g_array_new(false, false, sizeof(struct ir_literal *));
 	initializer->array = peek_node(nodes)->type ==
@@ -227,6 +237,7 @@ struct ir_block *ir_block_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_BLOCK);
 
 	struct ir_block *block = g_new(struct ir_block, 1);
+	block->token = last_node(nodes)->token;
 	block->fields_table = fields_table_new();
 	block->fields = g_array_new(false, false, sizeof(struct ir_field *));
 
@@ -271,6 +282,7 @@ struct ir_statement *ir_statement_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_STATEMENT);
 
 	struct ir_statement *statement = g_new(struct ir_statement, 1);
+	statement->token = last_node(nodes)->token;
 
 	switch (peek_node(nodes)->type) {
 	case AST_NODE_TYPE_IF_STATEMENT:
@@ -351,10 +363,10 @@ struct ir_assignment *ir_assignment_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_ASSIGNMENT);
 
 	struct ir_assignment *assignment = g_new(struct ir_assignment, 1);
-
+	assignment->token = last_node(nodes)->token;
 	assignment->location = ir_location_new(nodes);
 
-	switch (next_node(nodes)->token->type) {
+	switch (next_node(nodes)->token.type) {
 	case TOKEN_TYPE_ASSIGN:
 		assignment->assign_operator = IR_ASSIGN_OPERATOR_SET;
 		break;
@@ -398,6 +410,7 @@ ir_assignment_new_from_identifier(char *identifier,
 				  struct ir_expression *expression)
 {
 	struct ir_assignment *assignment = g_new(struct ir_assignment, 1);
+	assignment->token = expression->token;
 	assignment->location = g_new(struct ir_location, 1);
 	assignment->location->identifier = identifier;
 	assignment->location->index = NULL;
@@ -419,6 +432,7 @@ struct ir_method_call *ir_method_call_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_METHOD_CALL);
 
 	struct ir_method_call *call = g_new(struct ir_method_call, 1);
+	call->token = last_node(nodes)->token;
 	call->identifier = ir_identifier_from_ast(nodes);
 	call->arguments = g_array_new(false, false,
 				      sizeof(struct ir_method_call_argument *));
@@ -451,6 +465,7 @@ ir_method_call_argument_new(struct ast_node **nodes)
 
 	struct ir_method_call_argument *argument =
 		g_new(struct ir_method_call_argument, 1);
+	argument->token = last_node(nodes)->token;
 
 	if (peek_node(nodes)->type == AST_NODE_TYPE_STRING_LITERAL) {
 		argument->type = IR_METHOD_CALL_ARGUMENT_TYPE_STRING;
@@ -485,6 +500,7 @@ struct ir_if_statement *ir_if_statement_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_IF_STATEMENT);
 
 	struct ir_if_statement *statement = g_new(struct ir_if_statement, 1);
+	statement->token = last_node(nodes)->token;
 	statement->condition = ir_expression_new(nodes);
 	statement->if_block = ir_block_new(nodes);
 
@@ -510,6 +526,7 @@ struct ir_for_statement *ir_for_statement_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_FOR_STATEMENT);
 
 	struct ir_for_statement *statement = g_new(struct ir_for_statement, 1);
+	statement->token = last_node(nodes)->token;
 
 	char *identifier = ir_identifier_from_ast(nodes);
 	struct ir_expression *initializer = ir_expression_new(nodes);
@@ -536,6 +553,7 @@ struct ir_for_update *ir_for_update_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_FOR_UPDATE);
 
 	struct ir_for_update *update = g_new(struct ir_for_update, 1);
+	update->token = last_node(nodes)->token;
 
 	if (peek_node(nodes)->type == AST_NODE_TYPE_METHOD_CALL) {
 		update->type = IR_FOR_UPDATE_TYPE_METHOD_CALL;
@@ -572,6 +590,7 @@ struct ir_while_statement *ir_while_statement_new(struct ast_node **nodes)
 
 	struct ir_while_statement *statement =
 		g_new(struct ir_while_statement, 1);
+	statement->token = last_node(nodes)->token;
 	statement->condition = ir_expression_new(nodes);
 	statement->block = ir_block_new(nodes);
 	return statement;
@@ -589,6 +608,7 @@ struct ir_location *ir_location_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_LOCATION);
 
 	struct ir_location *location = g_new(struct ir_location, 1);
+	location->token = last_node(nodes)->token;
 	location->identifier = ir_identifier_from_ast(nodes);
 	location->index = NULL;
 
@@ -613,6 +633,7 @@ struct ir_expression *ir_expression_new(struct ast_node **nodes)
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_EXPRESSION);
 
 	struct ir_expression *expression = g_new(struct ir_expression, 1);
+	expression->token = last_node(nodes)->token;
 
 	switch (peek_node(nodes)->type) {
 	case AST_NODE_TYPE_BINARY_EXPRESSION:
@@ -692,9 +713,10 @@ struct ir_binary_expression *ir_binary_expression_new(struct ast_node **nodes)
 
 	struct ir_binary_expression *expression =
 		g_new(struct ir_binary_expression, 1);
+	expression->token = last_node(nodes)->token;
 	expression->left = ir_expression_new(nodes);
 
-	switch (next_node(nodes)->token->type) {
+	switch (next_node(nodes)->token.type) {
 	case TOKEN_TYPE_OR:
 		expression->binary_operator = IR_BINARY_OPERATOR_OR;
 		break;
@@ -758,6 +780,7 @@ struct ir_literal *ir_literal_new(struct ast_node **nodes)
 	struct ast_node *node = peek_node(nodes);
 
 	struct ir_literal *literal = g_new(struct ir_literal, 1);
+	literal->token = last_node(nodes)->token;
 	literal->negate = false;
 
 	if (node->type == AST_NODE_TYPE_LITERAL_NEGATION) {
@@ -803,7 +826,7 @@ enum ir_data_type ir_data_type_from_ast(struct ast_node **nodes)
 	if (node->type == AST_NODE_TYPE_VOID) {
 		return IR_DATA_TYPE_VOID;
 	} else {
-		switch (node->token->type) {
+		switch (node->token.type) {
 		case TOKEN_TYPE_KEYWORD_INT:
 			return IR_DATA_TYPE_INT;
 		case TOKEN_TYPE_KEYWORD_BOOL:
@@ -859,10 +882,10 @@ uint64_t ir_int_literal_from_ast(struct ast_node **nodes, bool negate)
 	struct ast_node *node = next_node(nodes);
 	g_assert(node->type == AST_NODE_TYPE_INT_LITERAL);
 
-	char *source_value = token_get_string(node->token);
+	char *source_value = token_get_string(&node->token);
 
 	uint64_t max_value = (uint64_t)INT64_MAX + (uint64_t)negate;
-	bool hex = node->token->type == TOKEN_TYPE_HEX_LITERAL;
+	bool hex = node->token.type == TOKEN_TYPE_HEX_LITERAL;
 
 	uint64_t value = string_to_int(hex ? source_value + 2 : source_value,
 				       max_value, hex ? 16 : 10);
@@ -875,7 +898,7 @@ bool ir_bool_literal_from_ast(struct ast_node **nodes)
 {
 	struct ast_node *node = next_node(nodes);
 	g_assert(node->type == AST_NODE_TYPE_BOOL_LITERAL);
-	switch (node->token->type) {
+	switch (node->token.type) {
 	case TOKEN_TYPE_KEYWORD_TRUE:
 		return true;
 	case TOKEN_TYPE_KEYWORD_FALSE:
@@ -913,7 +936,7 @@ char ir_char_literal_from_ast(struct ast_node **nodes)
 	struct ast_node *node = next_node(nodes);
 	g_assert(node->type == AST_NODE_TYPE_CHAR_LITERAL);
 
-	char *source_value = token_get_string(node->token);
+	char *source_value = token_get_string(&node->token);
 
 	char value = '\0';
 	if (source_value[1] == '\\')
@@ -930,7 +953,7 @@ char *ir_string_literal_from_ast(struct ast_node **nodes)
 	struct ast_node *node = next_node(nodes);
 	g_assert(node->type == AST_NODE_TYPE_STRING_LITERAL);
 
-	char *token_string = token_get_string(node->token);
+	char *token_string = token_get_string(&node->token);
 	g_assert(token_string[0] == '\"');
 
 	GString *string_literal = g_string_new(NULL);
@@ -958,5 +981,5 @@ char *ir_identifier_from_ast(struct ast_node **nodes)
 {
 	struct ast_node *node = next_node(nodes);
 	g_assert(node->type == AST_NODE_TYPE_IDENTIFIER);
-	return token_get_string(node->token);
+	return token_get_string(&node->token);
 }

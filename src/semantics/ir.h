@@ -20,6 +20,7 @@ enum ir_data_type {
 bool ir_data_type_is_array(enum ir_data_type type);
 
 struct ir_program {
+	struct token token;
 	fields_table_t *fields_table;
 	methods_table_t *methods_table;
 	GArray *imports;
@@ -31,6 +32,7 @@ struct ir_program *ir_program_new(struct ast_node **nodes);
 void ir_program_free(struct ir_program *program);
 
 struct ir_method {
+	struct token token;
 	bool imported;
 	enum ir_data_type return_type;
 	char *identifier;
@@ -43,6 +45,7 @@ struct ir_method *ir_method_new_from_import(struct ast_node **nodes);
 void ir_method_free(struct ir_method *method);
 
 struct ir_field {
+	struct token token;
 	enum ir_data_type type;
 	bool constant;
 	char *identifier;
@@ -56,6 +59,7 @@ struct ir_field *ir_field_new_from_method_argument(struct ast_node **nodes);
 void ir_field_free(struct ir_field *field);
 
 struct ir_initializer {
+	struct token token;
 	bool array;
 	GArray *literals;
 };
@@ -64,6 +68,7 @@ struct ir_initializer *ir_initializer_new(struct ast_node **nodes);
 void ir_initializer_free(struct ir_initializer *initializer);
 
 struct ir_block {
+	struct token token;
 	fields_table_t *fields_table;
 	GArray *fields;
 	GArray *statements;
@@ -73,6 +78,8 @@ struct ir_block *ir_block_new(struct ast_node **nodes);
 void ir_block_free(struct ir_block *block);
 
 struct ir_statement {
+	struct token token;
+
 	enum ir_statement_type {
 		IR_STATEMENT_TYPE_ASSIGNMENT,
 		IR_STATEMENT_TYPE_METHOD_CALL,
@@ -98,6 +105,7 @@ struct ir_statement *ir_statement_new(struct ast_node **nodes);
 void ir_statement_free(struct ir_statement *statement);
 
 struct ir_assignment {
+	struct token token;
 	struct ir_location *location;
 
 	enum ir_assign_operator {
@@ -121,6 +129,7 @@ ir_assignment_new_from_identifier(char *identifier,
 void ir_assignment_free(struct ir_assignment *assignment);
 
 struct ir_method_call {
+	struct token token;
 	char *identifier;
 	GArray *arguments;
 };
@@ -129,6 +138,7 @@ struct ir_method_call *ir_method_call_new(struct ast_node **nodes);
 void ir_method_call_free(struct ir_method_call *method_call);
 
 struct ir_method_call_argument {
+	struct token token;
 	enum ir_method_call_argument_type {
 		IR_METHOD_CALL_ARGUMENT_TYPE_STRING,
 		IR_METHOD_CALL_ARGUMENT_TYPE_EXPRESSION,
@@ -145,6 +155,7 @@ ir_method_call_argument_new(struct ast_node **nodes);
 void ir_method_call_argument_free(struct ir_method_call_argument *argument);
 
 struct ir_if_statement {
+	struct token token;
 	struct ir_expression *condition;
 	struct ir_block *if_block;
 	struct ir_block *else_block;
@@ -154,6 +165,7 @@ struct ir_if_statement *ir_if_statement_new(struct ast_node **nodes);
 void ir_if_statement_free(struct ir_if_statement *statement);
 
 struct ir_for_statement {
+	struct token token;
 	struct ir_assignment *initial;
 	struct ir_expression *condition;
 	struct ir_for_update *update;
@@ -164,6 +176,7 @@ struct ir_for_statement *ir_for_statement_new(struct ast_node **nodes);
 void ir_for_statement_free(struct ir_for_statement *statement);
 
 struct ir_for_update {
+	struct token token;
 	enum ir_for_update_type {
 		IR_FOR_UPDATE_TYPE_METHOD_CALL,
 		IR_FOR_UPDATE_TYPE_ASSIGNMENT,
@@ -179,6 +192,7 @@ struct ir_for_update *ir_for_update_new(struct ast_node **nodes);
 void ir_for_update_free(struct ir_for_update *update);
 
 struct ir_while_statement {
+	struct token token;
 	struct ir_expression *condition;
 	struct ir_block *block;
 };
@@ -187,6 +201,7 @@ struct ir_while_statement *ir_while_statement_new(struct ast_node **nodes);
 void ir_while_statement_free(struct ir_while_statement *statement);
 
 struct ir_location {
+	struct token token;
 	char *identifier;
 	struct ir_expression *index;
 };
@@ -195,6 +210,8 @@ struct ir_location *ir_location_new(struct ast_node **nodes);
 void ir_location_free(struct ir_location *location);
 
 struct ir_expression {
+	struct token token;
+
 	enum ir_expression_type {
 		IR_EXPRESSION_TYPE_BINARY,
 		IR_EXPRESSION_TYPE_NOT,
@@ -220,6 +237,7 @@ struct ir_expression *ir_expression_new(struct ast_node **nodes);
 void ir_expression_free(struct ir_expression *expression);
 
 struct ir_binary_expression {
+	struct token token;
 	struct ir_expression *left;
 
 	enum ir_binary_operator {
@@ -245,6 +263,7 @@ struct ir_binary_expression *ir_binary_expression_new(struct ast_node **nodes);
 void ir_binary_expression_free(struct ir_binary_expression *expression);
 
 struct ir_literal {
+	struct token token;
 	bool negate;
 
 	enum ir_literal_type {

@@ -101,21 +101,23 @@ static int get_input_file_contents(int argc, char *argv[], char **file_contents)
 	return 0;
 }
 
-static int run_scan_target(char *source, bool print_output, GArray **token_list)
+static int run_scan_target(char *file_name, char *source, bool print_output,
+			   GArray **token_list)
 {
 	struct scanner *scanner = scanner_new();
 
-	int result =
-		scanner_tokenize(scanner, source, print_output, token_list);
+	int result = scanner_tokenize(scanner, file_name, source, print_output,
+				      token_list);
 
 	scanner_free(scanner);
 	return result;
 }
 
-static int run_parse_target(char *source, struct ast_node **ast)
+static int run_parse_target(char *file_name, char *source,
+			    struct ast_node **ast)
 {
 	GArray *tokens;
-	if (run_scan_target(source, false, &tokens) != 0)
+	if (run_scan_target(file_name, source, false, &tokens) != 0)
 		return -1;
 
 	struct parser *parser = parser_new();
@@ -127,10 +129,11 @@ static int run_parse_target(char *source, struct ast_node **ast)
 	return result;
 }
 
-static int run_intermediate_target(char *source, struct ir_program **ir)
+static int run_intermediate_target(char *file_name, char *source,
+				   struct ir_program **ir)
 {
 	struct ast_node *ast;
-	if (run_parse_target(source, &ast) != 0)
+	if (run_parse_target(file_name, source, &ast) != 0)
 		return -1;
 
 	struct semantics *semantics = semantics_new();
@@ -142,25 +145,25 @@ static int run_intermediate_target(char *source, struct ir_program **ir)
 	return result;
 }
 
-static int run_assembly_target(char *source)
+static int run_assembly_target(char *file_name, char *source)
 {
 	g_printerr("assembly target not implemented yet.\n");
 	return -1;
 }
 
-static int run_target(char *target, char *source)
+static int run_target(char *target, char *file_name, char *source)
 {
 	if (target == NULL)
-		return run_assembly_target(source);
+		return run_assembly_target(file_name, source);
 
 	if (g_strcmp0(target, "scan") == 0)
-		return run_scan_target(source, true, NULL);
+		return run_scan_target(file_name, source, true, NULL);
 	if (g_strcmp0(target, "parse") == 0)
-		return run_parse_target(source, NULL);
+		return run_parse_target(file_name, source, NULL);
 	if (g_strcmp0(target, "inter") == 0)
-		return run_intermediate_target(source, NULL);
+		return run_intermediate_target(file_name, source, NULL);
 	if (g_strcmp0(target, "assembly") == 0)
-		return run_assembly_target(source);
+		return run_assembly_target(file_name, source);
 
 	g_printerr("Unknown target '%s' passed in as option.\n", target);
 	return -1;
@@ -180,7 +183,7 @@ int main(int argc, char *argv[])
 	if (get_input_file_contents(argc, argv, &file_contents) != 0)
 		goto error_cleanup;
 
-	if (run_target(options.target, file_contents) != 0)
+	if (run_target(options.target, argv[1], file_contents) != 0)
 		goto error_cleanup;
 
 	return 0;
