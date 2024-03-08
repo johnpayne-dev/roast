@@ -422,6 +422,21 @@ static void analyze_if_statement(struct semantics *semantics,
 		analyze_block(semantics, statement->else_block, NULL);
 }
 
+static void analyze_return_statement(struct semantics *semantics,
+				     struct ir_expression *expression)
+{
+	if (semantics->current_method->return_type == IR_DATA_TYPE_VOID) {
+		semantic_error(semantics,
+			       "Cannot have return statement in void method");
+		return;
+	}
+
+	enum ir_data_type type = analyze_expression(semantics, expression);
+	if (type != semantics->current_method->return_type)
+		semantic_error(semantics,
+			       "Expression does not match method return type");
+}
+
 static void analyze_statement(struct semantics *semantics,
 			      struct ir_statement *statement)
 {
@@ -440,6 +455,10 @@ static void analyze_statement(struct semantics *semantics,
 		break;
 	case IR_STATEMENT_TYPE_WHILE:
 		analyze_while_statement(semantics, statement->while_statement);
+		break;
+	case IR_STATEMENT_TYPE_RETURN:
+		analyze_return_statement(semantics,
+					 statement->return_expression);
 		break;
 	default:
 		break;
@@ -481,6 +500,7 @@ static void analyze_method(struct semantics *semantics,
 			   struct ir_method *method)
 {
 	declare_method(semantics, method);
+	semantics->current_method = method;
 	analyze_block(semantics, method->block, method->arguments);
 }
 
@@ -601,6 +621,7 @@ int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 
 	semantics->error = false;
 	semantics->methods_table = program->methods_table;
+	semantics->current_method = NULL;
 	analyze_program(semantics, program);
 
 	if (semantics->error || ir == NULL)
