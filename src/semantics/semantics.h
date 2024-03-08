@@ -7,6 +7,8 @@ struct semantics {
 	bool error;
 	GArray *fields_table_stack;
 	methods_table_t *methods_table;
+	struct ir_method *current_method;
+	uint32_t loop_depth;
 };
 
 struct semantics *semantics_new(void);

@@ -10,9 +10,14 @@
 
 enum ir_data_type {
 	IR_DATA_TYPE_VOID,
+	IR_DATA_TYPE_VOID_ARRAY,
 	IR_DATA_TYPE_BOOL,
+	IR_DATA_TYPE_BOOL_ARRAY,
 	IR_DATA_TYPE_INT,
+	IR_DATA_TYPE_INT_ARRAY,
 };
+
+bool ir_data_type_is_array(enum ir_data_type type);
 
 struct ir_program {
 	fields_table_t *fields_table;
@@ -37,25 +42,17 @@ struct ir_method *ir_method_new(struct ast_node **nodes);
 struct ir_method *ir_method_new_from_import(struct ast_node **nodes);
 void ir_method_free(struct ir_method *method);
 
-struct ir_method_argument {
-	enum ir_data_type type;
-	char *identifier;
-};
-
-struct ir_method_argument *ir_method_argument_new(struct ast_node **nodes);
-void ir_method_argument_free(struct ir_method_argument *method_argument);
-
 struct ir_field {
 	enum ir_data_type type;
 	bool constant;
 	char *identifier;
-	bool array;
 	int64_t array_length;
 	struct ir_initializer *initializer;
 };
 
 struct ir_field *ir_field_new(struct ast_node **nodes, bool constant,
 			      enum ir_data_type type);
+struct ir_field *ir_field_new_from_method_argument(struct ast_node **nodes);
 void ir_field_free(struct ir_field *field);
 
 struct ir_initializer {
@@ -118,6 +115,9 @@ struct ir_assignment {
 };
 
 struct ir_assignment *ir_assignment_new(struct ast_node **nodes);
+struct ir_assignment *
+ir_assignment_new_from_identifier(char *identifier,
+				  struct ir_expression *expression);
 void ir_assignment_free(struct ir_assignment *assignment);
 
 struct ir_method_call {
@@ -154,8 +154,7 @@ struct ir_if_statement *ir_if_statement_new(struct ast_node **nodes);
 void ir_if_statement_free(struct ir_if_statement *statement);
 
 struct ir_for_statement {
-	char *identifier;
-	struct ir_expression *initializer;
+	struct ir_assignment *initial;
 	struct ir_expression *condition;
 	struct ir_for_update *update;
 	struct ir_block *block;
