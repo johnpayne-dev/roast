@@ -10,9 +10,14 @@
 
 enum ir_data_type {
 	IR_DATA_TYPE_VOID,
+	IR_DATA_TYPE_VOID_ARRAY,
 	IR_DATA_TYPE_BOOL,
+	IR_DATA_TYPE_BOOL_ARRAY,
 	IR_DATA_TYPE_INT,
+	IR_DATA_TYPE_INT_ARRAY,
 };
+
+bool ir_data_type_is_array(enum ir_data_type type);
 
 struct ir_program {
 	fields_table_t *fields_table;
@@ -41,7 +46,6 @@ struct ir_field {
 	enum ir_data_type type;
 	bool constant;
 	char *identifier;
-	bool array;
 	int64_t array_length;
 	struct ir_initializer *initializer;
 };

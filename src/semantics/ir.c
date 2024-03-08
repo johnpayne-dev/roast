@@ -10,6 +10,11 @@ static struct ast_node *peek_node(struct ast_node **nodes)
 	return *nodes;
 }
 
+bool ir_data_type_is_array(enum ir_data_type type)
+{
+	return type % 2 == 1;
+}
+
 static void iterate_fields(struct ast_node **nodes, GArray *fields)
 {
 	g_assert(next_node(nodes)->type == AST_NODE_TYPE_FIELD);
@@ -147,14 +152,13 @@ struct ir_field *ir_field_new(struct ast_node **nodes, bool constant,
 	field->identifier = ir_identifier_from_ast(nodes);
 
 	if (peek_node(nodes)->type == AST_NODE_TYPE_INT_LITERAL) {
-		field->array = true;
+		field->type += 1;
 		field->array_length = ir_int_literal_from_ast(nodes, false);
 	} else if (peek_node(nodes)->type == AST_NODE_TYPE_EMPTY_ARRAY_LENGTH) {
-		field->array = true;
+		field->type += 1;
 		field->array_length = -1;
 		next_node(nodes);
 	} else {
-		field->array = false;
 		field->array_length = 1;
 	}
 
@@ -174,7 +178,6 @@ struct ir_field *ir_field_new_from_method_argument(struct ast_node **nodes)
 	argument->constant = false;
 	argument->type = ir_data_type_from_ast(nodes);
 	argument->identifier = ir_identifier_from_ast(nodes);
-	argument->array = false;
 	argument->array_length = 1;
 	argument->initializer = NULL;
 	return argument;

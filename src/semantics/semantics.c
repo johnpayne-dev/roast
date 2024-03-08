@@ -122,20 +122,24 @@ static enum ir_data_type analyze_location(struct semantics *semantics,
 	if (field == NULL)
 		return IR_DATA_TYPE_VOID;
 
+	enum ir_data_type type = field->type;
+
 	if (location->index != NULL) {
-		if (!field->array)
+		if (ir_data_type_is_array(type))
+			type -= 1;
+		else
 			semantic_error(semantics,
 				       "Cannot index into a non-array field");
 
-		enum ir_data_type type =
+		enum ir_data_type index_type =
 			analyze_expression(semantics, location->index);
-		if (type != IR_DATA_TYPE_INT)
+		if (index_type != IR_DATA_TYPE_INT)
 			semantic_error(
 				semantics,
 				"Indexing expression must be of type int");
 	}
 
-	return field->type;
+	return type;
 }
 
 static enum ir_data_type
@@ -216,7 +220,7 @@ analyze_not_expression(struct semantics *semantics,
 	if (type != IR_DATA_TYPE_BOOL)
 		semantic_error(
 			semantics,
-			"Cannot not an expression that is not of type bool");
+			"Cannot perform boolean operation on an expression that is not of type bool");
 
 	return IR_DATA_TYPE_BOOL;
 }
@@ -241,7 +245,7 @@ static enum ir_data_type analyze_len_expression(struct semantics *semantics,
 	if (field == NULL)
 		return IR_DATA_TYPE_INT;
 
-	if (!field->array)
+	if (!ir_data_type_is_array(field->type))
 		semantic_error(semantics, "Cannot take len of non-array field");
 
 	return IR_DATA_TYPE_INT;
@@ -498,37 +502,33 @@ static enum ir_data_type analyze_initializer(struct semantics *semantics,
 				"Inconsistent types in array initializer");
 	}
 
+	if (initializer->array)
+		type += 1;
+
 	return type;
 }
 
 static void analyze_field(struct semantics *semantics, struct ir_field *field)
 {
 	declare_field(semantics, field);
+	bool is_array = ir_data_type_is_array(field->type);
 
 	if (field->initializer != NULL) {
-		enum ir_data_type type =
+		enum ir_data_type initializer_type =
 			analyze_initializer(semantics, field->initializer);
 
-		if (field->initializer->array && !field->array)
+		if (initializer_type != field->type)
 			semantic_error(
 				semantics,
-				"Cannot initialize non-array field with array initializer");
-		if (!field->initializer->array && field->array)
-			semantic_error(
-				semantics,
-				"Cannot initialize array field with non-array initializer");
-		if (field->initializer->array && field->array &&
+				"Initializer type does not match field type");
+		if (is_array && field->initializer->array &&
 		    field->array_length != -1)
 			semantic_error(
 				semantics,
 				"Array initializer cannot be provided when length is declared");
-		if (type != field->type)
-			semantic_error(
-				semantics,
-				"Initializer type does not match field type");
 
 		field->array_length = field->initializer->literals->len;
-	} else if (field->array) {
+	} else if (is_array) {
 		if (field->array_length == -1)
 			semantic_error(
 				semantics,
