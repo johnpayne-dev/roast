@@ -54,13 +54,10 @@ enum ast_node_type {
 struct ast_node {
 	enum ast_node_type type;
 	GArray *children;
-	struct token *token;
+	struct token token;
 };
 
-struct ast_node *ast_node_new(enum ast_node_type type);
-
-struct ast_node *ast_node_new_terminal(enum ast_node_type type,
-				       struct token token);
+struct ast_node *ast_node_new(enum ast_node_type type, struct token token);
 
 void ast_node_add_child(struct ast_node *node, struct ast_node *child);
 

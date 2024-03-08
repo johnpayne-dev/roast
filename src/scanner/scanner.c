@@ -33,8 +33,10 @@ struct scanner *scanner_new(void)
 	return scanner;
 }
 
-void scanner_start(struct scanner *scanner, const char *source)
+void scanner_start(struct scanner *scanner, const char *file_name,
+		   const char *source)
 {
+	scanner->file_name = file_name;
 	scanner->source = source;
 	scanner->position = 0;
 }
@@ -82,16 +84,17 @@ bool scanner_next_token(struct scanner *scanner, struct token *token)
 
 	token->type = match_token(scanner, &token->length);
 	token->offset = scanner->position;
+	token->file_name = scanner->file_name;
 	token->source = scanner->source;
 	scanner->position += token->length;
 	return true;
 }
 
-int scanner_tokenize(struct scanner *scanner, const char *source,
-		     bool print_output, GArray **out_tokens)
+int scanner_tokenize(struct scanner *scanner, const char *file_name,
+		     const char *source, bool print_output, GArray **out_tokens)
 {
 	int result = 0;
-	scanner_start(scanner, source);
+	scanner_start(scanner, file_name, source);
 
 	GArray *tokens = g_array_new(false, false, sizeof(struct token));
 

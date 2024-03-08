@@ -89,6 +89,7 @@ struct token {
 	enum token_type type;
 	uint32_t offset;
 	uint32_t length;
+	const char *file_name;
 	const char *source;
 };
 

@@ -173,6 +173,7 @@ void token_print_error(struct token *token)
 	uint32_t line_number = token_get_line_number(token);
 	uint32_t column_number = token_get_column_number(token);
 	const char *error_message = token_type_error_message(token->type);
-	g_printerr("ERROR: %s at %i:%i: %.*s\n", error_message, line_number,
-		   column_number, token->length, &token->source[token->offset]);
+	g_printerr("SCAN-ERROR: %s at %s:%i:%i: %.*s\n", error_message,
+		   token->file_name, line_number, column_number, token->length,
+		   &token->source[token->offset]);
 }

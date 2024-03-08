@@ -121,6 +121,14 @@ static bool peek_token_in_table(struct parser *parser,
 	return false;
 }
 
+static struct ast_node *new_node(struct parser *parser, enum ast_node_type type)
+{
+	uint32_t position =
+		CLAMP(parser->position - 1, 0, parser->token_count - 1);
+	struct token token = parser->tokens[position];
+	return ast_node_new(type, token);
+}
+
 static void parse_error(struct parser *parser, const char *message)
 {
 	uint32_t token_index = parser->position == 0 ? 0 : parser->position - 1;
@@ -130,7 +138,8 @@ static void parse_error(struct parser *parser, const char *message)
 	uint32_t column_number = token_get_column_number(token);
 
 	parser->parse_error = true;
-	g_printerr("ERROR at %i:%i: %s\n", line_number, column_number, message);
+	g_printerr("PARSE-ERROR at %s:%i:%i: %s\n", token->file_name,
+		   line_number, column_number, message);
 }
 
 static struct ast_node *parse_identifier(struct parser *parser)
@@ -142,7 +151,7 @@ static struct ast_node *parse_identifier(struct parser *parser)
 	else if (!next_token(parser, TOKEN_TYPE_IDENTIFIER, &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_IDENTIFIER, token);
+	return ast_node_new(AST_NODE_TYPE_IDENTIFIER, token);
 }
 
 static struct ast_node *parse_char_literal(struct parser *parser)
@@ -151,7 +160,7 @@ static struct ast_node *parse_char_literal(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_CHAR_LITERAL, &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_CHAR_LITERAL, token);
+	return ast_node_new(AST_NODE_TYPE_CHAR_LITERAL, token);
 }
 
 static struct ast_node *parse_string_literal(struct parser *parser)
@@ -160,7 +169,7 @@ static struct ast_node *parse_string_literal(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_STRING_LITERAL, &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_STRING_LITERAL, token);
+	return ast_node_new(AST_NODE_TYPE_STRING_LITERAL, token);
 }
 
 static struct ast_node *parse_bool_literal(struct parser *parser)
@@ -170,7 +179,7 @@ static struct ast_node *parse_bool_literal(struct parser *parser)
 				 G_N_ELEMENTS(BOOL_LITERALS), &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_BOOL_LITERAL, token);
+	return ast_node_new(AST_NODE_TYPE_BOOL_LITERAL, token);
 }
 
 static struct ast_node *parse_int_literal(struct parser *parser)
@@ -180,7 +189,7 @@ static struct ast_node *parse_int_literal(struct parser *parser)
 				 G_N_ELEMENTS(INT_LITERALS), &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_INT_LITERAL, token);
+	return ast_node_new(AST_NODE_TYPE_INT_LITERAL, token);
 }
 
 static struct ast_node *parse_type(struct parser *parser)
@@ -192,7 +201,7 @@ static struct ast_node *parse_type(struct parser *parser)
 				      &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_DATA_TYPE, token);
+	return ast_node_new(AST_NODE_TYPE_DATA_TYPE, token);
 }
 
 static struct ast_node *parse_binary_operator(struct parser *parser)
@@ -202,7 +211,7 @@ static struct ast_node *parse_binary_operator(struct parser *parser)
 				 G_N_ELEMENTS(BINARY_OPERATORS), &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_BINARY_OPERATOR, token);
+	return ast_node_new(AST_NODE_TYPE_BINARY_OPERATOR, token);
 }
 
 static struct ast_node *parse_increment_operator(struct parser *parser)
@@ -212,7 +221,7 @@ static struct ast_node *parse_increment_operator(struct parser *parser)
 				 G_N_ELEMENTS(INCREMENT_OPERATORS), &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_INCREMENT_OPERATOR, token);
+	return ast_node_new(AST_NODE_TYPE_INCREMENT_OPERATOR, token);
 }
 
 static struct ast_node *parse_assign_operator(struct parser *parser)
@@ -222,7 +231,7 @@ static struct ast_node *parse_assign_operator(struct parser *parser)
 				 G_N_ELEMENTS(ASSIGN_OPERATORS), &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_ASSIGN_OPERATOR, token);
+	return ast_node_new(AST_NODE_TYPE_ASSIGN_OPERATOR, token);
 }
 
 static struct ast_node *parse_literal_negation(struct parser *parser)
@@ -231,12 +240,12 @@ static struct ast_node *parse_literal_negation(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_SUB, &token))
 		return NULL;
 
-	return ast_node_new_terminal(AST_NODE_TYPE_LITERAL_NEGATION, token);
+	return ast_node_new(AST_NODE_TYPE_LITERAL_NEGATION, token);
 }
 
 static struct ast_node *parse_literal(struct parser *parser)
 {
-	struct ast_node *literal = ast_node_new(AST_NODE_TYPE_LITERAL);
+	struct ast_node *literal = new_node(parser, AST_NODE_TYPE_LITERAL);
 
 	struct ast_node *negation = parse_literal_negation(parser);
 	if (negation != NULL)
@@ -264,7 +273,7 @@ static struct ast_node *parse_array_literal(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_OPEN_CURLY_BRACKET, NULL))
 		return NULL;
 
-	struct ast_node *array = ast_node_new(AST_NODE_TYPE_ARRAY_LITERAL);
+	struct ast_node *array = new_node(parser, AST_NODE_TYPE_ARRAY_LITERAL);
 
 	while (true) {
 		struct ast_node *literal = parse_literal(parser);
@@ -290,7 +299,8 @@ static struct ast_node *parse_array_literal(struct parser *parser)
 
 static struct ast_node *parse_initializer(struct parser *parser)
 {
-	struct ast_node *initializer = ast_node_new(AST_NODE_TYPE_INITIALIZER);
+	struct ast_node *initializer =
+		new_node(parser, AST_NODE_TYPE_INITIALIZER);
 
 	struct ast_node *child;
 	if ((child = parse_array_literal(parser))) {
@@ -309,7 +319,7 @@ static struct ast_node *parse_expression(struct parser *parser);
 static struct ast_node *parse_method_call_argument(struct parser *parser)
 {
 	struct ast_node *argument =
-		ast_node_new(AST_NODE_TYPE_METHOD_CALL_ARGUMENT);
+		new_node(parser, AST_NODE_TYPE_METHOD_CALL_ARGUMENT);
 
 	struct ast_node *child;
 	if ((child = parse_string_literal(parser))) {
@@ -329,7 +339,7 @@ static struct ast_node *parse_method_call(struct parser *parser)
 	    !peek_token(parser, 1, TOKEN_TYPE_OPEN_PARENTHESIS))
 		return NULL;
 
-	struct ast_node *call = ast_node_new(AST_NODE_TYPE_METHOD_CALL);
+	struct ast_node *call = new_node(parser, AST_NODE_TYPE_METHOD_CALL);
 
 	struct ast_node *identifier = parse_identifier(parser);
 	ast_node_add_child(call, identifier);
@@ -381,11 +391,12 @@ static bool is_binary_operator(struct parser *parser, uint32_t i)
 static bool is_expression_termination(struct parser *parser, uint32_t depth,
 				      uint32_t i)
 {
-	return depth == 0 &&
-	       (peek_token(parser, i, TOKEN_TYPE_CLOSE_PARENTHESIS) ||
-		peek_token(parser, i, TOKEN_TYPE_CLOSE_SQUARE_BRACKET) ||
-		peek_token(parser, i, TOKEN_TYPE_SEMICOLON) ||
-		peek_token(parser, i, TOKEN_TYPE_COMMA));
+	return (depth == 0 &&
+		(peek_token(parser, i, TOKEN_TYPE_CLOSE_PARENTHESIS) ||
+		 peek_token(parser, i, TOKEN_TYPE_CLOSE_SQUARE_BRACKET) ||
+		 peek_token(parser, i, TOKEN_TYPE_SEMICOLON) ||
+		 peek_token(parser, i, TOKEN_TYPE_COMMA))) ||
+	       i >= parser->token_count;
 }
 
 static GArray *find_binary_operator_indices(struct parser *parser,
@@ -450,7 +461,7 @@ static struct ast_node *parse_binary_expression(struct parser *parser,
 	}
 
 	struct ast_node *expression =
-		ast_node_new(AST_NODE_TYPE_BINARY_EXPRESSION);
+		new_node(parser, AST_NODE_TYPE_BINARY_EXPRESSION);
 
 	uint32_t operator_index = get_lowest_precedence_index(parser, indices);
 	uint32_t expected_position = parser->position + operator_index;
@@ -501,7 +512,7 @@ static struct ast_node *parse_not_expression(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_NOT, NULL))
 		return NULL;
 
-	struct ast_node *not = ast_node_new(AST_NODE_TYPE_NOT_EXPRESSION);
+	struct ast_node *not = new_node(parser, AST_NODE_TYPE_NOT_EXPRESSION);
 
 	struct ast_node *expression = parse_unary_expression(parser);
 	if (expression == NULL)
@@ -520,7 +531,8 @@ static struct ast_node *parse_negate_expression(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_SUB, NULL))
 		return NULL;
 
-	struct ast_node *negate = ast_node_new(AST_NODE_TYPE_NEGATE_EXPRESSION);
+	struct ast_node *negate =
+		new_node(parser, AST_NODE_TYPE_NEGATE_EXPRESSION);
 
 	struct ast_node *expression = parse_unary_expression(parser);
 	if (expression == NULL)
@@ -536,7 +548,7 @@ static struct ast_node *parse_len_expression(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_KEYWORD_LEN, NULL))
 		return false;
 
-	struct ast_node *len = ast_node_new(AST_NODE_TYPE_LEN_EXPRESSION);
+	struct ast_node *len = new_node(parser, AST_NODE_TYPE_LEN_EXPRESSION);
 
 	if (!next_token(parser, TOKEN_TYPE_OPEN_PARENTHESIS, NULL))
 		parse_error(parser,
@@ -558,7 +570,8 @@ static struct ast_node *parse_location(struct parser *parser);
 
 static struct ast_node *parse_unary_expression(struct parser *parser)
 {
-	struct ast_node *expression = ast_node_new(AST_NODE_TYPE_EXPRESSION);
+	struct ast_node *expression =
+		new_node(parser, AST_NODE_TYPE_EXPRESSION);
 
 	struct ast_node *child;
 	if ((child = parse_len_expression(parser))) {
@@ -582,7 +595,8 @@ static struct ast_node *parse_unary_expression(struct parser *parser)
 static struct ast_node *parse_expression_with_length(struct parser *parser,
 						     uint32_t length)
 {
-	struct ast_node *expression = ast_node_new(AST_NODE_TYPE_EXPRESSION);
+	struct ast_node *expression =
+		new_node(parser, AST_NODE_TYPE_EXPRESSION);
 
 	struct ast_node *child;
 	if ((child = parse_binary_expression(parser, length))) {
@@ -609,7 +623,8 @@ static struct ast_node *parse_assignment(struct parser *parser)
 	if (location == NULL)
 		return NULL;
 
-	struct ast_node *assignment = ast_node_new(AST_NODE_TYPE_ASSIGNMENT);
+	struct ast_node *assignment =
+		new_node(parser, AST_NODE_TYPE_ASSIGNMENT);
 	ast_node_add_child(assignment, location);
 
 	struct ast_node *assign_operator;
@@ -636,12 +651,12 @@ static struct ast_node *parse_location(struct parser *parser)
 	if (identifier == NULL)
 		return NULL;
 
-	struct ast_node *location = ast_node_new(AST_NODE_TYPE_LOCATION);
+	struct ast_node *location = new_node(parser, AST_NODE_TYPE_LOCATION);
 	ast_node_add_child(location, identifier);
 
 	if (next_token(parser, TOKEN_TYPE_OPEN_SQUARE_BRACKET, NULL)) {
 		struct ast_node *index =
-			ast_node_new(AST_NODE_TYPE_LOCATION_INDEX);
+			new_node(parser, AST_NODE_TYPE_LOCATION_INDEX);
 		struct ast_node *expression = parse_expression(parser);
 		if (expression == NULL)
 			parse_error(parser,
@@ -660,7 +675,7 @@ static struct ast_node *parse_location(struct parser *parser)
 
 static struct ast_node *parse_for_update(struct parser *parser)
 {
-	struct ast_node *update = ast_node_new(AST_NODE_TYPE_FOR_UPDATE);
+	struct ast_node *update = new_node(parser, AST_NODE_TYPE_FOR_UPDATE);
 
 	struct ast_node *child;
 	if ((child = parse_method_call(parser))) {
@@ -682,7 +697,7 @@ static struct ast_node *parse_continue_statement(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_SEMICOLON, NULL))
 		parse_error(parser, "Expected semicolon in continue statement");
 
-	return ast_node_new(AST_NODE_TYPE_CONTINUE_STATEMENT);
+	return new_node(parser, AST_NODE_TYPE_CONTINUE_STATEMENT);
 }
 
 static struct ast_node *parse_break_statement(struct parser *parser)
@@ -693,7 +708,7 @@ static struct ast_node *parse_break_statement(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_SEMICOLON, NULL))
 		parse_error(parser, "Expected semicolon in break statement");
 
-	return ast_node_new(AST_NODE_TYPE_BREAK_STATEMENT);
+	return new_node(parser, AST_NODE_TYPE_BREAK_STATEMENT);
 }
 
 static struct ast_node *parse_return_statement(struct parser *parser)
@@ -702,7 +717,7 @@ static struct ast_node *parse_return_statement(struct parser *parser)
 		return NULL;
 
 	struct ast_node *statement =
-		ast_node_new(AST_NODE_TYPE_RETURN_STATEMENT);
+		new_node(parser, AST_NODE_TYPE_RETURN_STATEMENT);
 
 	struct ast_node *expression = parse_expression(parser);
 	if (expression != NULL)
@@ -722,7 +737,7 @@ static struct ast_node *parse_while_statement(struct parser *parser)
 		return NULL;
 
 	struct ast_node *statement =
-		ast_node_new(AST_NODE_TYPE_WHILE_STATEMENT);
+		new_node(parser, AST_NODE_TYPE_WHILE_STATEMENT);
 
 	if (!next_token(parser, TOKEN_TYPE_OPEN_PARENTHESIS, NULL))
 		parse_error(parser,
@@ -750,7 +765,8 @@ static struct ast_node *parse_for_statement(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_KEYWORD_FOR, NULL))
 		return NULL;
 
-	struct ast_node *statement = ast_node_new(AST_NODE_TYPE_FOR_STATEMENT);
+	struct ast_node *statement =
+		new_node(parser, AST_NODE_TYPE_FOR_STATEMENT);
 
 	if (!next_token(parser, TOKEN_TYPE_OPEN_PARENTHESIS, NULL))
 		parse_error(parser,
@@ -808,7 +824,8 @@ static struct ast_node *parse_if_statement(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_KEYWORD_IF, NULL))
 		return NULL;
 
-	struct ast_node *statement = ast_node_new(AST_NODE_TYPE_IF_STATEMENT);
+	struct ast_node *statement =
+		new_node(parser, AST_NODE_TYPE_IF_STATEMENT);
 
 	if (!next_token(parser, TOKEN_TYPE_OPEN_PARENTHESIS, NULL))
 		parse_error(parser,
@@ -866,7 +883,7 @@ static struct ast_node *parse_assign_statement(struct parser *parser)
 
 static struct ast_node *parse_statement(struct parser *parser)
 {
-	struct ast_node *statement = ast_node_new(AST_NODE_TYPE_STATEMENT);
+	struct ast_node *statement = new_node(parser, AST_NODE_TYPE_STATEMENT);
 
 	struct ast_node *child;
 	if ((child = parse_if_statement(parser))) {
@@ -893,7 +910,7 @@ static struct ast_node *parse_block(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_OPEN_CURLY_BRACKET, NULL))
 		return NULL;
 
-	struct ast_node *block = ast_node_new(AST_NODE_TYPE_BLOCK);
+	struct ast_node *block = new_node(parser, AST_NODE_TYPE_BLOCK);
 
 	struct ast_node *field;
 	while ((field = parse_field(parser)))
@@ -915,7 +932,8 @@ static struct ast_node *parse_method_argument(struct parser *parser)
 	if (type == NULL)
 		return NULL;
 
-	struct ast_node *argument = ast_node_new(AST_NODE_TYPE_METHOD_ARGUMENT);
+	struct ast_node *argument =
+		new_node(parser, AST_NODE_TYPE_METHOD_ARGUMENT);
 	ast_node_add_child(argument, type);
 
 	struct ast_node *identifier = parse_identifier(parser);
@@ -931,7 +949,7 @@ static struct ast_node *parse_void(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_KEYWORD_VOID, NULL))
 		return NULL;
 
-	return ast_node_new(AST_NODE_TYPE_VOID);
+	return new_node(parser, AST_NODE_TYPE_VOID);
 }
 
 static struct ast_node *parse_method(struct parser *parser)
@@ -943,7 +961,7 @@ static struct ast_node *parse_method(struct parser *parser)
 			return NULL;
 	}
 
-	struct ast_node *method = ast_node_new(AST_NODE_TYPE_METHOD);
+	struct ast_node *method = new_node(parser, AST_NODE_TYPE_METHOD);
 	ast_node_add_child(method, type);
 
 	struct ast_node *identifier = parse_identifier(parser);
@@ -986,14 +1004,14 @@ static struct ast_node *parse_field_identifier(struct parser *parser)
 		return NULL;
 
 	struct ast_node *field_identifier =
-		ast_node_new(AST_NODE_TYPE_FIELD_IDENTIFIER);
+		new_node(parser, AST_NODE_TYPE_FIELD_IDENTIFIER);
 	ast_node_add_child(field_identifier, identifier);
 
 	if (next_token(parser, TOKEN_TYPE_OPEN_SQUARE_BRACKET, NULL)) {
 		struct ast_node *array_length = parse_int_literal(parser);
 		if (array_length == NULL)
-			array_length =
-				ast_node_new(AST_NODE_TYPE_EMPTY_ARRAY_LENGTH);
+			array_length = new_node(
+				parser, AST_NODE_TYPE_EMPTY_ARRAY_LENGTH);
 		ast_node_add_child(field_identifier, array_length);
 
 		if (!next_token(parser, TOKEN_TYPE_CLOSE_SQUARE_BRACKET, NULL))
@@ -1019,7 +1037,7 @@ static struct ast_node *parse_const(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_KEYWORD_CONST, NULL))
 		return NULL;
 
-	return ast_node_new(AST_NODE_TYPE_CONST);
+	return new_node(parser, AST_NODE_TYPE_CONST);
 }
 
 static struct ast_node *parse_field(struct parser *parser)
@@ -1035,7 +1053,7 @@ static struct ast_node *parse_field(struct parser *parser)
 			return NULL;
 	}
 
-	struct ast_node *field = ast_node_new(AST_NODE_TYPE_FIELD);
+	struct ast_node *field = new_node(parser, AST_NODE_TYPE_FIELD);
 	if (constant != NULL)
 		ast_node_add_child(field, constant);
 	ast_node_add_child(field, type);
@@ -1075,7 +1093,7 @@ static struct ast_node *parse_import(struct parser *parser)
 	if (!next_token(parser, TOKEN_TYPE_KEYWORD_IMPORT, NULL))
 		return NULL;
 
-	struct ast_node *import = ast_node_new(AST_NODE_TYPE_IMPORT);
+	struct ast_node *import = new_node(parser, AST_NODE_TYPE_IMPORT);
 
 	struct ast_node *identifier = parse_identifier(parser);
 	if (identifier == NULL)
@@ -1091,7 +1109,7 @@ static struct ast_node *parse_import(struct parser *parser)
 
 static struct ast_node *parse_program(struct parser *parser)
 {
-	struct ast_node *program = ast_node_new(AST_NODE_TYPE_PROGRAM);
+	struct ast_node *program = new_node(parser, AST_NODE_TYPE_PROGRAM);
 
 	struct ast_node *import;
 	while ((import = parse_import(parser)))

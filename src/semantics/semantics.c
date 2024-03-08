@@ -1,11 +1,16 @@
 #include "semantics/semantics.h"
 #include "semantics/ir.h"
 
-static void semantic_error(struct semantics *semantics, const char *message)
-{
-	semantics->error = true;
-	g_printerr("ERROR at %i:%i: %s\n", 0, 0, message);
-}
+#define semantic_error(semantics, token, ...)                               \
+	do {                                                                \
+		semantics->error = true;                                    \
+		uint32_t line_number = token_get_line_number(&token);       \
+		uint32_t column_number = token_get_column_number(&token);   \
+		g_printerr("SEMANTIC-ERROR at %s:%i:%i: ", token.file_name, \
+			   line_number, column_number);                     \
+		g_printerr(__VA_ARGS__);                                    \
+		g_printerr("\n");                                           \
+	} while (0)
 
 static void push_scope(struct semantics *semantics,
 		       fields_table_t *fields_table)
@@ -33,10 +38,13 @@ static void declare_method(struct semantics *semantics,
 	g_assert(fields_table_get_parent(fields_table) == NULL);
 
 	if (methods_table_get(semantics->methods_table, method->identifier))
-		semantic_error(semantics, "Redeclaration of method");
+		semantic_error(semantics, method->token,
+			       "Redeclaration of method '%s'",
+			       method->identifier);
 	else if (fields_table_get(fields_table, method->identifier, false))
-		semantic_error(semantics,
-			       "Identifier already declared as field");
+		semantic_error(semantics, method->token,
+			       "Identifier '%s' already declared as field",
+			       method->identifier);
 	else
 		methods_table_add(semantics->methods_table, method->identifier,
 				  method);
@@ -48,42 +56,50 @@ static void declare_field(struct semantics *semantics, struct ir_field *field)
 	bool global = fields_table_get_parent(fields_table) == NULL;
 
 	if (fields_table_get(fields_table, field->identifier, false))
-		semantic_error(semantics, "Redeclaration of field");
+		semantic_error(semantics, field->token,
+			       "Redeclaration of field '%s'",
+			       field->identifier);
 	else if (global &&
 		 methods_table_get(semantics->methods_table, field->identifier))
-		semantic_error(semantics,
-			       "Identifier already declared as method");
+		semantic_error(semantics, field->token,
+			       "Identifier '%s' already declared as method",
+			       field->identifier);
 	else
 		fields_table_add(fields_table, field->identifier, field);
 }
 
 static struct ir_method *get_method_declaration(struct semantics *semantics,
-						char *identifier)
+						char *identifier,
+						struct token token)
 {
 	fields_table_t *fields_table = current_scope(semantics);
 	struct ir_field *field =
 		fields_table_get(fields_table, identifier, true);
 	if (field != NULL) {
-		semantic_error(semantics, "Identifier is field");
+		semantic_error(semantics, token,
+			       "Identifier '%s' is not a method", identifier);
 		return NULL;
 	}
 
 	struct ir_method *method =
 		methods_table_get(semantics->methods_table, identifier);
 	if (method == NULL)
-		semantic_error(semantics, "Undeclared method");
+		semantic_error(semantics, token, "Undeclared method '%s'",
+			       identifier);
 
 	return method;
 }
 
 static struct ir_field *get_field_declaration(struct semantics *semantics,
-					      char *identifier)
+					      char *identifier,
+					      struct token token)
 {
 	fields_table_t *fields_table = current_scope(semantics);
 	struct ir_field *field =
 		fields_table_get(fields_table, identifier, true);
 	if (field == NULL)
-		semantic_error(semantics, "Undeclared field");
+		semantic_error(semantics, token, "Undeclared field '%s'",
+			       identifier);
 
 	return field;
 }
@@ -93,7 +109,10 @@ static enum ir_data_type analyze_literal(struct semantics *semantics,
 {
 	if (literal->type == IR_LITERAL_TYPE_INT) {
 		if (literal->value == (uint64_t)-1)
-			semantic_error(semantics, "Overflow in int literal");
+			semantic_error(semantics, literal->token,
+				       "Overflow in int literal '%.*s'",
+				       literal->token.length,
+				       literal->token.source);
 	}
 
 	switch (literal->type) {
@@ -119,8 +138,8 @@ static enum ir_data_type analyze_location(struct semantics *semantics,
 	if (constant != NULL)
 		*constant = false;
 
-	struct ir_field *field =
-		get_field_declaration(semantics, location->identifier);
+	struct ir_field *field = get_field_declaration(
+		semantics, location->identifier, location->token);
 	if (field == NULL)
 		return IR_DATA_TYPE_VOID;
 
@@ -133,14 +152,16 @@ static enum ir_data_type analyze_location(struct semantics *semantics,
 		if (ir_data_type_is_array(type))
 			type -= 1;
 		else
-			semantic_error(semantics,
-				       "Cannot index into a non-array field");
+			semantic_error(
+				semantics, location->token,
+				"Cannot index into a non-array field '%s'",
+				location->identifier);
 
 		enum ir_data_type index_type =
 			analyze_expression(semantics, location->index);
 		if (index_type != IR_DATA_TYPE_INT)
 			semantic_error(
-				semantics,
+				semantics, location->token,
 				"Indexing expression must be of type int");
 	}
 
@@ -168,24 +189,24 @@ analyze_binary_expression(struct semantics *semantics,
 		if (left_type != IR_DATA_TYPE_INT ||
 		    right_type != IR_DATA_TYPE_INT)
 			semantic_error(
-				semantics,
+				semantics, expression->token,
 				"arithmetic operators can only operate on expressions of type int");
 	} else if (expression->binary_operator == IR_BINARY_OPERATOR_OR ||
 		   expression->binary_operator == IR_BINARY_OPERATOR_AND) {
 		if (left_type != IR_DATA_TYPE_BOOL ||
 		    right_type != IR_DATA_TYPE_BOOL)
 			semantic_error(
-				semantics,
+				semantics, expression->token,
 				"boolean operators can only operate on expressions of type bool");
 	} else {
 		if (ir_data_type_is_array(left_type) ||
 		    ir_data_type_is_array(right_type))
 			semantic_error(
-				semantics,
+				semantics, expression->token,
 				"Cannot perform operations on array type");
 		if (left_type != right_type)
 			semantic_error(
-				semantics,
+				semantics, expression->token,
 				"Mismatching types in binary expression");
 	}
 
@@ -229,7 +250,7 @@ analyze_not_expression(struct semantics *semantics,
 	enum ir_data_type type = analyze_expression(semantics, expression);
 	if (type != IR_DATA_TYPE_BOOL)
 		semantic_error(
-			semantics,
+			semantics, expression->token,
 			"Cannot perform boolean operation on an expression that is not of type bool");
 
 	return IR_DATA_TYPE_BOOL;
@@ -242,21 +263,25 @@ analyze_negate_expression(struct semantics *semantics,
 	enum ir_data_type type = analyze_expression(semantics, expression);
 	if (type != IR_DATA_TYPE_INT)
 		semantic_error(
-			semantics,
+			semantics, expression->token,
 			"Cannot negate an expression that is not of type int");
 
 	return IR_DATA_TYPE_INT;
 }
 
 static enum ir_data_type analyze_len_expression(struct semantics *semantics,
-						char *identifier)
+						char *identifier,
+						struct token token)
 {
-	struct ir_field *field = get_field_declaration(semantics, identifier);
+	struct ir_field *field =
+		get_field_declaration(semantics, identifier, token);
 	if (field == NULL)
 		return IR_DATA_TYPE_INT;
 
 	if (!ir_data_type_is_array(field->type))
-		semantic_error(semantics, "Cannot take len of non-array field");
+		semantic_error(semantics, token,
+			       "Cannot take len of non-array field '%s'",
+			       identifier);
 
 	return IR_DATA_TYPE_INT;
 }
@@ -275,7 +300,7 @@ analyze_method_call_argument(struct semantics *semantics,
 			     struct ir_field *field)
 {
 	if (argument->type == IR_METHOD_CALL_ARGUMENT_TYPE_STRING)
-		semantic_error(semantics,
+		semantic_error(semantics, field->token,
 			       "String not allowed in non-imported methods");
 
 	if (argument->type == IR_METHOD_CALL_ARGUMENT_TYPE_EXPRESSION) {
@@ -283,7 +308,7 @@ analyze_method_call_argument(struct semantics *semantics,
 			analyze_expression(semantics, argument->expression);
 		if (type != field->type)
 			semantic_error(
-				semantics,
+				semantics, field->token,
 				"Incorrect type passed into method call");
 	}
 }
@@ -291,8 +316,8 @@ analyze_method_call_argument(struct semantics *semantics,
 static enum ir_data_type analyze_method_call(struct semantics *semantics,
 					     struct ir_method_call *call)
 {
-	struct ir_method *method =
-		get_method_declaration(semantics, call->identifier);
+	struct ir_method *method = get_method_declaration(
+		semantics, call->identifier, call->token);
 	if (method == NULL)
 		return IR_DATA_TYPE_VOID;
 
@@ -308,8 +333,9 @@ static enum ir_data_type analyze_method_call(struct semantics *semantics,
 	} else {
 		if (method->arguments->len != call->arguments->len) {
 			semantic_error(
-				semantics,
-				"Incorrect number of arguments passed into method call");
+				semantics, call->token,
+				"Incorrect number of arguments passed into method call '%s'",
+				call->identifier);
 			return method->return_type;
 		}
 
@@ -336,7 +362,8 @@ static enum ir_data_type analyze_expression(struct semantics *semantics,
 	switch (expression->type) {
 	case IR_EXPRESSION_TYPE_LEN:
 		return analyze_len_expression(semantics,
-					      expression->len_identifier);
+					      expression->len_identifier,
+					      expression->token);
 	case IR_EXPRESSION_TYPE_NEGATE:
 		return analyze_negate_expression(semantics,
 						 expression->negate_expression);
@@ -350,7 +377,7 @@ static enum ir_data_type analyze_expression(struct semantics *semantics,
 	case IR_EXPRESSION_TYPE_METHOD_CALL:
 		type = analyze_method_call(semantics, expression->method_call);
 		if (type == IR_DATA_TYPE_VOID)
-			semantic_error(semantics,
+			semantic_error(semantics, expression->token,
 				       "method call does not return a value");
 		return type;
 	case IR_EXPRESSION_TYPE_BINARY:
@@ -373,14 +400,18 @@ static void analyze_assignment(struct semantics *semantics,
 		analyze_location(semantics, assignment->location, &constant);
 
 	if (constant)
-		semantic_error(semantics, "Cannot assign to constant field");
+		semantic_error(semantics, assignment->token,
+			       "Cannot assign to constant field '%s'",
+			       assignment->location->identifier);
 	if (ir_data_type_is_array(location_type))
-		semantic_error(semantics, "Cannot assign to array type");
+		semantic_error(semantics, assignment->token,
+			       "Cannot assign to array typed field '%s'",
+			       assignment->location->identifier);
 
 	if (assignment->assign_operator != IR_ASSIGN_OPERATOR_SET &&
 	    location_type != IR_DATA_TYPE_INT)
 		semantic_error(
-			semantics,
+			semantics, assignment->token,
 			"Arithmetic assignment cannot be applied to field that is not of type int");
 
 	if (assignment->expression != NULL) {
@@ -388,7 +419,7 @@ static void analyze_assignment(struct semantics *semantics,
 			analyze_expression(semantics, assignment->expression);
 		if (expression_type != location_type)
 			semantic_error(
-				semantics,
+				semantics, assignment->token,
 				"Expression is not the same type as field");
 	}
 }
@@ -401,7 +432,7 @@ static void analyze_while_statement(struct semantics *semantics,
 		analyze_expression(semantics, statement->condition);
 	if (type != IR_DATA_TYPE_BOOL)
 		semantic_error(
-			semantics,
+			semantics, statement->token,
 			"Condition expression in while statement must be of type bool");
 
 	analyze_block(semantics, statement->block, NULL);
@@ -426,7 +457,7 @@ static void analyze_for_statement(struct semantics *semantics,
 		analyze_expression(semantics, statement->condition);
 	if (type != IR_DATA_TYPE_BOOL)
 		semantic_error(
-			semantics,
+			semantics, statement->token,
 			"Condition expression in for statement must be of type bool");
 
 	analyze_for_update(semantics, statement->update);
@@ -441,7 +472,7 @@ static void analyze_if_statement(struct semantics *semantics,
 		analyze_expression(semantics, statement->condition);
 	if (type != IR_DATA_TYPE_BOOL)
 		semantic_error(
-			semantics,
+			semantics, statement->token,
 			"Condition expression in if statement must be of type bool");
 
 	analyze_block(semantics, statement->if_block, NULL);
@@ -458,21 +489,23 @@ static void analyze_return_statement(struct semantics *semantics,
 
 	if (type != semantics->current_method->return_type)
 		semantic_error(
-			semantics,
+			semantics, expression->token,
 			"return expression does not match method return type");
 }
 
-static void analyze_continue_statement(struct semantics *semantics)
+static void analyze_continue_statement(struct semantics *semantics,
+				       struct token token)
 {
 	if (semantics->loop_depth == 0)
-		semantic_error(semantics,
+		semantic_error(semantics, token,
 			       "continue statement must be inside a loop");
 }
 
-static void analyze_break_statement(struct semantics *semantics)
+static void analyze_break_statement(struct semantics *semantics,
+				    struct token token)
 {
 	if (semantics->loop_depth == 0)
-		semantic_error(semantics,
+		semantic_error(semantics, token,
 			       "break statement must be inside a loop");
 }
 
@@ -500,10 +533,10 @@ static void analyze_statement(struct semantics *semantics,
 					 statement->return_expression);
 		break;
 	case IR_STATEMENT_TYPE_CONTINUE:
-		analyze_continue_statement(semantics);
+		analyze_continue_statement(semantics, statement->token);
 		break;
 	case IR_STATEMENT_TYPE_BREAK:
-		analyze_break_statement(semantics);
+		analyze_break_statement(semantics, statement->token);
 		break;
 	default:
 		break;
@@ -563,7 +596,7 @@ static enum ir_data_type analyze_initializer(struct semantics *semantics,
 			type = literal_type;
 		else if (literal_type != type)
 			semantic_error(
-				semantics,
+				semantics, initializer->token,
 				"Inconsistent types in array initializer");
 	}
 
@@ -584,27 +617,27 @@ static void analyze_field(struct semantics *semantics, struct ir_field *field)
 
 		if (initializer_type != field->type)
 			semantic_error(
-				semantics,
+				semantics, field->token,
 				"Initializer type does not match field type");
 		if (is_array && field->initializer->array &&
 		    field->array_length != -1)
 			semantic_error(
-				semantics,
+				semantics, field->token,
 				"Array initializer cannot be provided when length is declared");
 
 		field->array_length = field->initializer->literals->len;
 	} else {
 		if (is_array && field->array_length == -1)
 			semantic_error(
-				semantics,
+				semantics, field->token,
 				"Array fields without initializers must have a declared length");
 		else if (is_array && field->array_length == 0)
-			semantic_error(semantics,
+			semantic_error(semantics, field->token,
 				       "Array length must be greater than 0");
 
 		if (field->constant)
 			semantic_error(
-				semantics,
+				semantics, field->token,
 				"Fields declared constant must have an initializer");
 	}
 }
@@ -641,14 +674,17 @@ static void analyze_program(struct semantics *semantics,
 	struct ir_method *main =
 		methods_table_get(semantics->methods_table, "main");
 	if (main == NULL)
-		semantic_error(semantics,
+		semantic_error(semantics, program->token,
 			       "Program must have a definition for main");
 	else if (main->imported)
-		semantic_error(semantics, "main method cannot be imported");
+		semantic_error(semantics, program->token,
+			       "main method cannot be imported");
 	else if (main->return_type != IR_DATA_TYPE_VOID)
-		semantic_error(semantics, "main method must return void");
+		semantic_error(semantics, program->token,
+			       "main method must return void");
 	else if (main->arguments->len > 0)
-		semantic_error(semantics, "main method must have no arguments");
+		semantic_error(semantics, program->token,
+			       "main method must have no arguments");
 
 	pop_scope(semantics);
 }
