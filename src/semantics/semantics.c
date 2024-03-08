@@ -331,6 +331,8 @@ static enum ir_data_type analyze_method_call(struct semantics *semantics,
 static enum ir_data_type analyze_expression(struct semantics *semantics,
 					    struct ir_expression *expression)
 {
+	enum ir_data_type type;
+
 	switch (expression->type) {
 	case IR_EXPRESSION_TYPE_LEN:
 		return analyze_len_expression(semantics,
@@ -346,7 +348,11 @@ static enum ir_data_type analyze_expression(struct semantics *semantics,
 	case IR_EXPRESSION_TYPE_LOCATION:
 		return analyze_location(semantics, expression->location, NULL);
 	case IR_EXPRESSION_TYPE_METHOD_CALL:
-		return analyze_method_call(semantics, expression->method_call);
+		type = analyze_method_call(semantics, expression->method_call);
+		if (type == IR_DATA_TYPE_VOID)
+			semantic_error(semantics,
+				       "method call does not return a value");
+		return type;
 	case IR_EXPRESSION_TYPE_BINARY:
 		return analyze_binary_expression(semantics,
 						 expression->binary_expression);
