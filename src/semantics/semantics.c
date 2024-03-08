@@ -123,47 +123,166 @@ static enum ir_data_type analyze_location(struct semantics *semantics,
 static void analyze_block(struct semantics *semantics, struct ir_block *block,
 			  GArray *initial_fields);
 
-static void analyze_while_statement(struct semantics *semantics,
-				    struct ir_while_statement *statement)
+static void analyze_assignment(struct semantics *semantics,
+			       struct ir_assignment *assignment)
 {
-	g_assert(!"Unimplemented");
+	enum ir_data_type location_type =
+		analyze_location(semantics, assignment->location);
+	if (assignment->assign_operator != IR_ASSIGN_OPERATOR_SET &&
+	    location_type != IR_DATA_TYPE_INT)
+		semantic_error(
+			semantics,
+			"Arithmetic assignment cannot be applied to field that is not of type int");
+
+	if (assignment->expression != NULL) {
+		enum ir_data_type expression_type =
+			analyze_expression(semantics, assignment->expression);
+		if (expression_type != location_type)
+			semantic_error(
+				semantics,
+				"Expression is not the same type as field");
+	}
 }
 
-static void analyze_for_statement(struct semantics *semantics,
-				  struct ir_for_statement *statement)
+static void
+analyze_imported_method_call_argument(struct semantics *semantics,
+				      struct ir_method_call_argument *argument)
 {
-	g_assert(!"Unimplemented");
-}
-
-static void analyze_if_statement(struct semantics *semantics,
-				 struct ir_if_statement *statement)
-{
-	g_assert(!"Unimplemented");
+	if (argument->type == IR_METHOD_CALL_ARGUMENT_TYPE_EXPRESSION)
+		analyze_expression(semantics, argument->expression);
 }
 
 static void
 analyze_method_call_argument(struct semantics *semantics,
-			     struct ir_method_call_argument *argument)
+			     struct ir_method_call_argument *argument,
+			     struct ir_field *field)
 {
-	g_assert(!"Unimplemented");
+	if (argument->type == IR_METHOD_CALL_ARGUMENT_TYPE_STRING)
+		semantic_error(semantics,
+			       "String not allowed in non-imported methods");
+
+	if (argument->type == IR_METHOD_CALL_ARGUMENT_TYPE_EXPRESSION) {
+		enum ir_data_type type =
+			analyze_expression(semantics, argument->expression);
+		if (type != field->type)
+			semantic_error(
+				semantics,
+				"Incorrect type passed into method call");
+	}
 }
 
 static enum ir_data_type analyze_method_call(struct semantics *semantics,
 					     struct ir_method_call *call)
 {
-	g_assert(!"Unimplemented");
+	struct ir_method *method =
+		get_method_declaration(semantics, call->identifier);
+
+	if (method->imported) {
+		for (uint32_t i = 0; i < call->arguments->len; i++) {
+			struct ir_method_call_argument *argument =
+				g_array_index(call->arguments,
+					      struct ir_method_call_argument *,
+					      i);
+			analyze_imported_method_call_argument(semantics,
+							      argument);
+		}
+	} else {
+		if (method->arguments->len != call->arguments->len) {
+			semantic_error(
+				semantics,
+				"Incorrect number of arguments passed into method call");
+			return method->return_type;
+		}
+
+		for (uint32_t i = 0; i < call->arguments->len; i++) {
+			struct ir_method_call_argument *argument =
+				g_array_index(call->arguments,
+					      struct ir_method_call_argument *,
+					      i);
+			struct ir_field *field = g_array_index(
+				method->arguments, struct ir_field *, i);
+			analyze_method_call_argument(semantics, argument,
+						     field);
+		}
+	}
+
+	return method->return_type;
 }
 
-static void analyze_assignment(struct semantics *semantics,
-			       struct ir_assignment *assignment)
+static void analyze_while_statement(struct semantics *semantics,
+				    struct ir_while_statement *statement)
 {
-	g_assert(!"Unimplemented");
+	enum ir_data_type type =
+		analyze_expression(semantics, statement->condition);
+	if (type != IR_DATA_TYPE_BOOL)
+		semantic_error(
+			semantics,
+			"Condition expression in while statement must be of type bool");
+
+	analyze_block(semantics, statement->block, NULL);
+}
+
+static void analyze_for_update(struct semantics *semantics,
+			       struct ir_for_update *update)
+{
+	if (update->type == IR_FOR_UPDATE_TYPE_ASSIGNMENT)
+		analyze_assignment(semantics, update->assignment);
+	else if (update->type == IR_FOR_UPDATE_TYPE_METHOD_CALL)
+		analyze_method_call(semantics, update->method_call);
+}
+
+static void analyze_for_statement(struct semantics *semantics,
+				  struct ir_for_statement *statement)
+{
+	analyze_assignment(semantics, statement->initial);
+	enum ir_data_type type =
+		analyze_expression(semantics, statement->condition);
+	if (type != IR_DATA_TYPE_BOOL)
+		semantic_error(
+			semantics,
+			"Condition expression in for statement must be of type bool");
+
+	analyze_for_update(semantics, statement->update);
+	analyze_block(semantics, statement->block, NULL);
+}
+
+static void analyze_if_statement(struct semantics *semantics,
+				 struct ir_if_statement *statement)
+{
+	enum ir_data_type type =
+		analyze_expression(semantics, statement->condition);
+	if (type != IR_DATA_TYPE_BOOL)
+		semantic_error(
+			semantics,
+			"Condition expression in if statement must be of type bool");
+
+	analyze_block(semantics, statement->if_block, NULL);
+	if (statement->else_block != NULL)
+		analyze_block(semantics, statement->else_block, NULL);
 }
 
 static void analyze_statement(struct semantics *semantics,
 			      struct ir_statement *statement)
 {
-	g_assert(!"Unimplemented");
+	switch (statement->type) {
+	case IR_STATEMENT_TYPE_ASSIGNMENT:
+		analyze_assignment(semantics, statement->assignment);
+		break;
+	case IR_STATEMENT_TYPE_METHOD_CALL:
+		analyze_method_call(semantics, statement->method_call);
+		break;
+	case IR_STATEMENT_TYPE_IF:
+		analyze_if_statement(semantics, statement->if_statement);
+		break;
+	case IR_STATEMENT_TYPE_FOR:
+		analyze_for_statement(semantics, statement->for_statement);
+		break;
+	case IR_STATEMENT_TYPE_WHILE:
+		analyze_while_statement(semantics, statement->while_statement);
+		break;
+	default:
+		break;
+	}
 }
 
 static void analyze_field(struct semantics *semantics, struct ir_field *field);

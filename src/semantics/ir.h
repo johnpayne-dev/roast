@@ -111,6 +111,9 @@ struct ir_assignment {
 };
 
 struct ir_assignment *ir_assignment_new(struct ast_node **nodes);
+struct ir_assignment *
+ir_assignment_new_from_identifier(char *identifier,
+				  struct ir_expression *expression);
 void ir_assignment_free(struct ir_assignment *assignment);
 
 struct ir_method_call {
@@ -147,8 +150,7 @@ struct ir_if_statement *ir_if_statement_new(struct ast_node **nodes);
 void ir_if_statement_free(struct ir_if_statement *statement);
 
 struct ir_for_statement {
-	char *identifier;
-	struct ir_expression *initializer;
+	struct ir_assignment *initial;
 	struct ir_expression *condition;
 	struct ir_for_update *update;
 	struct ir_block *block;

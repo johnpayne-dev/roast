@@ -385,6 +385,19 @@ struct ir_assignment *ir_assignment_new(struct ast_node **nodes)
 	return assignment;
 }
 
+struct ir_assignment *
+ir_assignment_new_from_identifier(char *identifier,
+				  struct ir_expression *expression)
+{
+	struct ir_assignment *assignment = g_new(struct ir_assignment, 1);
+	assignment->location = g_new(struct ir_location, 1);
+	assignment->location->identifier = identifier;
+	assignment->location->index = NULL;
+	assignment->assign_operator = IR_ASSIGN_OPERATOR_SET;
+	assignment->expression = expression;
+	return assignment;
+}
+
 void ir_assignment_free(struct ir_assignment *assignment)
 {
 	ir_location_free(assignment->location);
@@ -490,8 +503,10 @@ struct ir_for_statement *ir_for_statement_new(struct ast_node **nodes)
 
 	struct ir_for_statement *statement = g_new(struct ir_for_statement, 1);
 
-	statement->identifier = ir_identifier_from_ast(nodes);
-	statement->initializer = ir_expression_new(nodes);
+	char *identifier = ir_identifier_from_ast(nodes);
+	struct ir_expression *initializer = ir_expression_new(nodes);
+	statement->initial =
+		ir_assignment_new_from_identifier(identifier, initializer);
 	statement->condition = ir_expression_new(nodes);
 	statement->update = ir_for_update_new(nodes);
 	statement->block = ir_block_new(nodes);
@@ -504,8 +519,7 @@ void ir_for_statement_free(struct ir_for_statement *statement)
 	ir_block_free(statement->block);
 	ir_for_update_free(statement->update);
 	ir_expression_free(statement->condition);
-	ir_expression_free(statement->initializer);
-	g_free(statement->identifier);
+	ir_assignment_free(statement->initial);
 	g_free(statement);
 }
 
