@@ -137,34 +137,65 @@ analyze_binary_expression(struct semantics *semantics,
 	enum ir_data_type right_type =
 		analyze_expression(semantics, expression->right);
 
-	if (expression->binary_operator == IR_BINARY_OPERATOR_OR ||
-	    expression->binary_operator == IR_BINARY_OPERATOR_AND) {
-		if (left_type != IR_DATA_TYPE_BOOL ||
-		    right_type != IR_DATA_TYPE_BOOL)
-			semantic_error(
-				semantics,
-				"boolean operators can only operate on expressions of type bool");
-		return IR_DATA_TYPE_BOOL;
-	}
-
 	if (expression->binary_operator == IR_BINARY_OPERATOR_ADD ||
 	    expression->binary_operator == IR_BINARY_OPERATOR_SUB ||
 	    expression->binary_operator == IR_BINARY_OPERATOR_MUL ||
 	    expression->binary_operator == IR_BINARY_OPERATOR_DIV ||
-	    expression->binary_operator == IR_BINARY_OPERATOR_MOD) {
+	    expression->binary_operator == IR_BINARY_OPERATOR_MOD ||
+	    expression->binary_operator == IR_BINARY_OPERATOR_LESS ||
+	    expression->binary_operator == IR_BINARY_OPERATOR_LESS_EQUAL ||
+	    expression->binary_operator == IR_BINARY_OPERATOR_GREATER_EQUAL ||
+	    expression->binary_operator == IR_BINARY_OPERATOR_GREATER) {
 		if (left_type != IR_DATA_TYPE_INT ||
 		    right_type != IR_DATA_TYPE_INT)
 			semantic_error(
 				semantics,
 				"arithmetic operators can only operate on expressions of type int");
-		return IR_DATA_TYPE_INT;
+	} else if (expression->binary_operator == IR_BINARY_OPERATOR_OR ||
+		   expression->binary_operator == IR_BINARY_OPERATOR_AND) {
+		if (left_type != IR_DATA_TYPE_BOOL ||
+		    right_type != IR_DATA_TYPE_BOOL)
+			semantic_error(
+				semantics,
+				"boolean operators can only operate on expressions of type bool");
+	} else {
+		if (left_type != right_type)
+			semantic_error(
+				semantics,
+				"Mismatching types in binary expression");
 	}
 
-	if (left_type != right_type)
-		semantic_error(semantics,
-			       "Mismatching types in binary expression");
-
-	return IR_DATA_TYPE_BOOL;
+	switch (expression->binary_operator) {
+	case IR_BINARY_OPERATOR_ADD:
+		return IR_DATA_TYPE_INT;
+	case IR_BINARY_OPERATOR_MUL:
+		return IR_DATA_TYPE_INT;
+	case IR_BINARY_OPERATOR_SUB:
+		return IR_DATA_TYPE_INT;
+	case IR_BINARY_OPERATOR_DIV:
+		return IR_DATA_TYPE_INT;
+	case IR_BINARY_OPERATOR_MOD:
+		return IR_DATA_TYPE_INT;
+	case IR_BINARY_OPERATOR_LESS:
+		return IR_DATA_TYPE_BOOL;
+	case IR_BINARY_OPERATOR_LESS_EQUAL:
+		return IR_DATA_TYPE_BOOL;
+	case IR_BINARY_OPERATOR_GREATER_EQUAL:
+		return IR_DATA_TYPE_BOOL;
+	case IR_BINARY_OPERATOR_GREATER:
+		return IR_DATA_TYPE_BOOL;
+	case IR_BINARY_OPERATOR_OR:
+		return IR_DATA_TYPE_BOOL;
+	case IR_BINARY_OPERATOR_AND:
+		return IR_DATA_TYPE_BOOL;
+	case IR_BINARY_OPERATOR_EQUAL:
+		return IR_DATA_TYPE_BOOL;
+	case IR_BINARY_OPERATOR_NOT_EQUAL:
+		return IR_DATA_TYPE_BOOL;
+	default:
+		g_assert(!"Invalid binary operator");
+		return IR_DATA_TYPE_VOID;
+	}
 }
 
 static enum ir_data_type
@@ -526,6 +557,18 @@ static void analyze_program(struct semantics *semantics,
 			g_array_index(program->methods, struct ir_method *, i);
 		analyze_method(semantics, method);
 	}
+
+	struct ir_method *main =
+		methods_table_get(semantics->methods_table, "main");
+	if (main == NULL)
+		semantic_error(semantics,
+			       "Program must have a definition for main");
+	else if (main->imported)
+		semantic_error(semantics, "main method cannot be imported");
+	else if (main->return_type != IR_DATA_TYPE_VOID)
+		semantic_error(semantics, "main method must return void");
+	else if (main->arguments->len > 0)
+		semantic_error(semantics, "main method must have no arguments");
 
 	pop_scope(semantics);
 }
