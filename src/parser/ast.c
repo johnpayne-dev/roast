@@ -33,22 +33,30 @@ struct ast_node *ast_node_get_child(struct ast_node *node, uint32_t i)
 	return g_array_index(node->children, struct ast_node *, i);
 }
 
+static void append_terminating_node(GArray *nodes, enum ast_node_type type)
+{
+	struct ast_node terminating_node = {
+		.type = type,
+	};
+	g_array_append_val(nodes, terminating_node);
+}
+
 static void linearize_ast(struct ast_node *ast, GArray *nodes)
 {
 	g_array_append_val(nodes, *ast);
 	for (uint32_t i = 0; i < ast_node_child_count(ast); i++)
 		linearize_ast(ast_node_get_child(ast, i), nodes);
+
+	if (ast->type == AST_NODE_TYPE_PROGRAM)
+		append_terminating_node(nodes, AST_NODE_TYPE_PROGRAM_END);
+	if (ast->type == AST_NODE_TYPE_BLOCK)
+		append_terminating_node(nodes, AST_NODE_TYPE_BLOCK_END);
 }
 
 struct ast_node *ast_node_linearize(struct ast_node *ast)
 {
 	GArray *nodes = g_array_new(false, false, sizeof(struct ast_node));
 	linearize_ast(ast, nodes);
-
-	struct ast_node terminating_node = {
-		.type = AST_NODE_TYPE_END,
-	};
-	g_array_append_val(nodes, terminating_node);
 
 	struct ast_node *array = &g_array_index(nodes, struct ast_node, 0);
 	g_array_free(nodes, false);

@@ -52,7 +52,7 @@ struct ir_program *ir_program_new(struct ast_node **nodes)
 		g_array_append_val(program->methods, method);
 	}
 
-	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_END);
+	g_assert(peek_node(nodes)->type == AST_NODE_TYPE_PROGRAM_END);
 	return program;
 }
 
@@ -238,6 +238,7 @@ struct ir_block *ir_block_new(struct ast_node **nodes)
 		g_array_append_val(block->statements, statement);
 	}
 
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_BLOCK_END);
 	return block;
 }
 
