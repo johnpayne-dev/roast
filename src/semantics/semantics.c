@@ -178,6 +178,11 @@ analyze_binary_expression(struct semantics *semantics,
 				semantics,
 				"boolean operators can only operate on expressions of type bool");
 	} else {
+		if (ir_data_type_is_array(left_type) ||
+		    ir_data_type_is_array(right_type))
+			semantic_error(
+				semantics,
+				"Cannot perform operations on array type");
 		if (left_type != right_type)
 			semantic_error(
 				semantics,
