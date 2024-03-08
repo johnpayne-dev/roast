@@ -115,12 +115,19 @@ static enum ir_data_type analyze_expression(struct semantics *semantics,
 					    struct ir_expression *expression);
 
 static enum ir_data_type analyze_location(struct semantics *semantics,
-					  struct ir_location *location)
+					  struct ir_location *location,
+					  bool *constant)
 {
+	if (constant != NULL)
+		*constant = false;
+
 	struct ir_field *field =
 		get_field_declaration(semantics, location->identifier);
 	if (field == NULL)
 		return IR_DATA_TYPE_VOID;
+
+	if (constant != NULL)
+		*constant = field->constant;
 
 	enum ir_data_type type = field->type;
 
@@ -334,7 +341,7 @@ static enum ir_data_type analyze_expression(struct semantics *semantics,
 	case IR_EXPRESSION_TYPE_LITERAL:
 		return analyze_literal(semantics, expression->literal);
 	case IR_EXPRESSION_TYPE_LOCATION:
-		return analyze_location(semantics, expression->location);
+		return analyze_location(semantics, expression->location, NULL);
 	case IR_EXPRESSION_TYPE_METHOD_CALL:
 		return analyze_method_call(semantics, expression->method_call);
 	case IR_EXPRESSION_TYPE_BINARY:
@@ -352,8 +359,13 @@ static void analyze_block(struct semantics *semantics, struct ir_block *block,
 static void analyze_assignment(struct semantics *semantics,
 			       struct ir_assignment *assignment)
 {
+	bool constant;
 	enum ir_data_type location_type =
-		analyze_location(semantics, assignment->location);
+		analyze_location(semantics, assignment->location, &constant);
+
+	if (constant)
+		semantic_error(semantics, "Cannot assign to constant field");
+
 	if (assignment->assign_operator != IR_ASSIGN_OPERATOR_SET &&
 	    location_type != IR_DATA_TYPE_INT)
 		semantic_error(
@@ -572,14 +584,19 @@ static void analyze_field(struct semantics *semantics, struct ir_field *field)
 				"Array initializer cannot be provided when length is declared");
 
 		field->array_length = field->initializer->literals->len;
-	} else if (is_array) {
-		if (field->array_length == -1)
+	} else {
+		if (is_array && field->array_length == -1)
 			semantic_error(
 				semantics,
 				"Array fields without initializers must have a declared length");
-		else if (field->array_length == 0)
+		else if (is_array && field->array_length == 0)
 			semantic_error(semantics,
 				       "Array length must be greater than 0");
+
+		if (field->constant)
+			semantic_error(
+				semantics,
+				"Fields declared constant must have an initializer");
 	}
 }
 
