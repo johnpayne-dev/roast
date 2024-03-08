@@ -373,6 +373,7 @@ static void analyze_assignment(struct semantics *semantics,
 static void analyze_while_statement(struct semantics *semantics,
 				    struct ir_while_statement *statement)
 {
+	semantics->loop_depth++;
 	enum ir_data_type type =
 		analyze_expression(semantics, statement->condition);
 	if (type != IR_DATA_TYPE_BOOL)
@@ -381,6 +382,7 @@ static void analyze_while_statement(struct semantics *semantics,
 			"Condition expression in while statement must be of type bool");
 
 	analyze_block(semantics, statement->block, NULL);
+	semantics->loop_depth--;
 }
 
 static void analyze_for_update(struct semantics *semantics,
@@ -395,6 +397,7 @@ static void analyze_for_update(struct semantics *semantics,
 static void analyze_for_statement(struct semantics *semantics,
 				  struct ir_for_statement *statement)
 {
+	semantics->loop_depth++;
 	analyze_assignment(semantics, statement->initial);
 	enum ir_data_type type =
 		analyze_expression(semantics, statement->condition);
@@ -405,6 +408,7 @@ static void analyze_for_statement(struct semantics *semantics,
 
 	analyze_for_update(semantics, statement->update);
 	analyze_block(semantics, statement->block, NULL);
+	semantics->loop_depth--;
 }
 
 static void analyze_if_statement(struct semantics *semantics,
@@ -437,6 +441,20 @@ static void analyze_return_statement(struct semantics *semantics,
 			       "Expression does not match method return type");
 }
 
+static void analyze_continue_statement(struct semantics *semantics)
+{
+	if (semantics->loop_depth == 0)
+		semantic_error(semantics,
+			       "continue statement must be inside a loop");
+}
+
+static void analyze_break_statement(struct semantics *semantics)
+{
+	if (semantics->loop_depth == 0)
+		semantic_error(semantics,
+			       "break statement must be inside a loop");
+}
+
 static void analyze_statement(struct semantics *semantics,
 			      struct ir_statement *statement)
 {
@@ -459,6 +477,12 @@ static void analyze_statement(struct semantics *semantics,
 	case IR_STATEMENT_TYPE_RETURN:
 		analyze_return_statement(semantics,
 					 statement->return_expression);
+		break;
+	case IR_STATEMENT_TYPE_CONTINUE:
+		analyze_continue_statement(semantics);
+		break;
+	case IR_STATEMENT_TYPE_BREAK:
+		analyze_break_statement(semantics);
 		break;
 	default:
 		break;
@@ -622,6 +646,7 @@ int semantics_analyze(struct semantics *semantics, struct ast_node *ast,
 	semantics->error = false;
 	semantics->methods_table = program->methods_table;
 	semantics->current_method = NULL;
+	semantics->loop_depth = 0;
 	analyze_program(semantics, program);
 
 	if (semantics->error || ir == NULL)
