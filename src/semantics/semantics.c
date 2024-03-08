@@ -447,16 +447,6 @@ static void analyze_return_statement(struct semantics *semantics,
 		semantic_error(
 			semantics,
 			"return expression does not match method return type");
-
-	fields_table_t *fields = current_scope(semantics);
-	bool in_body = fields_table_get_parent(
-			       fields_table_get_parent(fields)) == NULL;
-	if (!in_body &&
-	    semantics->current_method->return_type != IR_DATA_TYPE_VOID) {
-		semantic_error(
-			semantics,
-			"return statements cannot return values unless it is in the body of the method");
-	}
 }
 
 static void analyze_continue_statement(struct semantics *semantics)
