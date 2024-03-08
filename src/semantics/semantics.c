@@ -439,9 +439,17 @@ static void analyze_if_statement(struct semantics *semantics,
 static void analyze_return_statement(struct semantics *semantics,
 				     struct ir_expression *expression)
 {
+	if (expression == NULL) {
+		if (semantics->current_method->return_type != IR_DATA_TYPE_VOID)
+			semantic_error(
+				semantics,
+				"non-void method must have a value in return statement");
+		return;
+	}
+
 	if (semantics->current_method->return_type == IR_DATA_TYPE_VOID) {
 		semantic_error(semantics,
-			       "Cannot have return statement in void method");
+			       "Cannot have return value in void method");
 		return;
 	}
 

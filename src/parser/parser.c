@@ -705,9 +705,8 @@ static struct ast_node *parse_return_statement(struct parser *parser)
 		ast_node_new(AST_NODE_TYPE_RETURN_STATEMENT);
 
 	struct ast_node *expression = parse_expression(parser);
-	if (expression == NULL)
-		parse_error(parser, "Expected expression in return statement");
-	ast_node_add_child(statement, expression);
+	if (expression != NULL)
+		ast_node_add_child(statement, expression);
 
 	if (!next_token(parser, TOKEN_TYPE_SEMICOLON, NULL))
 		parse_error(parser, "Expected semicolon in return statement");

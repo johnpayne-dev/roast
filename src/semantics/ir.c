@@ -288,7 +288,10 @@ struct ir_statement *ir_statement_new(struct ast_node **nodes)
 	case AST_NODE_TYPE_RETURN_STATEMENT:
 		next_node(nodes);
 		statement->type = IR_STATEMENT_TYPE_RETURN;
-		statement->return_expression = ir_expression_new(nodes);
+		if (peek_node(nodes)->type == AST_NODE_TYPE_EXPRESSION)
+			statement->return_expression = ir_expression_new(nodes);
+		else
+			statement->return_expression = NULL;
 		break;
 	case AST_NODE_TYPE_BREAK_STATEMENT:
 		next_node(nodes);
@@ -328,7 +331,8 @@ void ir_statement_free(struct ir_statement *statement)
 		ir_while_statement_free(statement->while_statement);
 		break;
 	case IR_STATEMENT_TYPE_RETURN:
-		ir_expression_free(statement->return_expression);
+		if (statement->return_expression != NULL)
+			ir_expression_free(statement->return_expression);
 		break;
 	case IR_STATEMENT_TYPE_METHOD_CALL:
 		ir_method_call_free(statement->method_call);
