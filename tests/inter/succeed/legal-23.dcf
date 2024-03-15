@@ -1,0 +1,11 @@
+void main(){
+    int i;
+    bool a;
+
+    // not really useful, but legal
+    for (i = 0; i < 5; i = 100) {}
+
+    // also not really legal, but legal
+    for (i = 0; i < 10; a = true) {}
+
+}

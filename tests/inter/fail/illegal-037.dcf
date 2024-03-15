@@ -1,0 +1,4 @@
+void main(){
+    // const fields require an initializer
+    const int a[150], b;
+}
