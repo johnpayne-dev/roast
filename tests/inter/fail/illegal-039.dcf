@@ -1,0 +1,8 @@
+void main(){
+    const int a = 15;
+    int i;
+
+    // Cannot assign to a constant
+    for (i = 0; i < 30; a *= 1){}
+
+}
