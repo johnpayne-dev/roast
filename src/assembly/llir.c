@@ -37,11 +37,8 @@ struct llir_node *llir_node_new_method(struct ir_method *ir_method)
 {
 	g_assert(ir_method->imported == false);
 
-	struct llir_node *node = g_new(struct llir_node, 1);
-
-	node->type = LLIR_NODE_TYPE_METHOD;
-
-	node->method = llir_method_new(ir_method);
+	struct llir_node *node = llir_node_new(LLIR_NODE_TYPE_METHOD,
+					       llir_method_new(ir_method));
 
 	node->next = llir_node_new_block(ir_method->block);
 
