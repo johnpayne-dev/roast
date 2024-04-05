@@ -27,7 +27,7 @@ struct llir_node *llir_node_new(enum llir_node_type type, void *data)
 	return node;
 }
 
-struct llir_node *llir_node_new_program(struct ir_program *program)
+struct llir_node *llir_node_new_program(struct ir_program *ir_program)
 {
 	g_assert(!"TODO");
 	return NULL;
@@ -48,19 +48,19 @@ struct llir_node *llir_node_new_method(struct ir_method *ir_method)
 	return node;
 }
 
-struct llir_node *llir_node_new_field(struct ir_field *field)
+struct llir_node *llir_node_new_field(struct ir_field *ir_field)
 {
 	g_assert(!"TODO");
 	return NULL;
 }
 
-struct llir_node *llir_node_new_block(struct ir_block *block)
+struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 {
 	g_assert(!"TODO");
 	return NULL;
 }
 
-struct llir_node *llir_node_new_instructions(struct ir_statement *statement)
+struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement)
 {
 	g_assert(!"TODO");
 	return NULL;
@@ -79,6 +79,13 @@ struct llir_method *llir_method_new(struct ir_method *ir_method)
 
 	method->arguments =
 		g_array_new(false, false, sizeof(struct llir_field *));
+
+	for (uint32_t i = 0; i < ir_method->arguments->len; i++) {
+		struct ir_field *ir_field = g_array_index(ir_method->arguments,
+							  struct ir_field *, i);
+		struct llir_field *field = llir_field_new(ir_field);
+		g_array_append_val(method->arguments, field);
+	}
 
 	return method;
 }

@@ -43,6 +43,9 @@ struct llir_field {
 	GArray *values;
 };
 
+struct llir_field *llir_field_new(struct ir_field *ir_field);
+void *llir_field_free(struct llir_field *field);
+
 struct llir_method {
 	char *identifier;
 	GArray *arguments;
