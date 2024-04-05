@@ -110,10 +110,96 @@ struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 	return head_node;
 }
 
-struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement)
+static struct llir_node *
+nodes_from_expression(struct ir_expression *ir_expression)
 {
 	g_assert(!"TODO");
 	return NULL;
+}
+
+static struct llir_node *
+nodes_from_assignment(struct ir_assignment *ir_assignment)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *
+nodes_from_method_call(struct ir_method_call *ir_method_call)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *
+nodes_from_if_statement(struct ir_if_statement *ir_if_statement)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *
+nodes_from_for_statement(struct ir_for_statement *ir_for_statement)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *
+nodes_from_while_statement(struct ir_while_statement *ir_while_statement)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *nodes_from_break_statement(void)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *nodes_from_continue_statement(void)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement)
+{
+	struct llir_node *node = NULL;
+
+	switch (ir_statement->type) {
+	case IR_STATEMENT_TYPE_ASSIGNMENT:
+		node = nodes_from_assignment(ir_statement->assignment);
+		break;
+	case IR_STATEMENT_TYPE_METHOD_CALL:
+		node = nodes_from_method_call(ir_statement->method_call);
+		break;
+	case IR_STATEMENT_TYPE_IF:
+		node = nodes_from_if_statement(ir_statement->if_statement);
+		break;
+	case IR_STATEMENT_TYPE_FOR:
+		node = nodes_from_for_statement(ir_statement->for_statement);
+		break;
+	case IR_STATEMENT_TYPE_WHILE:
+		node = nodes_from_while_statement(
+			ir_statement->while_statement);
+		break;
+	case IR_STATEMENT_TYPE_RETURN:
+		node = nodes_from_expression(ir_statement->return_expression);
+		break;
+	case IR_STATEMENT_TYPE_BREAK:
+		node = nodes_from_break_statement();
+		break;
+	case IR_STATEMENT_TYPE_CONTINUE:
+		node = nodes_from_continue_statement();
+		break;
+	default:
+		g_assert(!"you fucked up");
+		break;
+	}
+
+	return node;
 }
 
 void llir_node_free(struct llir_node *node)
