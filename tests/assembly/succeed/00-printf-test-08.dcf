@@ -1,0 +1,9 @@
+import printf;
+
+void do_print(int a, bool b, int c, bool d, int g, bool h, int i){
+    printf("Hello Decaf %d\n", i);
+}
+
+void main() {
+    do_print(10, true, 20, false, 30, true, 40);
+}

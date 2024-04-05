@@ -1,0 +1,61 @@
+import atoi;
+import exit;
+import getenv;
+import printf;
+import strcmp;
+
+int base_cases[] = {0, 1};
+int memoization[100];
+bool is_memoized[100];
+
+int fib_recursive(int n) {
+  if (n == 0 || n == 1) {
+    return base_cases[n];
+  } else {
+    int l, r;
+    l = fib_recursive(n-1);
+    r = fib_recursive(n-2);
+    return l + r;
+  }
+}
+
+int fib_memoized(int n) {
+  if (is_memoized[n]) {
+    return memoization[n];
+  } else {
+    int res;
+    if (n == 0 || n == 1) {
+      res = n;
+    } else {
+      int l, r;
+      l = fib_memoized(n - 1);
+      r = fib_memoized(n - 2);
+      res = l + r;
+    }
+    memoization[n] = res;
+    is_memoized[n] = true;
+    return res;
+  }
+}
+
+int fib_iterative(int n) {
+  int a = 0, b = 1, i;
+  for (i = 2; i <= n; i++) {
+    int c;
+    c = a + b;
+    a = b;
+    b = c;
+  }
+  return b;
+}
+
+void main() {
+  int n = 8, res;
+
+  res = fib_recursive(n);
+  printf("recursive: %d\n", res);
+  res = fib_memoized(n);
+  printf("memoized: %d\n", res);
+  res = fib_iterative(n);
+  printf("iterative: %d\n", res);
+}

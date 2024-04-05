@@ -1,0 +1,9 @@
+import printf;
+
+void do_print(int a){
+    printf("Hello Decaf\n");
+}
+
+void main() {
+    do_print(10);
+}

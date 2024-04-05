@@ -25,7 +25,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-for stage_dir in "./tests/"{"scan","parse","inter"}"/"; do
+for stage_dir in "./tests/"{"scan","parse","inter","assembly"}"/"; do
     stage_name=$(basename "$stage_dir")
     echo "Testing stage: $stage_name"
 
@@ -35,7 +35,46 @@ for stage_dir in "./tests/"{"scan","parse","inter"}"/"; do
 
         for test_file in "$expected_result_dir"*; do
             result_message="didn't pass!"
-            ./run_extended.sh "-b" "$build_system" "-c" "$compiler" "--" "$test_file" -t "$stage_name" > /dev/null 2>&1
+
+            if [ "$stage_name" != "assembly" ]; then
+                ./run_extended.sh "-b" "$build_system" "-c" "$compiler" "--" "$test_file" -t "$stage_name" > /dev/null 2>&1
+            elif [ "$stage_name" = "assembly" ]; then
+                assemblies_dir=./bin/"${build_system}"_"${compiler}"/assemblies
+                mkdir -p "${assemblies_dir}"
+                assembly_file="${assemblies_dir}"/"$(basename "${test_file%????}")".asm
+                ./bin/"${build_system}"_"${compiler}"/roast "$test_file" -t "$stage_name" -o "${assembly_file}" 2>/dev/null
+
+                executables_dir=./bin/"${build_system}"_"${compiler}"/executables
+                mkdir -p "${executables_dir}"
+                exectuable_file="${executables_dir}"/"$(basename "${test_file%????}")"
+                /opt/homebrew/bin/gcc-13 -O0 -no-pie "${assembly_file}" -o "${exectuable_file}"
+
+                chmod +x "${exectuable_file}"
+
+                if [ "${expected_result}" = "fail" ]; then
+                    "${exectuable_file}"
+                elif [ "${expected_result}" = "succeed" ]; then
+                    executable_outputs_dir=./bin/"${build_system}"_"${compiler}"/executable_outputs
+                    mkdir -p "${executable_outputs_dir}"
+                    executable_output_file="${executable_outputs_dir}"/"$(basename "${test_file%}")".out
+
+                    "${exectuable_file}" > "${executable_output_file}"
+
+                    succeed_output_file=./tests/assembly/succeed_outputs/"$(basename "${test_file%}")".out
+                    if diff "${executable_output_file}" "${succeed_output_file}" > /dev/null; then
+                        (exit 0)
+                    else
+                        (exit 1)
+                    fi
+                else
+                    echo "This line shouldn't be running"
+                    exit 1
+                fi
+            else
+                echo "This line shouldn't be running"
+                exit 1
+            fi
+
             actual_result=$?
 
             if [ "$expected_result" = "fail" ] && [ "${actual_result}" -ne 0 ]; then
