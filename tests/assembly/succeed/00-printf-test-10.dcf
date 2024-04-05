@@ -1,0 +1,12 @@
+import printf;
+
+void do_print(){
+    // Store some arrays to attempt to get it out of alignment
+    int a[] = {1, 2, 3, 4, 5, 6};
+
+    printf("Hello Decaf\n");
+}
+
+void main() {
+    do_print();
+}
