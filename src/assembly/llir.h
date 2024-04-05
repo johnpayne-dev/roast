@@ -27,6 +27,7 @@ struct llir_node {
 
 struct llir_node *llir_node_new(enum llir_node_type type, void *data);
 struct llir_node *llir_node_new_program(struct ir_program *ir_program);
+struct llir_node *llir_node_new_import(struct ir_method *ir_method);
 struct llir_node *llir_node_new_method(struct ir_method *ir_method);
 struct llir_node *llir_node_new_field(struct ir_field *ir_field);
 struct llir_node *llir_node_new_block(struct ir_block *ir_block);
@@ -36,6 +37,9 @@ void llir_node_free(struct llir_node *node);
 struct llir_import {
 	char *identifier;
 };
+
+struct llir_import *llir_import_new(struct ir_method *ir_method);
+void llir_import_free(struct llir_import *import);
 
 struct llir_field {
 	char *identifier;
