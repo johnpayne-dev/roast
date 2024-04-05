@@ -88,8 +88,26 @@ struct llir_node *llir_node_new_field(struct ir_field *ir_field)
 
 struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_node *head_node =
+		llir_node_new(LLIR_NODE_TYPE_BLOCK_START, NULL);
+
+	struct llir_node *node = head_node;
+
+	for (uint32_t i = 0; i < ir_block->fields->len; i++) {
+		append_nodes(&node,
+			     llir_node_new_field(g_array_index(
+				     ir_block->fields, struct ir_field *, i)));
+	}
+
+	for (uint32_t i = 0; i < ir_block->statements->len; i++) {
+		append_nodes(&node, llir_node_new_instructions(g_array_index(
+					    ir_block->statements,
+					    struct ir_statement *, i)));
+	}
+
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BLOCK_END, NULL));
+
+	return head_node;
 }
 
 struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement)
