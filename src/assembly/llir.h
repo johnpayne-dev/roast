@@ -26,11 +26,11 @@ struct llir_node {
 };
 
 struct llir_node *llir_node_new(enum llir_node_type type, void *data);
-struct llir_node *llir_node_new_program(struct ir_program *program);
-struct llir_node *llir_node_new_method(struct ir_method *method);
-struct llir_node *llir_node_new_field(struct ir_field *field);
-struct llir_node *llir_node_new_block(struct ir_block *block);
-struct llir_node *llir_node_new_instructions(struct ir_statement *statement);
+struct llir_node *llir_node_new_program(struct ir_program *ir_program);
+struct llir_node *llir_node_new_method(struct ir_method *ir_method);
+struct llir_node *llir_node_new_field(struct ir_field *ir_field);
+struct llir_node *llir_node_new_block(struct ir_block *ir_block);
+struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement);
 void llir_node_free(struct llir_node *node);
 
 struct llir_import {
@@ -43,10 +43,16 @@ struct llir_field {
 	GArray *values;
 };
 
+struct llir_field *llir_field_new(struct ir_field *ir_field);
+void *llir_field_free(struct llir_field *field);
+
 struct llir_method {
 	char *identifier;
 	GArray *arguments;
 };
+
+struct llir_method *llir_method_new(struct ir_method *ir_method);
+void llir_method_free(struct llir_method *method);
 
 struct llir_instruction {
 	enum llir_instruction_type {
