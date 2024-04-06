@@ -639,7 +639,46 @@ struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement)
 
 void llir_node_free(struct llir_node *node)
 {
-	g_assert(!"TODO");
+	switch (node->type) {
+	case LLIR_NODE_TYPE_IMPORT:
+		llir_import_free(node->import);
+		break;
+	case LLIR_NODE_TYPE_FIELD:
+		llir_field_free(node->field);
+		break;
+	case LLIR_NODE_TYPE_METHOD:
+		llir_method_free(node->method);
+		break;
+	case LLIR_NODE_TYPE_ASSIGNMENT:
+		llir_assignment_free(node->assignment);
+		break;
+	case LLIR_NODE_TYPE_LITERAL_ASSIGNMENT:
+		llir_literal_assignment_free(node->literal_assignment);
+		break;
+	case LLIR_NODE_TYPE_INDEXED_ASSIGNMENT:
+		llir_indexed_assignment_free(node->indexed_assignment);
+		break;
+	case LLIR_NODE_TYPE_BINARY_OPERATION:
+		llir_binary_operation_free(node->binary_operation);
+		break;
+	case LLIR_NODE_TYPE_UNARY_OPERATION:
+		llir_unary_operation_free(node->unary_operation);
+		break;
+	case LLIR_NODE_TYPE_METHOD_CALL:
+		llir_method_call_free(node->method_call);
+		break;
+	case LLIR_NODE_TYPE_ARRAY_INDEX:
+		llir_array_index_free(node->array_index);
+		break;
+	case LLIR_NODE_TYPE_BRANCH:
+		llir_branch_free(node->branch);
+		break;
+	default:
+		break;
+	}
+
+	if (node->next != NULL)
+		llir_node_free(node->next);
 }
 
 struct llir_import *llir_import_new(struct ir_method *ir_method)
