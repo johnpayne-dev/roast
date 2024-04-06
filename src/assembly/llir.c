@@ -56,7 +56,11 @@ struct llir_node *llir_node_new(enum llir_node_type type, void *data)
 
 static void append_nodes(struct llir_node **node, struct llir_node *appended)
 {
+	while ((*node)->next != NULL)
+		*node = (*node)->next;
+
 	(*node)->next = appended;
+
 	while ((*node)->next != NULL)
 		*node = (*node)->next;
 }
@@ -138,49 +142,221 @@ struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 }
 
 static struct llir_node *
+nodes_from_expression(struct ir_expression *ir_expression);
+
+static const enum llir_binary_operation_type IR_TO_LLIR_BIN_OPS[] = {
+	[IR_BINARY_OPERATOR_OR] = LLIR_BINARY_OPERATION_TYPE_OR,
+	[IR_BINARY_OPERATOR_AND] = LLIR_BINARY_OPERATION_TYPE_AND,
+	[IR_BINARY_OPERATOR_EQUAL] = LLIR_BINARY_OPERATION_TYPE_EQUAL,
+	[IR_BINARY_OPERATOR_NOT_EQUAL] = LLIR_BINARY_OPERATION_TYPE_NOT_EQUAL,
+	[IR_BINARY_OPERATOR_LESS] = LLIR_BINARY_OPERATION_TYPE_LESS,
+	[IR_BINARY_OPERATOR_LESS_EQUAL] = LLIR_BINARY_OPERATION_TYPE_LESS_EQUAL,
+	[IR_BINARY_OPERATOR_GREATER_EQUAL] =
+		LLIR_BINARY_OPERATION_TYPE_GREATER_EQUAL,
+	[IR_BINARY_OPERATOR_GREATER] = LLIR_BINARY_OPERATION_TYPE_GREATER,
+	[IR_BINARY_OPERATOR_ADD] = LLIR_BINARY_OPERATION_TYPE_ADD,
+	[IR_BINARY_OPERATOR_SUB] = LLIR_BINARY_OPERATION_TYPE_SUB,
+	[IR_BINARY_OPERATOR_MUL] = LLIR_BINARY_OPERATION_TYPE_MUL,
+	[IR_BINARY_OPERATOR_DIV] = LLIR_BINARY_OPERATION_TYPE_DIV,
+	[IR_BINARY_OPERATOR_MOD] = LLIR_BINARY_OPERATION_TYPE_MOD,
+};
+
+static struct llir_node *
 nodes_from_binary_expression(struct ir_binary_expression *binary_expression)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_node *head_node =
+		nodes_from_expression(binary_expression->left);
+	char *left_operand = last_temporary_variable();
+
+	struct llir_node *node = head_node;
+
+	append_nodes(&node, nodes_from_expression(binary_expression->right));
+	char *right_operand = last_temporary_variable();
+
+	char *destination = next_temporary_variable();
+
+	struct llir_node *binary_operation_node = llir_node_new(
+		LLIR_NODE_TYPE_BINARY_OPERATION,
+		llir_binary_operation_new(
+			destination,
+			IR_TO_LLIR_BIN_OPS[binary_expression->binary_operator],
+			left_operand, right_operand));
+
+	g_free(left_operand);
+	g_free(right_operand);
+	g_free(destination);
+
+	append_nodes(&node, binary_operation_node);
+
+	return head_node;
 }
 
 static struct llir_node *
 nodes_from_not_expression(struct ir_expression *not_expression)
 {
-	g_assert(!"TODO");
-	return NULL;
+	g_assert(not_expression->type == IR_EXPRESSION_TYPE_NOT);
+
+	struct llir_node *head_node =
+		nodes_from_expression(not_expression->not_expression);
+	char *source = last_temporary_variable();
+
+	char *destination = next_temporary_variable();
+
+	struct llir_node *not_node = llir_node_new(
+		LLIR_NODE_TYPE_UNARY_OPERATION,
+		llir_unary_operation_new(
+			destination, LLIR_UNARY_OPERATION_TYPE_NOT, source));
+
+	g_free(source);
+	g_free(destination);
+
+	struct llir_node *node = head_node;
+
+	append_nodes(&node, not_node);
+
+	return head_node;
 }
 
 static struct llir_node *
 nodes_from_negate_expression(struct ir_expression *negate_expression)
 {
-	g_assert(!"TODO");
-	return NULL;
+	g_assert(negate_expression->type == LLIR_UNARY_OPERATION_TYPE_NEGATE);
+
+	struct llir_node *head_node =
+		nodes_from_expression(negate_expression->negate_expression);
+	char *source = last_temporary_variable();
+
+	char *destination = next_temporary_variable();
+
+	struct llir_node *negate_node = llir_node_new(
+		LLIR_NODE_TYPE_UNARY_OPERATION,
+		llir_unary_operation_new(
+			destination, LLIR_UNARY_OPERATION_TYPE_NEGATE, source));
+
+	g_free(source);
+	g_free(destination);
+
+	struct llir_node *node = head_node;
+
+	append_nodes(&node, negate_node);
+
+	return head_node;
 }
 
-static struct llir_node *nodes_from_len_identifier(char *len_identifier)
+static struct llir_node *
+nodes_from_len_identifier(struct ir_length_expression *length_expression)
 {
-	g_assert(!"TODO");
-	return NULL;
+	char *destination = next_temporary_variable();
+
+	struct llir_node *length_node =
+		llir_node_new(LLIR_NODE_TYPE_LITERAL_ASSIGNMENT,
+			      llir_literal_assignment_new(
+				      destination, length_expression->length));
+
+	g_free(destination);
+
+	return length_node;
 }
 
 static struct llir_node *
 nodes_from_method_call(struct ir_method_call *method_call)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_node *head_node = NULL, *node = NULL;
+
+	GArray *arguments = g_array_new(
+		false, false, sizeof(struct llir_method_call_argument));
+
+	for (uint32_t i = 0; i < method_call->arguments->len; i++) {
+		struct ir_method_call_argument *ir_method_call_argument =
+			g_array_index(method_call->arguments,
+				      struct ir_method_call_argument *, i);
+
+		struct llir_method_call_argument method_call_argument;
+
+		switch (ir_method_call_argument->type) {
+		case IR_METHOD_CALL_ARGUMENT_TYPE_STRING:
+			method_call_argument.type =
+				LLIR_METHOD_CALL_ARGUMENT_TYPE_STRING;
+			method_call_argument.string =
+				g_strdup(ir_method_call_argument->string);
+			break;
+		case IR_METHOD_CALL_ARGUMENT_TYPE_EXPRESSION:
+			method_call_argument.type =
+				LLIR_METHOD_CALL_ARGUMENT_TYPE_IDENTIFIER;
+
+			if (head_node == NULL) {
+				head_node = nodes_from_expression(
+					ir_method_call_argument->expression);
+				node = head_node;
+			} else {
+				append_nodes(&node,
+					     nodes_from_expression(
+						     ir_method_call_argument
+							     ->expression));
+			}
+
+			method_call_argument.identifier =
+				last_temporary_variable();
+			break;
+		default:
+			g_assert(!"you fucked up");
+			break;
+		}
+	}
+
+	char *destination = next_temporary_variable();
+
+	struct llir_node *method_call_node = llir_node_new(
+		LLIR_NODE_TYPE_METHOD_CALL,
+		llir_method_call_new(destination, method_call->identifier,
+				     arguments));
+
+	g_free(destination);
+
+	if (head_node == NULL) {
+		head_node = method_call_node;
+	} else {
+		append_nodes(&node, method_call_node);
+	}
+
+	return head_node;
 }
 
 static struct llir_node *nodes_from_literal(struct ir_literal *literal)
 {
-	g_assert(!"TODO");
-	return NULL;
+	char *destination = next_temporary_variable();
+
+	struct llir_node *literal_node = llir_node_new(
+		LLIR_NODE_TYPE_LITERAL_ASSIGNMENT,
+		llir_literal_assignment_new(
+			destination,
+			literal->value)); // TODO: NEGATIVE VALUES OR SMTH SHIT
+
+	g_free(destination);
+
+	return literal_node;
 }
 
 static struct llir_node *nodes_from_location(struct ir_location *location)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_node *head_node = nodes_from_expression(location->index);
+
+	char *index = last_temporary_variable();
+
+	char *destination = next_temporary_variable();
+
+	struct llir_node *location_node = llir_node_new(
+		LLIR_NODE_TYPE_ARRAY_INDEX,
+		llir_array_index_new(destination, location->identifier, index));
+
+	g_free(index);
+	g_free(destination);
+
+	struct llir_node *node = head_node;
+
+	append_nodes(&node, location_node);
+
+	return head_node;
 }
 
 static struct llir_node *
@@ -201,7 +377,8 @@ nodes_from_expression(struct ir_expression *ir_expression)
 			ir_expression->negate_expression);
 		break;
 	case IR_EXPRESSION_TYPE_LEN:
-		node = nodes_from_len_identifier(ir_expression->len_identifier);
+		node = nodes_from_len_identifier(
+			ir_expression->length_expression);
 		break;
 	case IR_EXPRESSION_TYPE_METHOD_CALL:
 		node = nodes_from_method_call(ir_expression->method_call);
@@ -510,22 +687,15 @@ void llir_unary_operation_free(struct llir_unary_operation *unary_operation)
 	g_free(unary_operation);
 }
 
-struct llir_method_call *llir_method_call_new(char *destination, char *method,
-					      GArray *arguments)
+struct llir_method_call *
+llir_method_call_new(char *destination, char *identifier, GArray *arguments)
 {
 	struct llir_method_call *method_call =
 		g_new(struct llir_method_call, 1);
 
 	method_call->destination = g_strdup(destination);
-	method_call->identifier = g_strdup(method);
-
-	for (uint32_t i = 0; i < arguments->len; i++) {
-		struct llir_method_call_argument method_call_argument =
-			g_array_index(arguments,
-				      struct llir_method_call_argument, i);
-		g_array_append_val(method_call->arguments,
-				   method_call_argument);
-	}
+	method_call->identifier = g_strdup(identifier);
+	method_call->arguments = arguments;
 
 	return method_call;
 }
@@ -534,6 +704,16 @@ void llir_method_call_free(struct llir_method_call *method_call)
 {
 	g_free(method_call->destination);
 	g_free(method_call->identifier);
+
+	for (uint32_t i = 0; i < method_call->arguments->len; i++) {
+		struct llir_method_call_argument *method_call_argument =
+			g_array_index(method_call->arguments,
+				      struct llir_method_call_argument *, i);
+		g_free(method_call_argument->identifier);
+		g_free(method_call_argument->string);
+	}
+	g_array_free(method_call->arguments, true);
+
 	g_free(method_call);
 }
 

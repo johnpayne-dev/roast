@@ -125,17 +125,19 @@ struct llir_binary_operation {
 	char *destination;
 
 	enum llir_binary_operation_type {
+		LLIR_BINARY_OPERATION_TYPE_OR,
+		LLIR_BINARY_OPERATION_TYPE_AND,
+		LLIR_BINARY_OPERATION_TYPE_EQUAL,
+		LLIR_BINARY_OPERATION_TYPE_NOT_EQUAL,
+		LLIR_BINARY_OPERATION_TYPE_LESS,
+		LLIR_BINARY_OPERATION_TYPE_LESS_EQUAL,
+		LLIR_BINARY_OPERATION_TYPE_GREATER_EQUAL,
+		LLIR_BINARY_OPERATION_TYPE_GREATER,
 		LLIR_BINARY_OPERATION_TYPE_ADD,
 		LLIR_BINARY_OPERATION_TYPE_SUB,
 		LLIR_BINARY_OPERATION_TYPE_MUL,
 		LLIR_BINARY_OPERATION_TYPE_DIV,
 		LLIR_BINARY_OPERATION_TYPE_MOD,
-		LLIR_BINARY_OPERATION_TYPE_LESS,
-		LLIR_BINARY_OPERATION_TYPE_LESS_EQUAL,
-		LLIR_BINARY_OPERATION_TYPE_GREATER_EQUAL,
-		LLIR_BINARY_OPERATION_TYPE_GREATER,
-		LLIR_BINARY_OPERATION_TYPE_EQUAL,
-		LLIR_BINARY_OPERATION_TYPE_NOT_EQUAL,
 	} operation;
 
 	char *left_operand;
@@ -183,8 +185,8 @@ struct llir_method_call_argument {
 	};
 };
 
-struct llir_method_call *llir_method_call_new(char *destination, char *method,
-					      GArray *arguments);
+struct llir_method_call *
+llir_method_call_new(char *destination, char *indetifier, GArray *arguments);
 void llir_method_call_free(struct llir_method_call *method_call);
 
 struct llir_array_index {

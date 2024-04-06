@@ -651,9 +651,8 @@ struct ir_expression *ir_expression_new(struct ast_node **nodes)
 		expression->negate_expression = ir_expression_new(nodes);
 		break;
 	case AST_NODE_TYPE_LEN_EXPRESSION:
-		next_node(nodes);
 		expression->type = IR_EXPRESSION_TYPE_LEN;
-		expression->len_identifier = ir_identifier_from_ast(nodes);
+		expression->length_expression = ir_length_expression_new(nodes);
 		break;
 	case AST_NODE_TYPE_METHOD_CALL:
 		expression->type = IR_EXPRESSION_TYPE_METHOD_CALL;
@@ -689,7 +688,7 @@ void ir_expression_free(struct ir_expression *expression)
 		ir_expression_free(expression->negate_expression);
 		break;
 	case IR_EXPRESSION_TYPE_LEN:
-		g_free(expression->len_identifier);
+		ir_length_expression_free(expression->length_expression);
 		break;
 	case IR_EXPRESSION_TYPE_METHOD_CALL:
 		ir_method_call_free(expression->method_call);
@@ -771,6 +770,25 @@ void ir_binary_expression_free(struct ir_binary_expression *expression)
 	ir_expression_free(expression->left);
 	ir_expression_free(expression->right);
 	g_free(expression);
+}
+
+struct ir_length_expression *ir_length_expression_new(struct ast_node **nodes)
+{
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_LEN_EXPRESSION);
+
+	struct ir_length_expression *length_expression =
+		g_new(struct ir_length_expression, 1);
+
+	length_expression->identifier = ir_identifier_from_ast(nodes);
+	length_expression->length = 1;
+
+	return length_expression;
+}
+
+void ir_length_expression_free(struct ir_length_expression *length_expression)
+{
+	g_free(length_expression->identifier);
+	g_free(length_expression);
 }
 
 struct ir_literal *ir_literal_new(struct ast_node **nodes)

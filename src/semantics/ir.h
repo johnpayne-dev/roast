@@ -226,7 +226,8 @@ struct ir_expression {
 		struct ir_binary_expression *binary_expression;
 		struct ir_expression *not_expression;
 		struct ir_expression *negate_expression;
-		char *len_identifier;
+		// char *len_identifier;
+		struct ir_length_expression *length_expression;
 		struct ir_method_call *method_call;
 		struct ir_literal *literal;
 		struct ir_location *location;
@@ -261,6 +262,14 @@ struct ir_binary_expression {
 
 struct ir_binary_expression *ir_binary_expression_new(struct ast_node **nodes);
 void ir_binary_expression_free(struct ir_binary_expression *expression);
+
+struct ir_length_expression {
+	char *identifier;
+	int64_t length;
+};
+
+struct ir_length_expression *ir_length_expression_new(struct ast_node **nodes);
+void ir_length_expression_free(struct ir_length_expression *length_expression);
 
 struct ir_literal {
 	struct token token;
