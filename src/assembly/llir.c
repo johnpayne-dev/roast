@@ -379,22 +379,32 @@ static struct llir_node *nodes_from_literal(struct ir_literal *literal)
 
 static struct llir_node *nodes_from_location(struct ir_location *location)
 {
-	struct llir_node *head_node = nodes_from_expression(location->index);
-
-	char *index = last_temporary_variable();
+	struct llir_node *head_node = NULL, *node = NULL, *location_node = NULL;
 
 	char *destination = next_temporary_variable();
 
-	struct llir_node *location_node = llir_node_new(
-		LLIR_NODE_TYPE_ARRAY_INDEX,
-		llir_array_index_new(destination, location->identifier, index));
+	if (location->index == NULL) {
+		head_node = llir_node_new(
+			LLIR_NODE_TYPE_ASSIGNMENT,
+			llir_assignment_new(destination, location->identifier));
+	} else {
+		head_node = nodes_from_expression(location->index);
 
-	g_free(index);
+		char *index = last_temporary_variable();
+
+		location_node = llir_node_new(
+			LLIR_NODE_TYPE_ARRAY_INDEX,
+			llir_array_index_new(destination, location->identifier,
+					     index));
+
+		g_free(index);
+
+		node = head_node;
+
+		append_nodes(&node, location_node);
+	}
+
 	g_free(destination);
-
-	struct llir_node *node = head_node;
-
-	append_nodes(&node, location_node);
 
 	return head_node;
 }
