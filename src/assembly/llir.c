@@ -204,8 +204,30 @@ static const enum llir_binary_operation_type IR_TO_LLIR_BIN_OPS[] = {
 };
 
 static struct llir_node *
+nodes_from_short_circuit(struct ir_binary_expression *binary_expression)
+{
+	struct llir_node *head = nodes_from_expression(binary_expression->left);
+	char *left = last_temporary_variable();
+	struct llir_node *node = head;
+
+	struct llir_node *label = llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+	struct llir_branch *branch = llir_branch_new(
+		left, label,
+		binary_expression->binary_operator == IR_BINARY_OPERATOR_AND);
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
+	append_nodes(&node, nodes_from_expression(binary_expression->right));
+	append_nodes(&node, label);
+
+	return head;
+}
+
+static struct llir_node *
 nodes_from_binary_expression(struct ir_binary_expression *binary_expression)
 {
+	if (binary_expression->binary_operator == IR_BINARY_OPERATOR_OR ||
+	    binary_expression->binary_operator == IR_BINARY_OPERATOR_AND)
+		return nodes_from_short_circuit(binary_expression);
+
 	struct llir_node *head_node =
 		nodes_from_expression(binary_expression->left);
 	char *left_operand = last_temporary_variable();
@@ -564,7 +586,8 @@ nodes_from_if_statement(struct ir_if_statement *ir_if_statement)
 
 	struct llir_node *end_if_label =
 		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
-	struct llir_branch *branch = llir_branch_new(condition, end_if_label);
+	struct llir_branch *branch =
+		llir_branch_new(condition, end_if_label, true);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
 	append_nodes(&node, llir_node_new_block(ir_if_statement->if_block));
 	append_nodes(&node, end_if_label);
@@ -616,7 +639,8 @@ nodes_from_for_statement(struct ir_for_statement *ir_for_statement)
 	append_nodes(&node, nodes_from_expression(ir_for_statement->condition));
 	char *condition = last_temporary_variable();
 
-	struct llir_branch *branch = llir_branch_new(condition, break_label);
+	struct llir_branch *branch =
+		llir_branch_new(condition, break_label, true);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
 
 	append_nodes(&node, llir_node_new_block(ir_for_statement->block));
@@ -648,7 +672,8 @@ nodes_from_while_statement(struct ir_while_statement *ir_while_statement)
 		     nodes_from_expression(ir_while_statement->condition));
 	char *condition = last_temporary_variable();
 
-	struct llir_branch *branch = llir_branch_new(condition, break_label);
+	struct llir_branch *branch =
+		llir_branch_new(condition, break_label, true);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
 
 	append_nodes(&node, llir_node_new_block(ir_while_statement->block));
@@ -998,12 +1023,14 @@ void llir_array_index_free(struct llir_array_index *array_index)
 	g_free(array_index);
 }
 
-struct llir_branch *llir_branch_new(char *condition, struct llir_node *label)
+struct llir_branch *llir_branch_new(char *condition, struct llir_node *label,
+				    bool negate)
 {
 	struct llir_branch *branch = g_new(struct llir_branch, 1);
 
 	branch->condition = g_strdup(condition);
 	branch->label = label;
+	branch->negate = negate;
 
 	return branch;
 }
@@ -1092,14 +1119,12 @@ void llir_node_print(struct llir_node *node)
 			node->literal_assignment->literal);
 		break;
 	case LLIR_NODE_TYPE_INDEXED_ASSIGNMENT:
-		g_print("%s[%s] = %s\n",
-			node->indexed_assignment->destination,
+		g_print("%s[%s] = %s\n", node->indexed_assignment->destination,
 			node->indexed_assignment->index,
 			node->indexed_assignment->source);
 		break;
 	case LLIR_NODE_TYPE_BINARY_OPERATION:
-		g_print("%s = %s %s %s\n",
-			node->binary_operation->destination,
+		g_print("%s = %s %s %s\n", node->binary_operation->destination,
 			node->binary_operation->left_operand,
 			OPERATOR_TO_STRING[node->binary_operation->operation],
 			node->binary_operation->right_operand);
