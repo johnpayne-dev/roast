@@ -7,7 +7,17 @@ enum llir_node_type {
 	LLIR_NODE_TYPE_FIELD,
 	LLIR_NODE_TYPE_METHOD,
 	LLIR_NODE_TYPE_BLOCK_START,
-	LLIR_NODE_TYPE_INSTRUCTION,
+	LLIR_NODE_TYPE_ASSIGNMENT,
+	LLIR_NODE_TYPE_LITERAL_ASSIGNMENT,
+	LLIR_NODE_TYPE_INDEXED_ASSIGNMENT,
+	LLIR_NODE_TYPE_INCREMENT,
+	LLIR_NODE_TYPE_DECREMENT,
+	LLIR_NODE_TYPE_BINARY_OPERATION,
+	LLIR_NODE_TYPE_UNARY_OPERATION,
+	LLIR_NODE_TYPE_METHOD_CALL,
+	LLIR_NODE_TYPE_ARRAY_INDEX,
+	LLIR_NODE_TYPE_BRANCH,
+	LLIR_NODE_TYPE_JUMP,
 	LLIR_NODE_TYPE_BLOCK_END,
 	LLIR_NODE_TYPE_PROGRAM_END,
 };
@@ -19,7 +29,16 @@ struct llir_node {
 		struct llir_import *import;
 		struct llir_field *field;
 		struct llir_method *method;
-		struct llir_instruction *instruction;
+		struct llir_assignment *assignment;
+		struct llir_literal_assignment *literal_assignment;
+		struct llir_indexed_assignment *indexed_assignment;
+		struct llir_increment *increment;
+		struct llir_decrement *decrement;
+		struct llir_binary_operation *binary_operation;
+		struct llir_unary_operation *unary_operation;
+		struct llir_method_call *method_call;
+		struct llir_array_index *array_index;
+		struct llir_branch *branch;
 	};
 
 	struct llir_node *next;
@@ -58,44 +77,23 @@ struct llir_method {
 struct llir_method *llir_method_new(struct ir_method *ir_method);
 void llir_method_free(struct llir_method *method);
 
-struct llir_instruction {
-	enum llir_instruction_type {
-		LLIR_INSTRUCTION_TYPE_ASSIGNMENT,
-		LLIR_INSTRUCTION_TYPE_LITERAL_ASSIGNMENT,
-		LLIR_INSTRUCTION_TYPE_INDEXED_ASSIGNMENT,
-		LLIR_INSTRUCTION_TYPE_INCREMENT,
-		LLIR_INSTRUCTION_TYPE_DECREMENT,
-		LLIR_INSTRUCTION_TYPE_BINARY_OPERATION,
-		LLIR_INSTRUCTION_TYPE_UNARY_OPERATION,
-		LLIR_INSTRUCTION_TYPE_METHOD_CALL,
-		LLIR_INSTRUCTION_TYPE_ARRAY_INDEX,
-		LLIR_INSTRUCTION_TYPE_BRANCH,
-		LLIR_INSTRUCTION_TYPE_JUMP,
-	} type;
-
-	union {
-		struct llir_assignment *assignment;
-		struct llir_literal_assignment *literal_assignment;
-		struct llir_indexed_assignment *indexed_assignment;
-		struct llir_increment *increment;
-		struct llir_decrement *decrement;
-		struct llir_binary_operation *binary_operation;
-		struct llir_unary_operation *unary_operation;
-		struct llir_method_call *method_call;
-		struct llir_array_index *array_index;
-		struct llir_branch *branch;
-	};
-};
-
 struct llir_assignment {
 	char *destination;
 	char *source;
 };
 
+struct llir_assignment *llir_assignment_new(char *destination, char *source);
+void llir_assignment_free(struct llir_assignment *assignment);
+
 struct llir_literal_assignment {
 	char *destination;
 	int64_t literal;
 };
+
+struct llir_literal_assignment *llir_literal_assignment_new(char *destination,
+							    int64_t literal);
+void llir_literal_assignment_free(
+	struct llir_literal_assignment *literal_assignment);
 
 struct llir_indexed_assignment {
 	char *destination;
@@ -103,13 +101,24 @@ struct llir_indexed_assignment {
 	char *source;
 };
 
+struct llir_indexed_assignment *
+llir_indexed_assignment_new(char *destination, char *index, char *source);
+void llir_indexed_assignment_free(
+	struct llir_indexed_assignment *indexed_assignment);
+
 struct llir_increment {
 	char *destination;
 };
 
+struct llir_increment *llir_increment_new(char *destination);
+void llir_increment_free(struct llir_increment *increment);
+
 struct llir_decrement {
 	char *destination;
 };
+
+struct llir_decrement *llir_decrement_new(char *destination);
+void llir_decrement_free(struct llir_decrement *decrement);
 
 struct llir_binary_operation {
 	char *destination;
@@ -132,6 +141,12 @@ struct llir_binary_operation {
 	char *right_operand;
 };
 
+struct llir_binary_operation *
+llir_binary_operation_new(char *destination,
+			  enum llir_binary_operation_type operation, char *left,
+			  char *right);
+void llir_binary_operation_free(struct llir_binary_operation *binary_operation);
+
 struct llir_unary_operation {
 	char *destination;
 
@@ -142,6 +157,12 @@ struct llir_unary_operation {
 
 	char *source;
 };
+
+struct llir_unary_operation *
+llir_unary_operation_new(char *destination,
+			 enum llir_unary_operation_type operation,
+			 char *source);
+void llir_unary_operation_free(struct llir_unary_operation *unary_operation);
 
 struct llir_method_call {
 	char *destination;
@@ -161,13 +182,24 @@ struct llir_method_call_argument {
 	};
 };
 
+struct llir_method_call *llir_method_call_new(char *destination, char *method,
+					      GArray *arguments);
+void llir_method_call_free(struct llir_method_call *method_call);
+
 struct llir_array_index {
 	char *destination;
 	char *source;
 	char *index;
 };
 
+struct llir_array_index *llir_array_index_new(char *destination, char *source,
+					      char *index);
+void llir_array_index_free(struct llir_array_index *array_index);
+
 struct llir_branch {
 	char *condition;
-	struct llir_instruction *branch;
+	struct llir_node *branch;
 };
+
+struct llir_branch *llir_branch_new(char *condition);
+void llir_branch_free(struct llir_branch *branch);
