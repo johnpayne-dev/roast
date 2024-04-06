@@ -368,13 +368,13 @@ static struct llir_node *nodes_from_literal(struct ir_literal *literal)
 {
 	char *destination = next_temporary_variable();
 
-	const uint64_t MAX_INT32_MAGNITUDE = ((uint64_t)1)
-					     << 63; // what the fuck?
+	const uint64_t MAX_INT64_POSSIBLE_MAGNITUDE = ((uint64_t)1)
+						      << 63; // what the fuck?
 
-	g_assert(literal->value <= MAX_INT32_MAGNITUDE);
+	g_assert(literal->value <= MAX_INT64_POSSIBLE_MAGNITUDE);
 
 	bool actually_negate = literal->negate &&
-			       (literal->value != MAX_INT32_MAGNITUDE);
+			       (literal->value != MAX_INT64_POSSIBLE_MAGNITUDE);
 
 	int64_t value = (int64_t)literal->value * (actually_negate ? -1 : 1);
 
