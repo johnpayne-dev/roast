@@ -5,6 +5,7 @@
 #include "scanner/scanner.h"
 #include "parser/parser.h"
 #include "semantics/semantics.h"
+#include "assembly/llir.h"
 
 struct options {
 	char *target;
@@ -147,8 +148,18 @@ static int run_intermediate_target(char *file_name, char *source,
 
 static int run_assembly_target(char *file_name, char *source)
 {
-	g_printerr("assembly target not implemented yet.\n");
-	return -1;
+	struct ir_program *ir;
+	if (run_intermediate_target(file_name, source, &ir) != 0)
+		return -1;
+
+	struct llir_node *llir = llir_node_new_program(ir);
+	llir_node_print(llir);
+	llir_node_free(llir);
+	
+	return 0;
+
+	//g_printerr("assembly target not implemented yet.\n");
+	//return -1;
 }
 
 static int run_target(char *target, char *file_name, char *source)
@@ -161,7 +172,7 @@ static int run_target(char *target, char *file_name, char *source)
 	if (g_strcmp0(target, "parse") == 0)
 		return run_parse_target(file_name, source, NULL);
 	if (g_strcmp0(target, "inter") == 0)
-		return run_intermediate_target(file_name, source, NULL);
+		return run_assembly_target(file_name, source);
 	if (g_strcmp0(target, "assembly") == 0)
 		return run_assembly_target(file_name, source);
 
