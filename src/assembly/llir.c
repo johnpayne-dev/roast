@@ -1,5 +1,51 @@
 #include "assembly/llir.h"
 
+struct loop_context {
+	struct llir_node *break_label;
+	struct llir_node *continue_label;
+};
+
+static GArray *loop_context_stack = NULL;
+
+static void push_loop(struct llir_node *break_label,
+		      struct llir_node *continue_label)
+{
+	if (loop_context_stack == NULL)
+		loop_context_stack =
+			g_array_new(false, false, sizeof(struct loop_context));
+
+	struct loop_context context = {
+		.break_label = break_label,
+		.continue_label = continue_label,
+	};
+	g_array_append_val(loop_context_stack, context);
+}
+
+static struct llir_node *get_break_label(void)
+{
+	g_assert(loop_context_stack != NULL);
+	g_assert(loop_context_stack->len > 0);
+	return g_array_index(loop_context_stack, struct loop_context,
+			     loop_context_stack->len - 1)
+		.break_label;
+}
+
+static struct llir_node *get_continue_label(void)
+{
+	g_assert(loop_context_stack != NULL);
+	g_assert(loop_context_stack->len > 0);
+	return g_array_index(loop_context_stack, struct loop_context,
+			     loop_context_stack->len - 1)
+		.continue_label;
+}
+
+static void pop_loop(void)
+{
+	g_assert(loop_context_stack != NULL);
+	g_assert(loop_context_stack->len > 0);
+	g_array_remove_index(loop_context_stack, loop_context_stack->len - 1);
+}
+
 struct llir_node *llir_node_new(enum llir_node_type type, void *data)
 {
 	struct llir_node *node = g_new(struct llir_node, 1);
@@ -502,17 +548,28 @@ nodes_from_if_statement(struct ir_if_statement *ir_if_statement)
 {
 	struct llir_node *head =
 		nodes_from_expression(ir_if_statement->condition);
+	char *condition = last_temporary_variable();
 	struct llir_node *node = head;
 
-	struct llir_branch *branch = llir_branch_new(peek_temporary_variable());
+	struct llir_node *end_if_label =
+		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+	struct llir_branch *branch =
+		llir_branch_new(condition, end_if_label);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
 	append_nodes(&node, llir_node_new_block(ir_if_statement->if_block));
-	branch->branch = node;
+	append_nodes(&node, end_if_label);
 
-	if (ir_if_statement->else_block != NULL)
+	if (ir_if_statement->else_block != NULL) {
+		struct llir_node *end_else_label =
+			llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+		struct llir_jump *jump = llir_jump_new(end_else_label);
+		append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_JUMP, jump));
 		append_nodes(&node,
 			     llir_node_new_block(ir_if_statement->else_block));
+		append_nodes(&node, end_else_label);
+	}
 
+	g_free(condition);
 	return head;
 }
 
@@ -537,19 +594,30 @@ nodes_from_for_statement(struct ir_for_statement *ir_for_statement)
 		nodes_from_assignment(ir_for_statement->initial);
 	struct llir_node *node = head;
 
-	append_nodes(&node, nodes_from_expression(ir_for_statement->condition));
-	struct llir_node *loop_start = node;
+	struct llir_node *start_label =
+		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+	struct llir_node *break_label =
+		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+	struct llir_node *continue_label =
+		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+	push_loop(break_label, continue_label);
 
+	append_nodes(&node, start_label);
+	append_nodes(&node, nodes_from_expression(ir_for_statement->condition));
 	char *condition = last_temporary_variable();
-	struct llir_branch *branch = llir_branch_new(condition);
+
+	struct llir_branch *branch = llir_branch_new(condition, break_label);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
 
 	append_nodes(&node, llir_node_new_block(ir_for_statement->block));
+	append_nodes(&node, continue_label);
 	append_nodes(&node, nodes_from_for_update(ir_for_statement->update));
 
-	struct llir_jump *jump = llir_jump_new(loop_start);
+	struct llir_jump *jump = llir_jump_new(start_label);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_JUMP, jump));
+	append_nodes(&node, break_label);
 
+	pop_loop();
 	g_free(condition);
 	return head;
 }
@@ -557,34 +625,44 @@ nodes_from_for_statement(struct ir_for_statement *ir_for_statement)
 static struct llir_node *
 nodes_from_while_statement(struct ir_while_statement *ir_while_statement)
 {
-	struct llir_node *head =
-		nodes_from_expression(ir_while_statement->condition);
-	struct llir_node *node = head;
-	struct llir_node *loop_start = node;
+	struct llir_node *break_label =
+		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+	struct llir_node *continue_label =
+		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+	push_loop(break_label, continue_label);
 
+	struct llir_node *head = continue_label;
+	struct llir_node *node = head;
+
+	append_nodes(&node,
+		     nodes_from_expression(ir_while_statement->condition));
 	char *condition = last_temporary_variable();
-	struct llir_branch *branch = llir_branch_new(condition);
+
+	struct llir_branch *branch = llir_branch_new(condition, break_label);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
 
 	append_nodes(&node, llir_node_new_block(ir_while_statement->block));
 
-	struct llir_jump *jump = llir_jump_new(loop_start);
+	struct llir_jump *jump = llir_jump_new(continue_label);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_JUMP, jump));
 
+	append_nodes(&node, break_label);
+
+	pop_loop();
 	g_free(condition);
 	return head;
 }
 
 static struct llir_node *nodes_from_break_statement(void)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_node *label = get_break_label();
+	return llir_node_new(LLIR_NODE_TYPE_JUMP, llir_jump_new(label));
 }
 
 static struct llir_node *nodes_from_continue_statement(void)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_node *label = get_continue_label();
+	return llir_node_new(LLIR_NODE_TYPE_JUMP, llir_jump_new(label));
 }
 
 static struct llir_node *
@@ -908,12 +986,12 @@ void llir_array_index_free(struct llir_array_index *array_index)
 	g_free(array_index);
 }
 
-struct llir_branch *llir_branch_new(char *condition)
+struct llir_branch *llir_branch_new(char *condition, struct llir_node *label)
 {
 	struct llir_branch *branch = g_new(struct llir_branch, 1);
 
 	branch->condition = g_strdup(condition);
-	branch->branch = NULL;
+	branch->label = label;
 
 	return branch;
 }
@@ -924,10 +1002,10 @@ void llir_branch_free(struct llir_branch *branch)
 	g_free(branch);
 }
 
-struct llir_jump *llir_jump_new(struct llir_node *branch)
+struct llir_jump *llir_jump_new(struct llir_node *label)
 {
 	struct llir_jump *jump = g_new(struct llir_jump, 1);
-	jump->branch = branch;
+	jump->label = label;
 	return jump;
 }
 

@@ -15,6 +15,7 @@ enum llir_node_type {
 	LLIR_NODE_TYPE_UNARY_OPERATION,
 	LLIR_NODE_TYPE_METHOD_CALL,
 	LLIR_NODE_TYPE_ARRAY_INDEX,
+	LLIR_NODE_TYPE_LABEL,
 	LLIR_NODE_TYPE_BRANCH,
 	LLIR_NODE_TYPE_JUMP,
 	LLIR_NODE_TYPE_RETURN,
@@ -185,15 +186,15 @@ void llir_array_index_free(struct llir_array_index *array_index);
 
 struct llir_branch {
 	char *condition;
-	struct llir_node *branch;
+	struct llir_node *label;
 };
 
-struct llir_branch *llir_branch_new(char *condition);
+struct llir_branch *llir_branch_new(char *condition, struct llir_node *label);
 void llir_branch_free(struct llir_branch *branch);
 
 struct llir_jump {
-	struct llir_node *branch;
+	struct llir_node *label;
 };
 
-struct llir_jump *llir_jump_new(struct llir_node *branch);
+struct llir_jump *llir_jump_new(struct llir_node *label);
 void llir_jump_free(struct llir_jump *jump);
