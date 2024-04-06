@@ -1,6 +1,6 @@
 #pragma once
 #include "semantics/ir.h"
-#include "assembly/temporary_variables.h"
+#include "assembly/counters.h"
 
 enum llir_node_type {
 	LLIR_NODE_TYPE_PROGRAM,
@@ -39,6 +39,7 @@ struct llir_node {
 		struct llir_array_index *array_index;
 		struct llir_branch *branch;
 		struct llir_jump *jump;
+		struct llir_label *label;
 	};
 
 	struct llir_node *next;
@@ -51,6 +52,7 @@ struct llir_node *llir_node_new_method(struct ir_method *ir_method);
 struct llir_node *llir_node_new_field(struct ir_field *ir_field);
 struct llir_node *llir_node_new_block(struct ir_block *ir_block);
 struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement);
+void llir_node_print(struct llir_node *node);
 void llir_node_free(struct llir_node *node);
 
 struct llir_import {
@@ -201,4 +203,9 @@ struct llir_jump {
 struct llir_jump *llir_jump_new(struct llir_node *label);
 void llir_jump_free(struct llir_jump *jump);
 
-void llir_node_print(struct llir_node *node);
+struct llir_label {
+	char *name;
+};
+
+struct llir_label *llir_label_new(void);
+void llir_label_free(struct llir_label *label);
