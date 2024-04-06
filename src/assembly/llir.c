@@ -111,10 +111,86 @@ struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 }
 
 static struct llir_node *
-nodes_from_expression(struct ir_expression *ir_expression)
+nodes_from_binary_expression(struct ir_binary_expression *binary_expression)
 {
 	g_assert(!"TODO");
 	return NULL;
+}
+
+static struct llir_node *
+nodes_from_not_expression(struct ir_expression *not_expression)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *
+nodes_from_negate_expression(struct ir_expression *negate_expression)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *nodes_from_len_identifier(char *len_identifier)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *
+nodes_from_method_call(struct ir_method_call *method_call)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *nodes_from_literal(struct ir_literal *literal)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *nodes_from_location(struct ir_location *location)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+static struct llir_node *
+nodes_from_expression(struct ir_expression *ir_expression)
+{
+	struct llir_node *node = NULL;
+
+	switch (ir_expression->type) {
+	case IR_EXPRESSION_TYPE_BINARY:
+		node = node_from_binary_expression(
+			ir_expression->binary_expression);
+		break;
+	case IR_EXPRESSION_TYPE_NOT:
+		node = node_from_not_expression(ir_expression->not_expression);
+		break;
+	case IR_EXPRESSION_TYPE_NEGATE:
+		node = node_from_negate_expression(
+			ir_expression->negate_expression);
+		break;
+	case IR_EXPRESSION_TYPE_LEN:
+		node = node_from_len_identifier(ir_expression->len_identifier);
+		break;
+	case IR_EXPRESSION_TYPE_METHOD_CALL:
+		node = node_from_method_call(ir_expression->method_call);
+		break;
+	case IR_EXPRESSION_TYPE_LITERAL:
+		node = node_from_literal(ir_expression->literal);
+		break;
+	case IR_EXPRESSION_TYPE_LOCATION:
+		node = node_from_location(ir_expression->location);
+		break;
+	default:
+		g_assert(!"you fucked up");
+		break;
+	}
+
+	return node;
 }
 
 static struct llir_node *
