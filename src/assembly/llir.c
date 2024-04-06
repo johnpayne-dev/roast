@@ -25,12 +25,6 @@ struct llir_node *llir_node_new(enum llir_node_type type, void *data)
 	case LLIR_NODE_TYPE_INDEXED_ASSIGNMENT:
 		node->indexed_assignment = data;
 		break;
-	case LLIR_NODE_TYPE_INCREMENT:
-		node->increment = data;
-		break;
-	case LLIR_NODE_TYPE_DECREMENT:
-		node->decrement = data;
-		break;
 	case LLIR_NODE_TYPE_BINARY_OPERATION:
 		node->binary_operation = data;
 		break;
@@ -398,38 +392,187 @@ nodes_from_expression(struct ir_expression *ir_expression)
 }
 
 static struct llir_node *
-nodes_from_assignment(struct ir_assignment *ir_assignment)
+nodes_from_compound_assignment(struct ir_assignment *ir_assignment)
 {
-	g_assert(!"TODO");
-	return NULL;
+	static enum llir_binary_operation_type BINARY_OPERATORS[] = {
+		[IR_ASSIGN_OPERATOR_ADD] = LLIR_BINARY_OPERATION_TYPE_ADD,
+		[IR_ASSIGN_OPERATOR_SUB] = LLIR_BINARY_OPERATION_TYPE_SUB,
+		[IR_ASSIGN_OPERATOR_MUL] = LLIR_BINARY_OPERATION_TYPE_MUL,
+		[IR_ASSIGN_OPERATOR_DIV] = LLIR_BINARY_OPERATION_TYPE_DIV,
+		[IR_ASSIGN_OPERATOR_MOD] = LLIR_BINARY_OPERATION_TYPE_MOD,
+	};
+
+	char *right = last_temporary_variable();
+
+	struct llir_node *head = nodes_from_location(ir_assignment->location);
+	struct llir_node *node = head;
+
+	char *left = last_temporary_variable();
+
+	char *result = next_temporary_variable();
+	struct llir_binary_operation *binary = llir_binary_operation_new(
+		result, BINARY_OPERATORS[ir_assignment->assign_operator], left,
+		right);
+	append_nodes(&node,
+		     llir_node_new(LLIR_NODE_TYPE_BINARY_OPERATION, binary));
+
+	g_free(left);
+	g_free(right);
+	g_free(result);
+	return head;
 }
 
 static struct llir_node *
-nodes_from_method_call_statement(struct ir_method_call *ir_method_call)
+nodes_from_increment_assignment(struct ir_assignment *ir_assignment)
 {
-	g_assert(!"TODO");
-	return NULL;
+	static enum llir_binary_operation_type INCREMENT_OPERATORS[] = {
+		[IR_ASSIGN_OPERATOR_INCREMENT] = LLIR_BINARY_OPERATION_TYPE_ADD,
+		[IR_ASSIGN_OPERATOR_DECREMENT] = LLIR_BINARY_OPERATION_TYPE_SUB,
+	};
+
+	struct llir_node *head = nodes_from_location(ir_assignment->location);
+	struct llir_node *node = head;
+
+	char *left = last_temporary_variable();
+	char *right = next_temporary_variable();
+
+	struct llir_literal_assignment *literal =
+		llir_literal_assignment_new(right, 1);
+	append_nodes(&node,
+		     llir_node_new(LLIR_NODE_TYPE_LITERAL_ASSIGNMENT, literal));
+
+	char *result = next_temporary_variable();
+	struct llir_binary_operation *binary = llir_binary_operation_new(
+		result, INCREMENT_OPERATORS[ir_assignment->assign_operator],
+		left, right);
+	append_nodes(&node,
+		     llir_node_new(LLIR_NODE_TYPE_BINARY_OPERATION, binary));
+
+	g_free(left);
+	g_free(right);
+	g_free(result);
+	return head;
+}
+
+static struct llir_node *
+nodes_from_assignment(struct ir_assignment *ir_assignment)
+{
+	struct llir_node *head = NULL;
+	if (ir_assignment->expression == NULL)
+		head = nodes_from_increment_assignment(ir_assignment);
+	else
+		head = nodes_from_expression(ir_assignment->expression);
+
+	struct llir_node *node = head;
+
+	if (ir_assignment->assign_operator != IR_ASSIGN_OPERATOR_SET &&
+	    ir_assignment->assign_operator != IR_ASSIGN_OPERATOR_DECREMENT &&
+	    ir_assignment->assign_operator != IR_ASSIGN_OPERATOR_INCREMENT)
+		append_nodes(&node,
+			     nodes_from_compound_assignment(ir_assignment));
+
+	char *destination = ir_assignment->location->identifier;
+	char *source = last_temporary_variable();
+
+	if (ir_assignment->location->index != NULL) {
+		append_nodes(&node, nodes_from_expression(
+					    ir_assignment->location->index));
+		char *index = last_temporary_variable();
+
+		struct llir_indexed_assignment *assignment =
+			llir_indexed_assignment_new(destination, index, source);
+		append_nodes(&node,
+			     llir_node_new(LLIR_NODE_TYPE_INDEXED_ASSIGNMENT,
+					   assignment));
+
+		g_free(index);
+	} else {
+		struct llir_assignment *assignment =
+			llir_assignment_new(destination, source);
+		append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_ASSIGNMENT,
+						  assignment));
+	}
+
+	g_free(source);
+	return head;
 }
 
 static struct llir_node *
 nodes_from_if_statement(struct ir_if_statement *ir_if_statement)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_node *head =
+		nodes_from_expression(ir_if_statement->condition);
+	struct llir_node *node = head;
+
+	struct llir_branch *branch = llir_branch_new(peek_temporary_variable());
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
+	append_nodes(&node, llir_node_new_block(ir_if_statement->if_block));
+	branch->branch = node;
+
+	if (ir_if_statement->else_block != NULL)
+		append_nodes(&node,
+			     llir_node_new_block(ir_if_statement->else_block));
+
+	return head;
+}
+
+static struct llir_node *
+nodes_from_for_update(struct ir_for_update *ir_for_update)
+{
+	switch (ir_for_update->type) {
+	case IR_FOR_UPDATE_TYPE_ASSIGNMENT:
+		return nodes_from_assignment(ir_for_update->assignment);
+	case IR_FOR_UPDATE_TYPE_METHOD_CALL:
+		return nodes_from_method_call(ir_for_update->method_call);
+	default:
+		g_assert(!"you fucked up");
+		return NULL;
+	}
 }
 
 static struct llir_node *
 nodes_from_for_statement(struct ir_for_statement *ir_for_statement)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_node *head =
+		nodes_from_assignment(ir_for_statement->initial);
+	struct llir_node *node = head;
+
+	append_nodes(&node, nodes_from_expression(ir_for_statement->condition));
+	struct llir_node *loop_start = node;
+
+	char *condition = last_temporary_variable();
+	struct llir_branch *branch = llir_branch_new(condition);
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
+
+	append_nodes(&node, llir_node_new_block(ir_for_statement->block));
+	append_nodes(&node, nodes_from_for_update(ir_for_statement->update));
+
+	struct llir_jump *jump = llir_jump_new(loop_start);
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_JUMP, jump));
+
+	g_free(condition);
+	return head;
 }
 
 static struct llir_node *
 nodes_from_while_statement(struct ir_while_statement *ir_while_statement)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_node *head =
+		nodes_from_expression(ir_while_statement->condition);
+	struct llir_node *node = head;
+	struct llir_node *loop_start = node;
+
+	char *condition = last_temporary_variable();
+	struct llir_branch *branch = llir_branch_new(condition);
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
+
+	append_nodes(&node, llir_node_new_block(ir_while_statement->block));
+
+	struct llir_jump *jump = llir_jump_new(loop_start);
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_JUMP, jump));
+
+	g_free(condition);
+	return head;
 }
 
 static struct llir_node *nodes_from_break_statement(void)
@@ -442,6 +585,17 @@ static struct llir_node *nodes_from_continue_statement(void)
 {
 	g_assert(!"TODO");
 	return NULL;
+}
+
+static struct llir_node *
+nodes_from_return_statement(struct ir_expression *ir_expression)
+{
+	struct llir_node *head = nodes_from_expression(ir_expression);
+	struct llir_node *node = head;
+
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_RETURN, NULL));
+
+	return head;
 }
 
 struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement)
@@ -466,7 +620,8 @@ struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement)
 			ir_statement->while_statement);
 		break;
 	case IR_STATEMENT_TYPE_RETURN:
-		node = nodes_from_expression(ir_statement->return_expression);
+		node = nodes_from_return_statement(
+			ir_statement->return_expression);
 		break;
 	case IR_STATEMENT_TYPE_BREAK:
 		node = nodes_from_break_statement();
@@ -616,32 +771,6 @@ void llir_indexed_assignment_free(
 	g_free(indexed_assignment);
 }
 
-struct llir_increment *llir_increment_new(char *destination)
-{
-	struct llir_increment *increment = g_new(struct llir_increment, 1);
-	increment->destination = g_strdup(destination);
-	return increment;
-}
-
-void llir_increment_free(struct llir_increment *increment)
-{
-	g_free(increment->destination);
-	g_free(increment);
-}
-
-struct llir_decrement *llir_decrement_new(char *destination)
-{
-	struct llir_decrement *decrement = g_new(struct llir_decrement, 1);
-	decrement->destination = g_strdup(destination);
-	return decrement;
-}
-
-void llir_decrement_free(struct llir_decrement *decrement)
-{
-	g_free(decrement->destination);
-	g_free(decrement);
-}
-
 struct llir_binary_operation *
 llir_binary_operation_new(char *destination,
 			  enum llir_binary_operation_type operation, char *left,
@@ -752,4 +881,16 @@ void llir_branch_free(struct llir_branch *branch)
 {
 	g_free(branch->condition);
 	g_free(branch);
+}
+
+struct llir_jump *llir_jump_new(struct llir_node *branch)
+{
+	struct llir_jump *jump = g_new(struct llir_jump, 1);
+	jump->branch = branch;
+	return jump;
+}
+
+void llir_jump_free(struct llir_jump *jump)
+{
+	g_free(jump);
 }
