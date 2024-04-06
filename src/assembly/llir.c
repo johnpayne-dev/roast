@@ -185,6 +185,9 @@ nodes_from_expression(struct ir_expression *ir_expression)
 	case IR_EXPRESSION_TYPE_LOCATION:
 		node = node_from_location(ir_expression->location);
 		break;
+	default:
+		g_assert(!"you fucked up");
+		break;
 	}
 
 	return node;
