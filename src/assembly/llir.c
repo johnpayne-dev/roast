@@ -548,12 +548,13 @@ nodes_from_if_statement(struct ir_if_statement *ir_if_statement)
 {
 	struct llir_node *head =
 		nodes_from_expression(ir_if_statement->condition);
+	char *condition = last_temporary_variable();
 	struct llir_node *node = head;
 
 	struct llir_node *end_if_label =
 		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
 	struct llir_branch *branch =
-		llir_branch_new(peek_temporary_variable(), end_if_label);
+		llir_branch_new(condition, end_if_label);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
 	append_nodes(&node, llir_node_new_block(ir_if_statement->if_block));
 	append_nodes(&node, end_if_label);
@@ -568,6 +569,7 @@ nodes_from_if_statement(struct ir_if_statement *ir_if_statement)
 		append_nodes(&node, end_else_label);
 	}
 
+	g_free(condition);
 	return head;
 }
 
