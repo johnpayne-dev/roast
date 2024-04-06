@@ -1013,3 +1013,60 @@ void llir_jump_free(struct llir_jump *jump)
 {
 	g_free(jump);
 }
+
+static const char *LLIR_NODE_TYPE_TO_STRING[] = {
+	[LLIR_NODE_TYPE_PROGRAM] = "program",
+	[LLIR_NODE_TYPE_IMPORT] = "import",
+	[LLIR_NODE_TYPE_FIELD] = "field",
+	[LLIR_NODE_TYPE_METHOD] = "method",
+	[LLIR_NODE_TYPE_BLOCK_START] = "block_start",
+	[LLIR_NODE_TYPE_ASSIGNMENT] = "assignment",
+	[LLIR_NODE_TYPE_LITERAL_ASSIGNMENT] = "literal_assignment",
+	[LLIR_NODE_TYPE_INDEXED_ASSIGNMENT] = "indexed_assignment",
+	[LLIR_NODE_TYPE_BINARY_OPERATION] = "binary_operation",
+	[LLIR_NODE_TYPE_UNARY_OPERATION] = "unary_operation",
+	[LLIR_NODE_TYPE_METHOD_CALL] = "method_call",
+	[LLIR_NODE_TYPE_ARRAY_INDEX] = "array_index",
+	[LLIR_NODE_TYPE_BRANCH] = "branch",
+	[LLIR_NODE_TYPE_JUMP] = "jump",
+	[LLIR_NODE_TYPE_RETURN] = "return",
+	[LLIR_NODE_TYPE_BLOCK_END] = "block_end",
+	[LLIR_NODE_TYPE_PROGRAM_END] = "program_end",
+};
+
+void llir_node_print(struct llir_node *node)
+{
+	g_assert(0 <= node->type &&
+		 node->type < G_N_ELEMENTS(LLIR_NODE_TYPE_TO_STRING));
+	g_printf("%s\n", LLIR_NODE_TYPE_TO_STRING[node->type]);
+
+	switch (node->type) {
+	case LLIR_NODE_TYPE_IMPORT:
+		break;
+	case LLIR_NODE_TYPE_FIELD:
+		break;
+	case LLIR_NODE_TYPE_METHOD:
+		break;
+	case LLIR_NODE_TYPE_ASSIGNMENT:
+		break;
+	case LLIR_NODE_TYPE_LITERAL_ASSIGNMENT:
+		break;
+	case LLIR_NODE_TYPE_INDEXED_ASSIGNMENT:
+		break;
+	case LLIR_NODE_TYPE_BINARY_OPERATION:
+		break;
+	case LLIR_NODE_TYPE_UNARY_OPERATION:
+		break;
+	case LLIR_NODE_TYPE_METHOD_CALL:
+		break;
+	case LLIR_NODE_TYPE_ARRAY_INDEX:
+		break;
+	case LLIR_NODE_TYPE_BRANCH:
+		break;
+	default:
+		break;
+	}
+
+	if (node->next != NULL)
+		llir_node_print(node->next);
+}

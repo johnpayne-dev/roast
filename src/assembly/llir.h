@@ -1,6 +1,7 @@
 #pragma once
 #include "semantics/ir.h"
 #include "assembly/temporary_variables.h"
+#include <glib/gprintf.h>
 
 enum llir_node_type {
 	LLIR_NODE_TYPE_PROGRAM,
@@ -198,3 +199,5 @@ struct llir_jump {
 
 struct llir_jump *llir_jump_new(struct llir_node *label);
 void llir_jump_free(struct llir_jump *jump);
+
+void llir_node_print(struct llir_node *node);
