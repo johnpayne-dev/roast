@@ -138,10 +138,48 @@ struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 }
 
 static struct llir_node *
+nodes_from_expression(struct ir_expression *ir_expression);
+
+static const enum llir_binary_operation_type IR_TO_LLIR_BIN_OPS[] = {
+	[IR_BINARY_OPERATOR_OR] = LLIR_BINARY_OPERATION_TYPE_OR,
+	[IR_BINARY_OPERATOR_AND] = LLIR_BINARY_OPERATION_TYPE_AND,
+	[IR_BINARY_OPERATOR_EQUAL] = LLIR_BINARY_OPERATION_TYPE_EQUAL,
+	[IR_BINARY_OPERATOR_NOT_EQUAL] = LLIR_BINARY_OPERATION_TYPE_NOT_EQUAL,
+	[IR_BINARY_OPERATOR_LESS] = LLIR_BINARY_OPERATION_TYPE_LESS,
+	[IR_BINARY_OPERATOR_LESS_EQUAL] = LLIR_BINARY_OPERATION_TYPE_LESS_EQUAL,
+	[IR_BINARY_OPERATOR_GREATER_EQUAL] =
+		LLIR_BINARY_OPERATION_TYPE_GREATER_EQUAL,
+	[IR_BINARY_OPERATOR_GREATER] = LLIR_BINARY_OPERATION_TYPE_GREATER,
+	[IR_BINARY_OPERATOR_ADD] = LLIR_BINARY_OPERATION_TYPE_ADD,
+	[IR_BINARY_OPERATOR_SUB] = LLIR_BINARY_OPERATION_TYPE_SUB,
+	[IR_BINARY_OPERATOR_MUL] = LLIR_BINARY_OPERATION_TYPE_MUL,
+	[IR_BINARY_OPERATOR_DIV] = LLIR_BINARY_OPERATION_TYPE_DIV,
+	[IR_BINARY_OPERATOR_MOD] = LLIR_BINARY_OPERATION_TYPE_MOD,
+};
+
+static struct llir_node *
 nodes_from_binary_expression(struct ir_binary_expression *binary_expression)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_node *head_node =
+		nodes_from_expression(binary_expression->left);
+	char *left_operand = last_temporary_variable();
+
+	struct llir_node *node = head_node;
+
+	append_nodes(&node, nodes_from_expression(binary_expression->right));
+	char *right_operand = last_temporary_variable;
+
+	struct llir_node *binary_operation_node = g_new(struct llir_node, 1);
+
+	binary_operation_node->type = LLIR_NODE_TYPE_BINARY_OPERATION;
+	binary_operation_node->binary_operation = llir_binary_operation_new(
+		next_temporary_variable(),
+		IR_TO_LLIR_BIN_OPS[binary_expression->binary_operator],
+		left_operand, right_operand);
+
+	node->next = binary_operation_node;
+
+	return head_node;
 }
 
 static struct llir_node *
