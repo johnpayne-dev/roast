@@ -405,7 +405,8 @@ void llir_assignment_free(struct llir_assignment *assignment)
 struct llir_literal_assignment *llir_literal_assignment_new(char *destination,
 							    int64_t literal)
 {
-	struct llir_literal_assignment *assignment = g_new(struct llir_literal_assignment, 1);
+	struct llir_literal_assignment *assignment =
+		g_new(struct llir_literal_assignment, 1);
 	assignment->destination = g_strdup(destination);
 	assignment->literal = literal;
 	return assignment;
@@ -421,7 +422,8 @@ void llir_literal_assignment_free(
 struct llir_indexed_assignment *
 llir_indexed_assignment_new(char *destination, char *index, char *source)
 {
-	struct llir_indexed_assignment *assignment = g_new(struct llir_indexed_assignment, 1);
+	struct llir_indexed_assignment *assignment =
+		g_new(struct llir_indexed_assignment, 1);
 	assignment->destination = g_strdup(destination);
 	assignment->index = g_strdup(index);
 	assignment->source = g_strdup(source);
