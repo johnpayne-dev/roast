@@ -32,8 +32,6 @@ struct llir_node {
 		struct llir_assignment *assignment;
 		struct llir_literal_assignment *literal_assignment;
 		struct llir_indexed_assignment *indexed_assignment;
-		struct llir_increment *increment;
-		struct llir_decrement *decrement;
 		struct llir_binary_operation *binary_operation;
 		struct llir_unary_operation *unary_operation;
 		struct llir_method_call *method_call;
