@@ -5,7 +5,7 @@
 #include "scanner/scanner.h"
 #include "parser/parser.h"
 #include "semantics/semantics.h"
-#include "assembly/llir.h"
+#include "assembly/assembly.h"
 
 struct options {
 	char *target;
@@ -152,14 +152,13 @@ static int run_assembly_target(char *file_name, char *source)
 	if (run_intermediate_target(file_name, source, &ir) != 0)
 		return -1;
 
-	struct llir_node *llir = llir_node_new_program(ir);
-	llir_node_print(llir);
-	llir_node_free(llir);
+	struct code_generator *generator = code_generator_new();
 	
-	return 0;
+	int result = code_generator_generate(generator, ir);
 
-	//g_printerr("assembly target not implemented yet.\n");
-	//return -1;
+	code_generator_free(generator);
+	ir_program_free(ir);
+	return result;
 }
 
 static int run_target(char *target, char *file_name, char *source)
@@ -172,7 +171,7 @@ static int run_target(char *target, char *file_name, char *source)
 	if (g_strcmp0(target, "parse") == 0)
 		return run_parse_target(file_name, source, NULL);
 	if (g_strcmp0(target, "inter") == 0)
-		return run_assembly_target(file_name, source);
+		return run_intermediate_target(file_name, source, NULL);
 	if (g_strcmp0(target, "assembly") == 0)
 		return run_assembly_target(file_name, source);
 
