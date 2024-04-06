@@ -113,33 +113,47 @@ struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 static struct llir_node *
 nodes_from_binary_expression(struct ir_binary_expression *binary_expression)
 {
+	g_assert(!"TODO");
+	return NULL;
 }
 
 static struct llir_node *
 nodes_from_not_expression(struct ir_expression *not_expression)
 {
+	g_assert(!"TODO");
+	return NULL;
 }
 
 static struct llir_node *
 nodes_from_negate_expression(struct ir_expression *negate_expression)
 {
+	g_assert(!"TODO");
+	return NULL;
 }
 
 static struct llir_node *nodes_from_len_identifier(char *len_identifier)
 {
+	g_assert(!"TODO");
+	return NULL;
 }
 
 static struct llir_node *
 nodes_from_method_call(struct ir_method_call *method_call)
 {
+	g_assert(!"TODO");
+	return NULL;
 }
 
 static struct llir_node *nodes_from_literal(struct ir_literal *literal)
 {
+	g_assert(!"TODO");
+	return NULL;
 }
 
 static struct llir_node *nodes_from_location(struct ir_location *location)
 {
+	g_assert(!"TODO");
+	return NULL;
 }
 
 static struct llir_node *
