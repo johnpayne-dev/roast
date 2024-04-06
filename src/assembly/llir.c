@@ -260,7 +260,7 @@ nodes_from_not_expression(struct ir_expression *not_expression)
 static struct llir_node *
 nodes_from_negate_expression(struct ir_expression *negate_expression)
 {
-	g_assert(negate_expression->type == LLIR_UNARY_OPERATION_TYPE_NEGATE);
+	g_assert(negate_expression->type == IR_EXPRESSION_TYPE_NEGATE);
 
 	struct llir_node *head_node =
 		nodes_from_expression(negate_expression->negate_expression);
@@ -420,11 +420,10 @@ nodes_from_expression(struct ir_expression *ir_expression)
 			ir_expression->binary_expression);
 		break;
 	case IR_EXPRESSION_TYPE_NOT:
-		node = nodes_from_not_expression(ir_expression->not_expression);
+		node = nodes_from_not_expression(ir_expression);
 		break;
 	case IR_EXPRESSION_TYPE_NEGATE:
-		node = nodes_from_negate_expression(
-			ir_expression->negate_expression);
+		node = nodes_from_negate_expression(ir_expression);
 		break;
 	case IR_EXPRESSION_TYPE_LEN:
 		node = nodes_from_len_identifier(
