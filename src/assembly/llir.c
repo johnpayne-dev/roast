@@ -186,7 +186,7 @@ nodes_from_binary_expression(struct ir_binary_expression *binary_expression)
 	g_free(right_operand);
 	g_free(destination);
 
-	node->next = binary_operation_node;
+	append_nodes(&node, binary_operation_node);
 
 	return head_node;
 }
@@ -200,8 +200,6 @@ nodes_from_not_expression(struct ir_expression *not_expression)
 		nodes_from_expression(not_expression->not_expression);
 	char *source = last_temporary_variable();
 
-	struct llir_node *node = head_node;
-
 	char *destination = next_temporary_variable();
 
 	struct llir_node *not_node = llir_node_new(
@@ -212,7 +210,9 @@ nodes_from_not_expression(struct ir_expression *not_expression)
 	g_free(source);
 	g_free(destination);
 
-	node->next = not_node;
+	struct llir_node *node = head_node;
+
+	append_nodes(&node, not_node);
 
 	return head_node;
 }
@@ -226,8 +226,6 @@ nodes_from_negate_expression(struct ir_expression *negate_expression)
 		nodes_from_expression(negate_expression->negate_expression);
 	char *source = last_temporary_variable();
 
-	struct llir_node *node = head_node;
-
 	char *destination = next_temporary_variable();
 
 	struct llir_node *negate_node = llir_node_new(
@@ -238,7 +236,9 @@ nodes_from_negate_expression(struct ir_expression *negate_expression)
 	g_free(source);
 	g_free(destination);
 
-	node->next = negate_node;
+	struct llir_node *node = head_node;
+
+	append_nodes(&node, negate_node);
 
 	return head_node;
 }
@@ -352,7 +352,11 @@ static struct llir_node *nodes_from_location(struct ir_location *location)
 	g_free(index);
 	g_free(destination);
 
-	return location_node;
+	struct llir_node *node = head_node;
+
+	append_nodes(&node, location_node);
+
+	return head_node;
 }
 
 static struct llir_node *
