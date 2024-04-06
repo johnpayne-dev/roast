@@ -553,8 +553,7 @@ nodes_from_if_statement(struct ir_if_statement *ir_if_statement)
 
 	struct llir_node *end_if_label =
 		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
-	struct llir_branch *branch =
-		llir_branch_new(condition, end_if_label);
+	struct llir_branch *branch = llir_branch_new(condition, end_if_label);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
 	append_nodes(&node, llir_node_new_block(ir_if_statement->if_block));
 	append_nodes(&node, end_if_label);
@@ -1027,6 +1026,7 @@ static const char *LLIR_NODE_TYPE_TO_STRING[] = {
 	[LLIR_NODE_TYPE_UNARY_OPERATION] = "unary_operation",
 	[LLIR_NODE_TYPE_METHOD_CALL] = "method_call",
 	[LLIR_NODE_TYPE_ARRAY_INDEX] = "array_index",
+	[LLIR_NODE_TYPE_LABEL] = "label",
 	[LLIR_NODE_TYPE_BRANCH] = "branch",
 	[LLIR_NODE_TYPE_JUMP] = "jump",
 	[LLIR_NODE_TYPE_RETURN] = "return",
