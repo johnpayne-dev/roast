@@ -679,6 +679,8 @@ void llir_node_free(struct llir_node *node)
 
 	if (node->next != NULL)
 		llir_node_free(node->next);
+
+	g_free(node);
 }
 
 struct llir_import *llir_import_new(struct ir_method *ir_method)
