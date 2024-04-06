@@ -470,59 +470,106 @@ llir_binary_operation_new(char *destination,
 			  enum llir_binary_operation_type operation, char *left,
 			  char *right)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_binary_operation *binary_operation =
+		g_new(struct llir_binary_operation, 1);
+
+	binary_operation->destination = g_strdup(destination);
+	binary_operation->operation = operation;
+	binary_operation->left_operand = g_strdup(left);
+	binary_operation->right_operand = g_strdup(right);
+
+	return binary_operation;
 }
 
 void llir_binary_operation_free(struct llir_binary_operation *binary_operation)
 {
-	g_assert(!"TODO");
+	g_free(binary_operation->destination);
+	g_free(binary_operation->left_operand);
+	g_free(binary_operation->right_operand);
+	g_free(binary_operation);
 }
 
 struct llir_unary_operation *
 llir_unary_operation_new(char *destination,
 			 enum llir_unary_operation_type operation, char *source)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_unary_operation *unary_operation =
+		g_new(struct llir_binary_operation, 1);
+
+	unary_operation->destination = g_strdup(destination);
+	unary_operation->operation = operation;
+	unary_operation->source = g_strdup(source);
+
+	return unary_operation;
 }
 
 void llir_unary_operation_free(struct llir_unary_operation *unary_operation)
 {
-	g_assert(!"TODO");
+	g_free(unary_operation->destination);
+	g_free(unary_operation->source);
+	g_free(unary_operation);
 }
 
 struct llir_method_call *llir_method_call_new(char *destination, char *method,
 					      GArray *arguments)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_method_call *method_call =
+		g_new(struct llir_method_call, 1);
+
+	method_call->destination = g_strdup(destination);
+	method_call->identifier = g_strdup(method);
+
+	for (uint32_t i = 0; i < arguments->len; i++) {
+		struct llir_method_call_argument method_call_argument =
+			g_array_index(arguments,
+				      struct llir_method_call_argument, i);
+		g_array_append_val(method_call->arguments,
+				   method_call_argument);
+	}
+
+	return method_call;
 }
 
 void llir_method_call_free(struct llir_method_call *method_call)
 {
-	g_assert(!"TODO");
+	g_free(method_call->destination);
+	g_free(method_call->identifier);
+	g_free(method_call);
 }
 
 struct llir_array_index *llir_array_index_new(char *destination, char *source,
 					      char *index)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_array_index *array_index =
+		g_new(struct llir_array_index, 1);
+
+	array_index->destination = g_strdup(destination);
+	array_index->source = g_strdup(source);
+	array_index->index = g_strdup(index);
+
+	return array_index;
 }
 
 void llir_array_index_free(struct llir_array_index *array_index)
 {
-	g_assert(!"TODO");
+	g_free(array_index->destination);
+	g_free(array_index->source);
+	g_free(array_index->index);
+	g_free(array_index);
 }
 
 struct llir_branch *llir_branch_new(char *condition)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_branch *branch = g_new(struct llir_branch, 1);
+
+	branch->condition = g_strdup(condition);
+	branch->branch = NULL;
+
+	return condition;
 }
 
 void llir_branch_free(struct llir_branch *branch)
 {
-	g_assert(!"TODO");
+	g_free(branch->condition);
+	g_free(branch);
 }
