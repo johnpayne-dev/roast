@@ -190,27 +190,27 @@ nodes_from_expression(struct ir_expression *ir_expression)
 
 	switch (ir_expression->type) {
 	case IR_EXPRESSION_TYPE_BINARY:
-		node = node_from_binary_expression(
+		node = nodes_from_binary_expression(
 			ir_expression->binary_expression);
 		break;
 	case IR_EXPRESSION_TYPE_NOT:
-		node = node_from_not_expression(ir_expression->not_expression);
+		node = nodes_from_not_expression(ir_expression->not_expression);
 		break;
 	case IR_EXPRESSION_TYPE_NEGATE:
-		node = node_from_negate_expression(
+		node = nodes_from_negate_expression(
 			ir_expression->negate_expression);
 		break;
 	case IR_EXPRESSION_TYPE_LEN:
-		node = node_from_len_identifier(ir_expression->len_identifier);
+		node = nodes_from_len_identifier(ir_expression->len_identifier);
 		break;
 	case IR_EXPRESSION_TYPE_METHOD_CALL:
-		node = node_from_method_call(ir_expression->method_call);
+		node = nodes_from_method_call(ir_expression->method_call);
 		break;
 	case IR_EXPRESSION_TYPE_LITERAL:
-		node = node_from_literal(ir_expression->literal);
+		node = nodes_from_literal(ir_expression->literal);
 		break;
 	case IR_EXPRESSION_TYPE_LOCATION:
-		node = node_from_location(ir_expression->location);
+		node = nodes_from_location(ir_expression->location);
 		break;
 	default:
 		g_assert(!"you fucked up");
@@ -228,7 +228,7 @@ nodes_from_assignment(struct ir_assignment *ir_assignment)
 }
 
 static struct llir_node *
-nodes_from_method_call(struct ir_method_call *ir_method_call)
+nodes_from_method_call_statement(struct ir_method_call *ir_method_call)
 {
 	g_assert(!"TODO");
 	return NULL;
@@ -389,61 +389,80 @@ void llir_method_free(struct llir_method *method)
 
 struct llir_assignment *llir_assignment_new(char *destination, char *source)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_assignment *assignment = g_new(struct llir_assignment, 1);
+	assignment->destination = g_strdup(destination);
+	assignment->source = g_strdup(source);
+	return assignment;
 }
 
 void llir_assignment_free(struct llir_assignment *assignment)
 {
-	g_assert(!"TODO");
+	g_free(assignment->destination);
+	g_free(assignment->source);
+	g_free(assignment);
 }
 
 struct llir_literal_assignment *llir_literal_assignment_new(char *destination,
 							    int64_t literal)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_literal_assignment *assignment =
+		g_new(struct llir_literal_assignment, 1);
+	assignment->destination = g_strdup(destination);
+	assignment->literal = literal;
+	return assignment;
 }
 
 void llir_literal_assignment_free(
 	struct llir_literal_assignment *literal_assignment)
 {
-	g_assert(!"TODO");
+	g_free(literal_assignment->destination);
+	g_free(literal_assignment);
 }
 
 struct llir_indexed_assignment *
 llir_indexed_assignment_new(char *destination, char *index, char *source)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_indexed_assignment *assignment =
+		g_new(struct llir_indexed_assignment, 1);
+	assignment->destination = g_strdup(destination);
+	assignment->index = g_strdup(index);
+	assignment->source = g_strdup(source);
+	return assignment;
 }
 
 void llir_indexed_assignment_free(
 	struct llir_indexed_assignment *indexed_assignment)
 {
-	g_assert(!"TODO");
+	g_free(indexed_assignment->destination);
+	g_free(indexed_assignment->index);
+	g_free(indexed_assignment->source);
+	g_free(indexed_assignment);
 }
 
 struct llir_increment *llir_increment_new(char *destination)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_increment *increment = g_new(struct llir_increment, 1);
+	increment->destination = g_strdup(destination);
+	return increment;
 }
 
 void llir_increment_free(struct llir_increment *increment)
 {
-	g_assert(!"TODO");
+	g_free(increment->destination);
+	g_free(increment);
 }
 
 struct llir_decrement *llir_decrement_new(char *destination)
 {
-	g_assert(!"TODO");
-	return NULL;
+	struct llir_decrement *decrement = g_new(struct llir_decrement, 1);
+	decrement->destination = g_strdup(destination);
+	return decrement;
 }
 
 void llir_decrement_free(struct llir_decrement *decrement)
 {
-	g_assert(!"TODO");
+	g_free(decrement->destination);
+	g_free(decrement);
 }
 
 struct llir_binary_operation *

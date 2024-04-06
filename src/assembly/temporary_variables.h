@@ -2,6 +2,6 @@
 #include <stdint.h>
 #include <glib.h>
 
-char *peek_temporary_variable();
+char *peek_temporary_variable(void);
 
-char *next_temporary_variable();
+char *next_temporary_variable(void);

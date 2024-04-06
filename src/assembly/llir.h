@@ -167,7 +167,7 @@ void llir_unary_operation_free(struct llir_unary_operation *unary_operation);
 
 struct llir_method_call {
 	char *destination;
-	char *method;
+	char *identifier;
 	GArray *arguments;
 };
 
