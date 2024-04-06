@@ -587,6 +587,17 @@ static struct llir_node *nodes_from_continue_statement(void)
 	return NULL;
 }
 
+static struct llir_node *
+nodes_from_return_statement(struct ir_expression *ir_expression)
+{
+	struct llir_node *head = nodes_from_expression(ir_expression);
+	struct llir_node *node = head;
+
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_RETURN, NULL));
+
+	return head;
+}
+
 struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement)
 {
 	struct llir_node *node = NULL;
@@ -609,7 +620,8 @@ struct llir_node *llir_node_new_instructions(struct ir_statement *ir_statement)
 			ir_statement->while_statement);
 		break;
 	case IR_STATEMENT_TYPE_RETURN:
-		node = nodes_from_expression(ir_statement->return_expression);
+		node = nodes_from_return_statement(
+			ir_statement->return_expression);
 		break;
 	case IR_STATEMENT_TYPE_BREAK:
 		node = nodes_from_break_statement();
