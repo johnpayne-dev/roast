@@ -16,8 +16,35 @@ struct llir_node *llir_node_new(enum llir_node_type type, void *data)
 	case LLIR_NODE_TYPE_METHOD:
 		node->method = data;
 		break;
-	case LLIR_NODE_TYPE_INSTRUCTION:
-		node->instruction = data;
+	case LLIR_NODE_TYPE_ASSIGNMENT:
+		node->assignment = data;
+		break;
+	case LLIR_NODE_TYPE_LITERAL_ASSIGNMENT:
+		node->literal_assignment = data;
+		break;
+	case LLIR_NODE_TYPE_INDEXED_ASSIGNMENT:
+		node->indexed_assignment = data;
+		break;
+	case LLIR_NODE_TYPE_INCREMENT:
+		node->increment = data;
+		break;
+	case LLIR_NODE_TYPE_DECREMENT:
+		node->decrement = data;
+		break;
+	case LLIR_NODE_TYPE_BINARY_OPERATION:
+		node->binary_operation = data;
+		break;
+	case LLIR_NODE_TYPE_UNARY_OPERATION:
+		node->unary_operation = data;
+		break;
+	case LLIR_NODE_TYPE_METHOD_CALL:
+		node->method_call = data;
+		break;
+	case LLIR_NODE_TYPE_ARRAY_INDEX:
+		node->array_index = data;
+		break;
+	case LLIR_NODE_TYPE_BRANCH:
+		node->branch = data;
 		break;
 	default:
 		node->import = NULL;
@@ -358,4 +385,125 @@ void llir_method_free(struct llir_method *method)
 	g_array_free(method->arguments, true);
 
 	g_free(method);
+}
+
+struct llir_assignment *llir_assignment_new(char *destination, char *source)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+void llir_assignment_free(struct llir_assignment *assignment)
+{
+	g_assert(!"TODO");
+}
+
+struct llir_literal_assignment *llir_literal_assignment_new(char *destination,
+							    int64_t literal)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+void llir_literal_assignment_free(
+	struct llir_literal_assignment *literal_assignment)
+{
+	g_assert(!"TODO");
+}
+
+struct llir_indexed_assignment *
+llir_indexed_assignment_new(char *destination, char *index, char *source)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+void llir_indexed_assignment_free(
+	struct llir_indexed_assignment *indexed_assignment)
+{
+	g_assert(!"TODO");
+}
+
+struct llir_increment *llir_increment_new(char *destination)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+void llir_increment_free(struct llir_increment *increment)
+{
+	g_assert(!"TODO");
+}
+
+struct llir_decrement *llir_decrement_new(char *destination)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+void llir_decrement_free(struct llir_decrement *decrement)
+{
+	g_assert(!"TODO");
+}
+
+struct llir_binary_operation *
+llir_binary_operation_new(char *destination,
+			  enum llir_binary_operation_type operation, char *left,
+			  char *right)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+void llir_binary_operation_free(struct llir_binary_operation *binary_operation)
+{
+	g_assert(!"TODO");
+}
+
+struct llir_unary_operation *
+llir_unary_operation_new(char *destination,
+			 enum llir_unary_operation_type operation, char *source)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+void llir_unary_operation_free(struct llir_unary_operation *unary_operation)
+{
+	g_assert(!"TODO");
+}
+
+struct llir_method_call *llir_method_call_new(char *destination, char *method,
+					      GArray *arguments)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+void llir_method_call_free(struct llir_method_call *method_call)
+{
+	g_assert(!"TODO");
+}
+
+struct llir_array_index *llir_array_index_new(char *destination, char *source,
+					      char *index)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+void llir_array_index_free(struct llir_array_index *array_index)
+{
+	g_assert(!"TODO");
+}
+
+struct llir_branch *llir_branch_new(char *condition)
+{
+	g_assert(!"TODO");
+	return NULL;
+}
+
+void llir_branch_free(struct llir_branch *branch)
+{
+	g_assert(!"TODO");
 }
