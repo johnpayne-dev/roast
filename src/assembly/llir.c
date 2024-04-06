@@ -494,7 +494,7 @@ llir_unary_operation_new(char *destination,
 			 enum llir_unary_operation_type operation, char *source)
 {
 	struct llir_unary_operation *unary_operation =
-		g_new(struct llir_binary_operation, 1);
+		g_new(struct llir_unary_operation, 1);
 
 	unary_operation->destination = g_strdup(destination);
 	unary_operation->operation = operation;
@@ -565,7 +565,7 @@ struct llir_branch *llir_branch_new(char *condition)
 	branch->condition = g_strdup(condition);
 	branch->branch = NULL;
 
-	return condition;
+	return branch;
 }
 
 void llir_branch_free(struct llir_branch *branch)
