@@ -368,11 +368,19 @@ static struct llir_node *nodes_from_literal(struct ir_literal *literal)
 {
 	char *destination = next_temporary_variable();
 
-	struct llir_node *literal_node = llir_node_new(
-		LLIR_NODE_TYPE_LITERAL_ASSIGNMENT,
-		llir_literal_assignment_new(
-			destination,
-			literal->value)); // TODO: NEGATIVE VALUES OR SMTH SHIT
+	const uint64_t MAX_INT32_MAGNITUDE = ((uint64_t)1)
+					     << 63; // what the fuck?
+
+	g_assert(literal->value <= MAX_INT32_MAGNITUDE);
+
+	bool actually_negate = literal->negate &&
+			       (literal->value != MAX_INT32_MAGNITUDE);
+
+	int64_t value = (int64_t)literal->value * (actually_negate ? -1 : 1);
+
+	struct llir_node *literal_node =
+		llir_node_new(LLIR_NODE_TYPE_LITERAL_ASSIGNMENT,
+			      llir_literal_assignment_new(destination, value));
 
 	g_free(destination);
 
@@ -1092,14 +1100,12 @@ void llir_node_print(struct llir_node *node)
 			node->literal_assignment->literal);
 		break;
 	case LLIR_NODE_TYPE_INDEXED_ASSIGNMENT:
-		g_print("%s[%s] = %s\n",
-			node->indexed_assignment->destination,
+		g_print("%s[%s] = %s\n", node->indexed_assignment->destination,
 			node->indexed_assignment->index,
 			node->indexed_assignment->source);
 		break;
 	case LLIR_NODE_TYPE_BINARY_OPERATION:
-		g_print("%s = %s %s %s\n",
-			node->binary_operation->destination,
+		g_print("%s = %s %s %s\n", node->binary_operation->destination,
 			node->binary_operation->left_operand,
 			OPERATOR_TO_STRING[node->binary_operation->operation],
 			node->binary_operation->right_operand);
