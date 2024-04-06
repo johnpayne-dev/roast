@@ -269,19 +269,23 @@ analyze_negate_expression(struct semantics *semantics,
 	return IR_DATA_TYPE_INT;
 }
 
-static enum ir_data_type analyze_len_expression(struct semantics *semantics,
-						char *identifier,
-						struct token token)
+static enum ir_data_type
+analyze_len_expression(struct semantics *semantics,
+		       struct ir_length_expression *length_expression,
+		       struct token token)
 {
-	struct ir_field *field =
-		get_field_declaration(semantics, identifier, token);
+	struct ir_field *field = get_field_declaration(
+		semantics, length_expression->identifier, token);
 	if (field == NULL)
 		return IR_DATA_TYPE_INT;
 
 	if (!ir_data_type_is_array(field->type))
 		semantic_error(semantics, token,
 			       "Cannot take len of non-array field '%s'",
-			       identifier);
+			       length_expression->identifier);
+
+	else
+		length_expression->length = field->array_length;
 
 	return IR_DATA_TYPE_INT;
 }
@@ -362,7 +366,7 @@ static enum ir_data_type analyze_expression(struct semantics *semantics,
 	switch (expression->type) {
 	case IR_EXPRESSION_TYPE_LEN:
 		return analyze_len_expression(semantics,
-					      expression->len_identifier,
+					      expression->length_expression,
 					      expression->token);
 	case IR_EXPRESSION_TYPE_NEGATE:
 		return analyze_negate_expression(semantics,

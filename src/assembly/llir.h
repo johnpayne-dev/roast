@@ -185,8 +185,8 @@ struct llir_method_call_argument {
 	};
 };
 
-struct llir_method_call *llir_method_call_new(char *destination, char *method,
-					      GArray *arguments);
+struct llir_method_call *
+llir_method_call_new(char *destination, char *indetifier, GArray *arguments);
 void llir_method_call_free(struct llir_method_call *method_call);
 
 struct llir_array_index {
