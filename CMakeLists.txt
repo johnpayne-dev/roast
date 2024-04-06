@@ -8,6 +8,8 @@ set(PROJECT_FILES
     src/main.c
     src/assembly/llir.c
     src/assembly/llir.h
+    src/assembly/temporary_variables.c
+    src/assembly/temporary_variables.h
     src/parser/ast.c
     src/parser/ast.h
     src/parser/parser.c
