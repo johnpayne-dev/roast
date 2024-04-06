@@ -6,6 +6,8 @@ project(roast)
 set(PROJECT_FILES
     README.md
     src/main.c
+    src/assembly/assembly.c
+    src/assembly/assembly.h
     src/assembly/llir.c
     src/assembly/llir.h
     src/assembly/temporary_variables.c
