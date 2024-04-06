@@ -1,7 +1,6 @@
 #pragma once
 #include "semantics/ir.h"
 #include "assembly/temporary_variables.h"
-#include <glib/gprintf.h>
 
 enum llir_node_type {
 	LLIR_NODE_TYPE_PROGRAM,
