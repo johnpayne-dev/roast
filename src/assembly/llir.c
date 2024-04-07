@@ -92,6 +92,9 @@ struct llir_node *llir_node_new(enum llir_node_type type, void *data)
 	case LLIR_NODE_TYPE_LABEL:
 		node->label = data;
 		break;
+	case LLIR_NODE_TYPE_RETURN:
+		node->llir_return = data;
+		break;
 	default:
 		node->import = NULL;
 		break;
@@ -152,6 +155,13 @@ struct llir_node *llir_node_new_method(struct ir_method *ir_method)
 	struct llir_node *node = head;
 
 	append_nodes(&node, llir_node_new_block(ir_method->block));
+
+	if (ir_method->return_type == IR_DATA_TYPE_VOID) {
+		struct llir_return *llir_return = llir_return_new(NULL);
+		append_nodes(&node,
+			     llir_node_new(LLIR_NODE_TYPE_RETURN, llir_return));
+	}
+
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_METHOD_END, NULL));
 
 	return head;
@@ -737,11 +747,19 @@ static struct llir_node *nodes_from_continue_statement(void)
 static struct llir_node *
 nodes_from_return_statement(struct ir_expression *ir_expression)
 {
+	if (ir_expression == NULL) {
+		struct llir_return *llir_return = llir_return_new(NULL);
+		return llir_node_new(LLIR_NODE_TYPE_RETURN, llir_return);
+	}
+
 	struct llir_node *head = nodes_from_expression(ir_expression);
 	struct llir_node *node = head;
+	char *source = last_temporary_variable();
 
-	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_RETURN, NULL));
+	struct llir_return *llir_return = llir_return_new(source);
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_RETURN, llir_return));
 
+	g_free(source);
 	return head;
 }
 
@@ -825,6 +843,9 @@ void llir_node_free(struct llir_node *node)
 		break;
 	case LLIR_NODE_TYPE_LABEL:
 		llir_label_free(node->label);
+		break;
+	case LLIR_NODE_TYPE_RETURN:
+		llir_return_free(node->llir_return);
 		break;
 	default:
 		break;
@@ -1103,6 +1124,19 @@ void llir_label_free(struct llir_label *label)
 	g_free(label);
 }
 
+struct llir_return *llir_return_new(char *source)
+{
+	struct llir_return *llir_return = g_new(struct llir_return, 1);
+	llir_return->source = source;
+	return llir_return;
+}
+
+void llir_return_free(struct llir_return *llir_return)
+{
+	g_free(llir_return->source);
+	g_free(llir_return);
+}
+
 static const char *LLIR_NODE_TYPE_TO_STRING[] = {
 	[LLIR_NODE_TYPE_PROGRAM] = "PROGRAM",
 	[LLIR_NODE_TYPE_IMPORT] = "IMPORT",
@@ -1206,6 +1240,11 @@ void llir_node_print(struct llir_node *node)
 		break;
 	case LLIR_NODE_TYPE_LABEL:
 		g_print("%s\n", node->label->name);
+		break;
+	case LLIR_NODE_TYPE_RETURN:
+		g_print("return");
+		g_print(node->llir_return->source == NULL ? "\n" : " %s\n",
+			node->llir_return->source);
 		break;
 	default:
 		g_print("%s\n", LLIR_NODE_TYPE_TO_STRING[node->type]);

@@ -268,7 +268,20 @@ static void generate_jump(struct code_generator *generator)
 
 static void generate_return(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_print("\t# generate_return\n");
+
+	struct llir_return *llir_return = generator->node->llir_return;
+	if (llir_return->source == NULL) {
+		g_print("\tmov $0, %%rax\n");
+	} else {
+		uint32_t offset =
+			get_field_offset(generator, llir_return->source);
+		g_print("\tmovq -%u(%%rbp), %%rax\n", offset);
+	}
+
+	g_print("\tmovq %%rbp, %%rsp\n");
+	g_print("\tpopq %%rbp\n");
+	g_print("\tret\n");
 }
 
 static void generate_block_end(struct code_generator *generator)
