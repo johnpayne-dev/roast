@@ -4,8 +4,8 @@ static const char *ARGUMENT_REGISTERS[] = { "rdi", "rsi", "rdx",
 					    "rcx", "r8",  "r9" };
 
 struct symbol_info {
-	int32_t offset;
-	int32_t size;
+	uint32_t offset;
+	uint32_t size;
 };
 
 static void push_scope(struct code_generator *generator)
@@ -23,8 +23,8 @@ static struct symbol_info *push_field(struct code_generator *generator,
 
 	struct symbol_info *info = g_new(struct symbol_info, 1);
 	info->offset = generator->stack_pointer;
-	info->size =
-		8 * (field->values->len + 1 + (field->values->len + 1) % 2);
+	info->size = 8 * (field->values->len + field->array +
+			  (field->values->len + field->array) % 2);
 	g_hash_table_insert(table, field->identifier, info);
 
 	generator->stack_pointer += info->size;
@@ -192,7 +192,24 @@ static void generate_block_start(struct code_generator *generator)
 
 static void generate_field(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_assert(generator->node->type == LLIR_NODE_TYPE_FIELD);
+
+	struct llir_field *field = generator->node->field;
+
+	struct symbol_info *symbol_info = push_field(generator, field);
+
+	g_print("\t# generate_field\n");
+	g_print("\tsubq $%u, %%rsp\n", symbol_info->size);
+	g_print("\tmovq $%lld, -%u(%%rbp)\n",
+		field->array ? field->values->len :
+			       g_array_index(field->values, int64_t, 0),
+		symbol_info->offset);
+
+	for (uint32_t i = 0; field->array && i < field->values->len; i++) {
+		g_print("\tmovq $%lld, -%u(%%rbp)\n",
+			g_array_index(field->values, int64_t, i),
+			(uint32_t)(8 * (i + 1)) + symbol_info->offset);
+	}
 }
 
 static void generate_assignment(struct code_generator *generator)
