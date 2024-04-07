@@ -2,7 +2,7 @@
 #include "assembly/llir.h"
 
 struct code_generator {
-	struct llir_node *llir;
+	struct llir_node *node;
 };
 
 struct code_generator *code_generator_new(void);
