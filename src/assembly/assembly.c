@@ -192,7 +192,28 @@ static void generate_block_start(struct code_generator *generator)
 
 static void generate_field(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_assert(generator->node->type == LLIR_NODE_TYPE_FIELD);
+
+	struct llir_field *field = generator->node->field;
+
+	// g_array_append_val(generator->fields, field->identifier);
+
+	uint32_t stack_amount = 16 + (field->array ?
+					      (field->values->len +
+					       (field->values->len % 2 == 1)) :
+					      0);
+
+	g_print("\t# generate_field");
+	g_print("\tsubq $%u, %%rsp\n", stack_amount);
+	g_print("\tmovq $%lld, %%rsp\n",
+		field->array ? field->values->len :
+			       g_array_index(field->values, int64_t, 0));
+
+	for (uint32_t i = 0; field->array && i < field->values->len; i++) {
+		g_print("\tmovq $%lld, -%u(%%rsp)\n",
+			g_array_index(field->values, int64_t, i),
+			(uint32_t)(8 * (i + 1)));
+	}
 }
 
 static void generate_assignment(struct code_generator *generator)
