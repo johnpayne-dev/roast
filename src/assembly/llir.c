@@ -1022,11 +1022,10 @@ void llir_method_call_free(struct llir_method_call *method_call)
 	g_free(method_call->identifier);
 
 	for (uint32_t i = 0; i < method_call->arguments->len; i++) {
-		struct llir_method_call_argument *method_call_argument =
+		struct llir_method_call_argument method_call_argument =
 			g_array_index(method_call->arguments,
-				      struct llir_method_call_argument *, i);
-		g_free(method_call_argument->identifier);
-		g_free(method_call_argument->string);
+				      struct llir_method_call_argument, i);
+		g_free(method_call_argument.string);
 	}
 	g_array_free(method_call->arguments, true);
 

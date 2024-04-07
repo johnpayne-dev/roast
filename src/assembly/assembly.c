@@ -6,12 +6,12 @@ static void generate_global_string(struct code_generator *generator,
 	if (g_hash_table_lookup(generator->strings, string) != 0)
 		return;
 
-	g_print("string_%i:\n", generator->string_counter);
+	g_print("string_%llu:\n", generator->string_counter);
 	g_print("\t.string %s\n", string);
 	g_print("\t.align 16\n");
 
 	g_hash_table_insert(generator->strings, string,
-			    generator->string_counter);
+			    (gpointer)generator->string_counter);
 	generator->string_counter++;
 }
 
@@ -42,14 +42,11 @@ static void generate_global_field(struct llir_field *field)
 {
 	uint64_t length = 8 * (field->array ? field->values->len + 1 : 1);
 
-	g_print("\t.comm %s, %llu, 16\n\t.align 16\n", field->identifier,
-		length);
+	g_print("\t.comm %s, %llu\n\t.align 16\n", field->identifier, length);
 }
 
 static void generate_global_fields(struct code_generator *generator)
 {
-	g_assert(generator->node->type == LLIR_NODE_TYPE_FIELD);
-
 	generator->global_fields_head_node = generator->node;
 
 	for (; generator->node->type == LLIR_NODE_TYPE_FIELD;
