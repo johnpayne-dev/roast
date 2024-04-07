@@ -82,7 +82,7 @@ static void generate_data_section(struct code_generator *generator)
 
 static void generate_text_section(struct code_generator *generator)
 {
-	g_print(".text\n.globl _main");
+	g_print(".text\n.globl _main\n");
 
 	for (; generator->node->next != NULL;
 	     generator->node = generator->node->next) {
@@ -130,7 +130,7 @@ static void generate_text_section(struct code_generator *generator)
 			generate_return(generator);
 			break;
 		case LLIR_NODE_TYPE_BLOCK_END:
-			g_assert(!"TODO figured out the fuck this does");
+			g_assert(!"TODO figure out the fuck this does");
 			break;
 		default:
 			g_assert(
