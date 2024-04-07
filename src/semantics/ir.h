@@ -226,7 +226,6 @@ struct ir_expression {
 		struct ir_binary_expression *binary_expression;
 		struct ir_expression *not_expression;
 		struct ir_expression *negate_expression;
-		// char *len_identifier;
 		struct ir_length_expression *length_expression;
 		struct ir_method_call *method_call;
 		struct ir_literal *literal;

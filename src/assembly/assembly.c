@@ -3,6 +3,9 @@
 static void generate_global_string(struct code_generator *generator,
 				   char *string)
 {
+	if (g_hash_table_lookup(generator->strings, string) != 0)
+		return;
+
 	g_print("string_%i:\n", generator->string_counter);
 	g_print("\t.string %s\n", string);
 	g_print("\t.align 16\n");
@@ -200,6 +203,10 @@ int code_generator_generate(struct code_generator *generator,
 	struct llir_node *head = llir_node_new_program(ir);
 	generator->node = head;
 	generator->strings = g_hash_table_new(g_str_hash, g_str_equal);
+	generator->string_counter = 1;
+
+	g_assert(generator->node->type == LLIR_NODE_TYPE_PROGRAM);
+	generator->node = generator->node->next;
 
 	while (generator->node->type == LLIR_NODE_TYPE_IMPORT)
 		generator->node = generator->node->next;

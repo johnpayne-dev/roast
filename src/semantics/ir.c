@@ -971,28 +971,7 @@ char *ir_string_literal_from_ast(struct ast_node **nodes)
 	struct ast_node *node = next_node(nodes);
 	g_assert(node->type == AST_NODE_TYPE_STRING_LITERAL);
 
-	char *token_string = token_get_string(&node->token);
-	g_assert(token_string[0] == '\"');
-
-	GString *string_literal = g_string_new(NULL);
-
-	for (char *c = &token_string[1]; *c != '\"'; ++c) {
-		if (*c == '\\') {
-			g_string_append_c(string_literal,
-					  handle_backslash_sequence(c));
-			++c;
-		} else {
-			g_string_append_c(string_literal, *c);
-		}
-	}
-
-	g_free(token_string);
-
-	char *char_data = string_literal->str;
-
-	g_string_free(string_literal, FALSE);
-
-	return char_data;
+	return token_get_string(&node->token);
 }
 
 char *ir_identifier_from_ast(struct ast_node **nodes)
