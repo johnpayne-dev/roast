@@ -20,7 +20,6 @@ enum llir_node_type {
 	LLIR_NODE_TYPE_JUMP,
 	LLIR_NODE_TYPE_RETURN,
 	LLIR_NODE_TYPE_BLOCK_END,
-	LLIR_NODE_TYPE_PROGRAM_END,
 };
 
 struct llir_node {
