@@ -4,8 +4,8 @@ static const char *ARGUMENT_REGISTERS[] = { "rdi", "rsi", "rdx",
 					    "rcx", "r8",  "r9" };
 
 struct symbol_info {
-	uint32_t offset;
-	uint32_t size;
+	int32_t offset;
+	int32_t size;
 };
 
 static void push_scope(struct code_generator *generator)
@@ -216,8 +216,8 @@ static void generate_field(struct code_generator *generator)
 	}
 }
 
-static uint32_t get_destination_offset(struct code_generator *generator,
-				       char *destination)
+static int32_t get_destination_offset(struct code_generator *generator,
+				      char *destination)
 {
 	g_assert(destination != NULL);
 
@@ -239,28 +239,42 @@ static void generate_assignment(struct code_generator *generator)
 
 	struct llir_assignment *assignment = generator->node->assignment;
 
-	uint32_t source_offset =
-		get_field_offset(generator, assignment->source);
+	int32_t source_offset = get_field_offset(generator, assignment->source);
 
-	uint32_t destination_offset =
+	int32_t destination_offset =
 		get_destination_offset(generator, assignment->destination);
 
-	g_print("\t# generate_field\n");
+	g_print("\t# generate_assignment\n");
 
 	if (source_offset == -1)
 		g_print("\tmov %s, %%r10\n", assignment->source);
 	else
-		g_print("\tmov -%u(%%rbp), %%r10\n", source_offset);
+		g_print("\tmov -%d(%%rbp), %%r10\n", source_offset);
 
 	if (destination_offset == -1)
 		g_print("\tmov %%r10, %s\n", assignment->destination);
 	else
-		g_print("\tmov %%r10, -%u(%%rbp)\n", destination_offset);
+		g_print("\tmov %%r10, -%d(%%rbp)\n", destination_offset);
 }
 
 static void generate_literal_assignment(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_assert(generator->node->type == LLIR_NODE_TYPE_LITERAL_ASSIGNMENT);
+
+	struct llir_literal_assignment *literal_assignment =
+		generator->node->literal_assignment;
+
+	int32_t destination_offset = get_destination_offset(
+		generator, literal_assignment->destination);
+
+	g_print("\t# generate_literal_assignment\n");
+
+	if (destination_offset == -1)
+		g_print("\tmov $%lld, %s\n", literal_assignment->literal,
+			literal_assignment->destination);
+	else
+		g_print("\tmov $%lld, -%u(%%rbp)\n",
+			literal_assignment->literal, destination_offset);
 }
 
 static void generate_indexed_assignment(struct code_generator *generator)
