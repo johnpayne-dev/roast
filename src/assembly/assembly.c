@@ -23,8 +23,8 @@ static struct symbol_info *push_field(struct code_generator *generator,
 
 	struct symbol_info *info = g_new(struct symbol_info, 1);
 	info->offset = generator->stack_pointer;
-	info->size =
-		8 * (field->values->len + 1 + (field->values->len + 1) % 2);
+	info->size = 8 * (field->values->len + field->array +
+			  (field->values->len + field->array) % 2);
 	g_hash_table_insert(table, field->identifier, info);
 
 	generator->stack_pointer += info->size;
@@ -196,15 +196,10 @@ static void generate_field(struct code_generator *generator)
 
 	struct llir_field *field = generator->node->field;
 
-	// g_array_append_val(generator->fields, field->identifier);
-
-	uint32_t stack_amount = 16 + (field->array ?
-					      (field->values->len +
-					       (field->values->len % 2 == 1)) :
-					      0);
+	struct symbol_info *symbol_info = push_field(generator, field);
 
 	g_print("\t# generate_field");
-	g_print("\tsubq $%u, 0(%%rsp)\n", stack_amount);
+	g_print("\tsubq $%u, 0(%%rsp)\n", symbol_info->size);
 	g_print("\tmovq $%lld, 0(%%rsp)\n",
 		field->array ? field->values->len :
 			       g_array_index(field->values, int64_t, 0));
