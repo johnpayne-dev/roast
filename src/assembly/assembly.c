@@ -216,9 +216,38 @@ static void generate_field(struct code_generator *generator)
 	}
 }
 
+static uint32_t get_destination_offset(struct code_generator *generator,
+				       char *destination)
+{
+	g_assert(destination != NULL);
+	return destination[0] == '$' ?
+		       push_field(generator, destination, 1)->offset :
+		       get_field_offset(generator, destination);
+}
+
 static void generate_assignment(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_assert(generator->node->type == LLIR_NODE_TYPE_ASSIGNMENT);
+
+	struct llir_assignment *assignment = generator->node->assignment;
+
+	uint32_t source_offset =
+		get_field_offset(generator, assignment->source);
+
+	uint32_t destination_offset =
+		get_destination_offset(generator, assignment->destination);
+
+	g_print("\t# generate_field\n");
+
+	if (source_offset == -1)
+		g_print("\tmov %s, %%r10\n", assignment->source);
+	else
+		g_print("\tmov -%u(%%rbp), %%r10\n", source_offset);
+
+	if (destination_offset == -1)
+		g_print("\tmov %%r10, %s\n", assignment->destination);
+	else
+		g_print("\tmov %%r10, -%u(%%rbp)\n", destination_offset);
 }
 
 static void generate_literal_assignment(struct code_generator *generator)
