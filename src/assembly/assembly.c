@@ -220,9 +220,17 @@ static uint32_t get_destination_offset(struct code_generator *generator,
 				       char *destination)
 {
 	g_assert(destination != NULL);
-	return destination[0] == '$' ?
-		       push_field(generator, destination, 1)->offset :
-		       get_field_offset(generator, destination);
+
+	if (destination[0] == '$') {
+		struct symbol_info *info =
+			push_field(generator, destination, 1);
+
+		g_print("\tsubq $%u, %%rsp", info->offset);
+
+		return info->offset;
+	}
+
+	return get_field_offset(generator, destination);
 }
 
 static void generate_assignment(struct code_generator *generator)
