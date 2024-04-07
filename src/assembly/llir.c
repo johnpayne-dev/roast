@@ -166,9 +166,8 @@ struct llir_node *llir_node_new_field(struct ir_field *ir_field)
 
 struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 {
-	struct llir_node *head_node = NULL;
-	llir_node_new(LLIR_NODE_TYPE_BLOCK, NULL);
-
+	struct llir_node *head_node =
+		llir_node_new(LLIR_NODE_TYPE_BLOCK_START, NULL);
 	struct llir_node *node = head_node;
 
 	for (uint32_t i = 0; i < ir_block->fields->len; i++) {
@@ -182,6 +181,8 @@ struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 					    ir_block->statements,
 					    struct ir_statement *, i)));
 	}
+
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BLOCK_END, NULL));
 
 	return head_node;
 }
@@ -1107,7 +1108,7 @@ static const char *LLIR_NODE_TYPE_TO_STRING[] = {
 	[LLIR_NODE_TYPE_IMPORT] = "IMPORT",
 	[LLIR_NODE_TYPE_FIELD] = "FIELD",
 	[LLIR_NODE_TYPE_METHOD_START] = "METHOD",
-	[LLIR_NODE_TYPE_BLOCK] = "BLOCK",
+	[LLIR_NODE_TYPE_BLOCK_START] = "BLOCK_START",
 	[LLIR_NODE_TYPE_ASSIGNMENT] = "ASSIGNMENT",
 	[LLIR_NODE_TYPE_LITERAL_ASSIGNMENT] = "LITERAL_ASSIGNMENT",
 	[LLIR_NODE_TYPE_INDEXED_ASSIGNMENT] = "INDEXED_ASSIGNMENT",
@@ -1119,6 +1120,7 @@ static const char *LLIR_NODE_TYPE_TO_STRING[] = {
 	[LLIR_NODE_TYPE_BRANCH] = "BRANCH",
 	[LLIR_NODE_TYPE_JUMP] = "JUMP",
 	[LLIR_NODE_TYPE_RETURN] = "RETURN",
+	[LLIR_NODE_TYPE_BLOCK_END] = "BLOCK_END",
 	[LLIR_NODE_TYPE_METHOD_END] = "METHOD_END",
 };
 

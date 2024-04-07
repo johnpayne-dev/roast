@@ -6,7 +6,8 @@ struct code_generator {
 	GHashTable *strings;
 	uint64_t string_counter;
 	struct llir_node *global_fields_head_node;
-	GArray *fields;
+	GArray *symbol_tables;
+	uint32_t stack_pointer;
 };
 
 struct code_generator *code_generator_new(void);

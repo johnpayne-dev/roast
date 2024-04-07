@@ -3,6 +3,73 @@
 static const char *ARGUMENT_REGISTERS[] = { "rdi", "rsi", "rdx",
 					    "rcx", "r8",  "r9" };
 
+struct symbol_info {
+	int32_t offset;
+	int32_t size;
+};
+
+static void push_scope(struct code_generator *generator)
+{
+	GHashTable *table = g_hash_table_new(g_str_hash, g_str_equal);
+	g_array_append_val(generator->symbol_tables, table);
+}
+
+static struct symbol_info *push_field(struct code_generator *generator,
+				      struct llir_field *field)
+{
+	GHashTable *table = g_array_index(generator->symbol_tables,
+					  GHashTable *,
+					  generator->symbol_tables->len - 1);
+
+	struct symbol_info *info = g_new(struct symbol_info, 1);
+	info->offset = generator->stack_pointer;
+	info->size =
+		8 * (field->values->len + 1 + (field->values->len + 1) % 2);
+	g_hash_table_insert(table, field->identifier, info);
+
+	generator->stack_pointer += info->size;
+	return info;
+}
+
+static int32_t get_field_offset(struct code_generator *generator,
+				char *identifier)
+{
+	for (int32_t i = generator->symbol_tables->len - 1; i >= 0; i--) {
+		GHashTable *table = g_array_index(generator->symbol_tables,
+						  GHashTable *, i);
+
+		struct symbol_info *info =
+			g_hash_table_lookup(table, identifier);
+		if (info != NULL)
+			return info->offset;
+	}
+
+	return -1;
+}
+
+static int32_t pop_scope(struct code_generator *generator)
+{
+	GHashTable *table = g_array_index(generator->symbol_tables,
+					  GHashTable *,
+					  generator->symbol_tables->len - 1);
+	GList *list = g_hash_table_get_values(table);
+
+	int32_t size = 0;
+	while (list != NULL) {
+		struct symbol_info *info = list->data;
+		size += info->size;
+		list = list->next;
+	}
+
+	generator->stack_pointer -= size;
+
+	g_list_free(list);
+	g_hash_table_unref(table);
+	g_array_remove_index(generator->symbol_tables,
+			     generator->symbol_tables->len - 1);
+	return size;
+}
+
 static void generate_global_string(struct code_generator *generator,
 				   char *string)
 {
@@ -85,22 +152,25 @@ static void generate_method_arguments(struct code_generator *generator)
 	for (uint32_t i = 0; i < arguments->len; i++) {
 		struct llir_field *field =
 			g_array_index(arguments, struct llir_field *, i);
-		g_array_append_val(generator->fields, field->identifier);
+		struct symbol_info *info = push_field(generator, field);
 
-		g_print("\tsubq $16, %%rsp\n");
+		g_print("\tsubq $%i, %%rsp\n", info->size);
 		if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
-			g_print("\tmovq %%%s, 0(%%rsp)\n",
-				ARGUMENT_REGISTERS[i]);
+			g_print("\tmovq %%%s, %i(%%rbp)\n",
+				ARGUMENT_REGISTERS[i], info->offset);
 		} else {
 			int32_t offset =
 				(i - G_N_ELEMENTS(ARGUMENT_REGISTERS)) * 16;
-			g_print("\tmovq %i(%%rbp), 0(%%rsp)\n", offset);
+			g_print("\tmovq %i(%%rbp), %i(%%rbp)\n", offset,
+				info->offset);
 		}
 	}
 }
 
 static void generate_method_declaration(struct code_generator *generator)
 {
+	push_scope(generator);
+
 	g_print("_%s:\n", generator->node->method->identifier);
 	g_print("\tpushq %%rbp\n");
 	g_print("\tmovq %%rsp, %%rbp\n");
@@ -113,6 +183,11 @@ static void generate_method_declaration(struct code_generator *generator)
 	for (struct llir_node *node = generator->global_fields_head_node;
 	     node->type == LLIR_NODE_TYPE_FIELD; node = node->next)
 		generate_global_field_initialization(node->field);
+}
+
+static void generate_block_start(struct code_generator *generator)
+{
+	push_scope(generator);
 }
 
 static void generate_field(struct code_generator *generator)
@@ -175,6 +250,12 @@ static void generate_return(struct code_generator *generator)
 	g_assert(!"TODO");
 }
 
+static void generate_block_end(struct code_generator *generator)
+{
+	int32_t size = pop_scope(generator);
+	g_print("\taddq $%i, %%rsp\n", size);
+}
+
 static void generate_method_end(struct code_generator *generator)
 {
 	g_assert(!"TODO");
@@ -200,7 +281,8 @@ static void generate_text_section(struct code_generator *generator)
 		case LLIR_NODE_TYPE_METHOD_START:
 			generate_method_declaration(generator);
 			break;
-		case LLIR_NODE_TYPE_BLOCK:
+		case LLIR_NODE_TYPE_BLOCK_START:
+			generate_block_start(generator);
 			break;
 		case LLIR_NODE_TYPE_ASSIGNMENT:
 			generate_assignment(generator);
@@ -235,6 +317,9 @@ static void generate_text_section(struct code_generator *generator)
 		case LLIR_NODE_TYPE_RETURN:
 			generate_return(generator);
 			break;
+		case LLIR_NODE_TYPE_BLOCK_END:
+			generate_block_end(generator);
+			break;
 		case LLIR_NODE_TYPE_METHOD_END:
 			generate_method_end(generator);
 			break;
@@ -260,7 +345,9 @@ int code_generator_generate(struct code_generator *generator,
 	generator->node = head;
 	generator->strings = g_hash_table_new(g_str_hash, g_str_equal);
 	generator->string_counter = 1;
-	generator->fields = g_array_new(false, false, sizeof(char *));
+	generator->symbol_tables =
+		g_array_new(false, false, sizeof(GHashTable *));
+	generator->stack_pointer = 0;
 
 	g_assert(generator->node->type == LLIR_NODE_TYPE_PROGRAM);
 	generator->node = generator->node->next;
@@ -271,7 +358,7 @@ int code_generator_generate(struct code_generator *generator,
 	generate_data_section(generator);
 	generate_text_section(generator);
 
-	g_array_free(generator->fields, true);
+	g_array_free(generator->symbol_tables, true);
 	g_hash_table_unref(generator->strings);
 	llir_node_free(head);
 	return 0;
