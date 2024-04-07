@@ -204,8 +204,8 @@ static void generate_field(struct code_generator *generator)
 					      0);
 
 	g_print("\t# generate_field");
-	g_print("\tsubq $%u, %%rsp\n", stack_amount);
-	g_print("\tmovq $%lld, %%rsp\n",
+	g_print("\tsubq $%u, 0(%%rsp)\n", stack_amount);
+	g_print("\tmovq $%lld, 0(%%rsp)\n",
 		field->array ? field->values->len :
 			       g_array_index(field->values, int64_t, 0));
 
