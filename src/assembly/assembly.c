@@ -247,14 +247,14 @@ static void generate_assignment(struct code_generator *generator)
 	g_print("\t# generate_assignment\n");
 
 	if (source_offset == -1)
-		g_print("\tmov %s, %%r10\n", assignment->source);
+		g_print("\tmovq %s, %%r10\n", assignment->source);
 	else
-		g_print("\tmov -%d(%%rbp), %%r10\n", source_offset);
+		g_print("\tmovq -%d(%%rbp), %%r10\n", source_offset);
 
 	if (destination_offset == -1)
-		g_print("\tmov %%r10, %s\n", assignment->destination);
+		g_print("\tmovq %%r10, %s\n", assignment->destination);
 	else
-		g_print("\tmov %%r10, -%d(%%rbp)\n", destination_offset);
+		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
 }
 
 static void generate_literal_assignment(struct code_generator *generator)
@@ -270,16 +270,42 @@ static void generate_literal_assignment(struct code_generator *generator)
 	g_print("\t# generate_literal_assignment\n");
 
 	if (destination_offset == -1)
-		g_print("\tmov $%lld, %s\n", literal_assignment->literal,
+		g_print("\tmovq $%lld, %s\n", literal_assignment->literal,
 			literal_assignment->destination);
 	else
-		g_print("\tmov $%lld, -%d(%%rbp)\n",
+		g_print("\tmovq $%lld, -%d(%%rbp)\n",
 			literal_assignment->literal, destination_offset);
 }
 
 static void generate_indexed_assignment(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_assert(generator->node->type == LLIR_NODE_TYPE_INDEXED_ASSIGNMENT);
+
+	struct llir_indexed_assignment *indexed_assignment =
+		generator->node->indexed_assignment;
+
+	int32_t source_offset =
+		get_field_offset(generator, indexed_assignment->source);
+
+	int32_t index_offset =
+		get_field_offset(generator, indexed_assignment->index);
+
+	int32_t destination_offset = get_destination_offset(
+		generator, indexed_assignment->destination);
+	g_assert(destination_offset != -1);
+
+	g_print("\t# generate_indexed_assignment\n");
+
+	if (source_offset == -1)
+		g_print("\tmovq %s, %%r10\n", indexed_assignment->source);
+	else
+		g_print("\tmovq -%d(%%rbp), %%r10\n", source_offset);
+
+	g_print("\tmovq -%d(%%rbp), %%r11\n", index_offset);
+	g_print("\taddq %%r11, $1");
+	g_print("\timul $8, %%r11");
+	g_print("\taddq %%r11, $%d", destination_offset);
+	g_print("\tmovq %%r10, -(%%rbp,%%r11)\n");
 }
 
 static void generate_binary_operation(struct code_generator *generator)
