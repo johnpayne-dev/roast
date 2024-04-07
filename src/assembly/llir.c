@@ -403,10 +403,8 @@ nodes_from_method_call(struct ir_method_call *method_call)
 	return head_node;
 }
 
-static struct llir_node *nodes_from_literal(struct ir_literal *literal)
+static int64_t literal_to_int64(struct ir_literal *literal)
 {
-	char *destination = next_temporary_variable();
-
 	const uint64_t MAX_INT64_POSSIBLE_MAGNITUDE = ((uint64_t)1)
 						      << 63; // what the fuck?
 
@@ -416,6 +414,14 @@ static struct llir_node *nodes_from_literal(struct ir_literal *literal)
 			       (literal->value != MAX_INT64_POSSIBLE_MAGNITUDE);
 
 	int64_t value = (int64_t)literal->value * (actually_negate ? -1 : 1);
+	return value;
+}
+
+static struct llir_node *nodes_from_literal(struct ir_literal *literal)
+{
+	char *destination = next_temporary_variable();
+
+	int64_t value = literal_to_int64(literal);
 
 	struct llir_node *literal_node =
 		llir_node_new(LLIR_NODE_TYPE_LITERAL_ASSIGNMENT,
@@ -858,7 +864,7 @@ struct llir_field *llir_field_new(struct ir_field *ir_field)
 			struct ir_literal *literal =
 				g_array_index(ir_field->initializer->literals,
 					      struct ir_literal *, i);
-			value = literal->value;
+			value = literal_to_int64(literal);
 		}
 
 		g_array_append_val(field->values, value);

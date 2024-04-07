@@ -55,9 +55,37 @@ static void generate_global_fields(struct code_generator *generator)
 	}
 }
 
+static void generate_global_field_initialization(struct llir_field *field)
+{
+	if (!field->array) {
+		uint64_t value = g_array_index(field->values, uint64_t, 0);
+		if (value != 0)
+			g_print("\tmovq $%llu, %s\n", value, field->identifier);
+		return;
+	}
+
+	g_print("\tmovq $%i, %s\n", field->values->len, field->identifier);
+
+	for (uint32_t i = 0; i < field->values->len; i++) {
+		uint64_t value = g_array_index(field->values, uint64_t, i);
+
+		if (value != 0)
+			g_print("\tmovq $%llu, %s + %i\n", value,
+				field->identifier, 8 * (i + 1));
+	}
+}
+
 static void generate_method_declaration(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_print("_%s:\n", generator->node->method->identifier);
+	generator->method_arguments = generator->node->method->arguments;
+
+	if (g_strcmp0(generator->node->method->identifier, "main") != 0)
+		return;
+
+	for (struct llir_node *node = generator->global_fields_head_node;
+	     node->type == LLIR_NODE_TYPE_FIELD; node = node->next)
+		generate_global_field_initialization(node->field);
 }
 
 static void generate_fields(struct code_generator *generator)
@@ -201,6 +229,7 @@ int code_generator_generate(struct code_generator *generator,
 	generator->node = head;
 	generator->strings = g_hash_table_new(g_str_hash, g_str_equal);
 	generator->string_counter = 1;
+	generator->method_arguments = NULL;
 
 	g_assert(generator->node->type == LLIR_NODE_TYPE_PROGRAM);
 	generator->node = generator->node->next;
