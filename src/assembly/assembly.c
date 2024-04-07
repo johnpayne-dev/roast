@@ -273,7 +273,7 @@ static void generate_literal_assignment(struct code_generator *generator)
 		g_print("\tmov $%lld, %s\n", literal_assignment->literal,
 			literal_assignment->destination);
 	else
-		g_print("\tmov $%lld, -%u(%%rbp)\n",
+		g_print("\tmov $%lld, -%d(%%rbp)\n",
 			literal_assignment->literal, destination_offset);
 }
 
