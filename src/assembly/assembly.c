@@ -198,7 +198,7 @@ static void generate_field(struct code_generator *generator)
 
 	struct symbol_info *symbol_info = push_field(generator, field);
 
-	g_print("\t# generate_field");
+	g_print("\t# generate_field\n");
 	g_print("\tsubq $%u, %%rsp\n", symbol_info->size);
 	g_print("\tmovq $%lld, -%u(%%rbp)\n",
 		field->array ? field->values->len :
