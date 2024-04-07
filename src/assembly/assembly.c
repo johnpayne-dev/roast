@@ -4,8 +4,8 @@ static const char *ARGUMENT_REGISTERS[] = { "rdi", "rsi", "rdx",
 					    "rcx", "r8",  "r9" };
 
 struct symbol_info {
-	int32_t offset;
-	int32_t size;
+	uint32_t offset;
+	uint32_t size;
 };
 
 static void push_scope(struct code_generator *generator)
@@ -200,12 +200,13 @@ static void generate_field(struct code_generator *generator)
 
 	g_print("\t# generate_field");
 	g_print("\tsubq $%u, %%rsp\n", symbol_info->size);
-	g_print("\tmovq $%lld, 0(%%rsp)\n",
+	g_print("\tmovq $%lld, -%u(%%rbp)\n",
 		field->array ? field->values->len :
-			       g_array_index(field->values, int64_t, 0));
+			       g_array_index(field->values, int64_t, 0),
+		symbol_info->offset);
 
 	for (uint32_t i = 0; field->array && i < field->values->len; i++) {
-		g_print("\tmovq $%lld, -%u(%%rsp)\n",
+		g_print("\tmovq $%lld, %u(%%rbp)\n",
 			g_array_index(field->values, int64_t, i),
 			(uint32_t)(8 * (i + 1)));
 	}
