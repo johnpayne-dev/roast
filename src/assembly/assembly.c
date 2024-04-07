@@ -127,6 +127,7 @@ static void generate_global_fields(struct code_generator *generator)
 
 static void generate_global_field_initialization(struct llir_field *field)
 {
+	g_print("\t# generate_global_field_initialization\n");
 	if (!field->array) {
 		uint64_t value = g_array_index(field->values, uint64_t, 0);
 		if (value != 0)
@@ -149,6 +150,7 @@ static void generate_method_arguments(struct code_generator *generator)
 {
 	GArray *arguments = generator->node->method->arguments;
 
+	g_print("\t# generate_method_arguments\n");
 	for (uint32_t i = 0; i < arguments->len; i++) {
 		struct llir_field *field =
 			g_array_index(arguments, struct llir_field *, i);
@@ -270,12 +272,17 @@ static void generate_return(struct code_generator *generator)
 static void generate_block_end(struct code_generator *generator)
 {
 	int32_t size = pop_scope(generator);
+	g_print("\t# generate_block_end\n");
 	g_print("\taddq $%i, %%rsp\n", size);
 }
 
 static void generate_method_end(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	pop_scope(generator);
+	g_print("\t# generate_method_end\n");
+	g_print("\tmovl $0x2000001, %%eax\n");
+	g_print("\tmovl $-2, %%edi\n");
+	g_print("\tsyscall\n");
 }
 
 static void generate_data_section(struct code_generator *generator)
