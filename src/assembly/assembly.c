@@ -206,9 +206,9 @@ static void generate_field(struct code_generator *generator)
 		symbol_info->offset);
 
 	for (uint32_t i = 0; field->array && i < field->values->len; i++) {
-		g_print("\tmovq $%lld, %u(%%rbp)\n",
+		g_print("\tmovq $%lld, -%u(%%rbp)\n",
 			g_array_index(field->values, int64_t, i),
-			(uint32_t)(8 * (i + 1)));
+			(uint32_t)(8 * (i + 1)) + symbol_info->offset);
 	}
 }
 
