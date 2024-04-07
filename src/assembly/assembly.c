@@ -15,7 +15,7 @@ static void push_scope(struct code_generator *generator)
 }
 
 static struct symbol_info *push_field(struct code_generator *generator,
-				      struct llir_field *field)
+				      char *identifier, uint32_t length)
 {
 	GHashTable *table = g_array_index(generator->symbol_tables,
 					  GHashTable *,
@@ -23,9 +23,8 @@ static struct symbol_info *push_field(struct code_generator *generator,
 
 	struct symbol_info *info = g_new(struct symbol_info, 1);
 	info->offset = generator->stack_pointer;
-	info->size = 8 * (field->values->len + field->array +
-			  (field->values->len + field->array) % 2);
-	g_hash_table_insert(table, field->identifier, info);
+	info->size = 8 * (length + length % 2);
+	g_hash_table_insert(table, identifier, info);
 
 	generator->stack_pointer += info->size;
 	return info;
@@ -154,7 +153,8 @@ static void generate_method_arguments(struct code_generator *generator)
 	for (uint32_t i = 0; i < arguments->len; i++) {
 		struct llir_field *field =
 			g_array_index(arguments, struct llir_field *, i);
-		struct symbol_info *info = push_field(generator, field);
+		struct symbol_info *info =
+			push_field(generator, field->identifier, 1);
 
 		g_print("\tsubq $%i, %%rsp\n", info->size);
 		if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
@@ -198,7 +198,9 @@ static void generate_field(struct code_generator *generator)
 
 	struct llir_field *field = generator->node->field;
 
-	struct symbol_info *symbol_info = push_field(generator, field);
+	struct symbol_info *symbol_info =
+		push_field(generator, field->identifier,
+			   field->values->len + field->array);
 
 	g_print("\t# generate_field\n");
 	g_print("\tsubq $%u, %%rsp\n", symbol_info->size);
