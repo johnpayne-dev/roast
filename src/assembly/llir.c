@@ -381,6 +381,8 @@ nodes_from_method_call(struct ir_method_call *method_call)
 			g_assert(!"you fucked up");
 			break;
 		}
+
+		g_array_append_val(arguments, method_call_argument);
 	}
 
 	char *destination = next_temporary_variable();
