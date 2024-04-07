@@ -75,10 +75,18 @@ static void generate_global_field_initialization(struct llir_field *field)
 	}
 }
 
+static void generate_method_arguments(GArray *arguments)
+{
+	g_assert(!"TODO");
+}
+
 static void generate_method_declaration(struct code_generator *generator)
 {
 	g_print("_%s:\n", generator->node->method->identifier);
-	generator->method_arguments = generator->node->method->arguments;
+	g_print("\tpushq %%rbp\n");
+	g_print("\tmovq %%rsp, %%rbp\n");
+
+	generate_method_arguments(generator->node->method->arguments);
 
 	if (g_strcmp0(generator->node->method->identifier, "main") != 0)
 		return;
@@ -88,7 +96,7 @@ static void generate_method_declaration(struct code_generator *generator)
 		generate_global_field_initialization(node->field);
 }
 
-static void generate_fields(struct code_generator *generator)
+static void generate_field(struct code_generator *generator)
 {
 	g_assert(!"TODO");
 }
@@ -148,6 +156,11 @@ static void generate_return(struct code_generator *generator)
 	g_assert(!"TODO");
 }
 
+static void generate_method_end(struct code_generator *generator)
+{
+	g_assert(!"TODO");
+}
+
 static void generate_data_section(struct code_generator *generator)
 {
 	g_print(".data\n");
@@ -159,17 +172,16 @@ static void generate_text_section(struct code_generator *generator)
 {
 	g_print(".text\n.globl _main\n");
 
-	for (; generator->node->next != NULL;
+	for (; generator->node != NULL;
 	     generator->node = generator->node->next) {
 		switch (generator->node->type) {
 		case LLIR_NODE_TYPE_FIELD:
-			generate_fields(generator);
+			generate_field(generator);
 			break;
-		case LLIR_NODE_TYPE_METHOD:
+		case LLIR_NODE_TYPE_METHOD_START:
 			generate_method_declaration(generator);
 			break;
-		case LLIR_NODE_TYPE_BLOCK_START:
-			g_assert(!"TODO create field table");
+		case LLIR_NODE_TYPE_BLOCK:
 			break;
 		case LLIR_NODE_TYPE_ASSIGNMENT:
 			generate_assignment(generator);
@@ -204,8 +216,8 @@ static void generate_text_section(struct code_generator *generator)
 		case LLIR_NODE_TYPE_RETURN:
 			generate_return(generator);
 			break;
-		case LLIR_NODE_TYPE_BLOCK_END:
-			g_assert(!"TODO figure out the fuck this does");
+		case LLIR_NODE_TYPE_METHOD_END:
+			generate_method_end(generator);
 			break;
 		default:
 			g_assert(
@@ -229,7 +241,7 @@ int code_generator_generate(struct code_generator *generator,
 	generator->node = head;
 	generator->strings = g_hash_table_new(g_str_hash, g_str_equal);
 	generator->string_counter = 1;
-	generator->method_arguments = NULL;
+	generator->fields = g_array_new(false, false, sizeof(char *));
 
 	g_assert(generator->node->type == LLIR_NODE_TYPE_PROGRAM);
 	generator->node = generator->node->next;
@@ -240,6 +252,7 @@ int code_generator_generate(struct code_generator *generator,
 	generate_data_section(generator);
 	generate_text_section(generator);
 
+	g_array_free(generator->fields, true);
 	g_hash_table_unref(generator->strings);
 	llir_node_free(head);
 	return 0;

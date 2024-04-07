@@ -59,7 +59,7 @@ struct llir_node *llir_node_new(enum llir_node_type type, void *data)
 	case LLIR_NODE_TYPE_FIELD:
 		node->field = data;
 		break;
-	case LLIR_NODE_TYPE_METHOD:
+	case LLIR_NODE_TYPE_METHOD_START:
 		node->method = data;
 		break;
 	case LLIR_NODE_TYPE_ASSIGNMENT:
@@ -147,12 +147,14 @@ struct llir_node *llir_node_new_method(struct ir_method *ir_method)
 {
 	g_assert(ir_method->imported == false);
 
-	struct llir_node *node = llir_node_new(LLIR_NODE_TYPE_METHOD,
+	struct llir_node *head = llir_node_new(LLIR_NODE_TYPE_METHOD_START,
 					       llir_method_new(ir_method));
+	struct llir_node *node = head;
 
-	node->next = llir_node_new_block(ir_method->block);
+	append_nodes(&node, llir_node_new_block(ir_method->block));
+	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_METHOD_END, NULL));
 
-	return node;
+	return head;
 }
 
 struct llir_node *llir_node_new_field(struct ir_field *ir_field)
@@ -164,8 +166,8 @@ struct llir_node *llir_node_new_field(struct ir_field *ir_field)
 
 struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 {
-	struct llir_node *head_node =
-		llir_node_new(LLIR_NODE_TYPE_BLOCK_START, NULL);
+	struct llir_node *head_node = NULL;
+	llir_node_new(LLIR_NODE_TYPE_BLOCK, NULL);
 
 	struct llir_node *node = head_node;
 
@@ -180,8 +182,6 @@ struct llir_node *llir_node_new_block(struct ir_block *ir_block)
 					    ir_block->statements,
 					    struct ir_statement *, i)));
 	}
-
-	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BLOCK_END, NULL));
 
 	return head_node;
 }
@@ -792,7 +792,7 @@ void llir_node_free(struct llir_node *node)
 	case LLIR_NODE_TYPE_FIELD:
 		llir_field_free(node->field);
 		break;
-	case LLIR_NODE_TYPE_METHOD:
+	case LLIR_NODE_TYPE_METHOD_START:
 		llir_method_free(node->method);
 		break;
 	case LLIR_NODE_TYPE_ASSIGNMENT:
@@ -1106,8 +1106,8 @@ static const char *LLIR_NODE_TYPE_TO_STRING[] = {
 	[LLIR_NODE_TYPE_PROGRAM] = "PROGRAM",
 	[LLIR_NODE_TYPE_IMPORT] = "IMPORT",
 	[LLIR_NODE_TYPE_FIELD] = "FIELD",
-	[LLIR_NODE_TYPE_METHOD] = "METHOD",
-	[LLIR_NODE_TYPE_BLOCK_START] = "BLOCK_START",
+	[LLIR_NODE_TYPE_METHOD_START] = "METHOD",
+	[LLIR_NODE_TYPE_BLOCK] = "BLOCK",
 	[LLIR_NODE_TYPE_ASSIGNMENT] = "ASSIGNMENT",
 	[LLIR_NODE_TYPE_LITERAL_ASSIGNMENT] = "LITERAL_ASSIGNMENT",
 	[LLIR_NODE_TYPE_INDEXED_ASSIGNMENT] = "INDEXED_ASSIGNMENT",
@@ -1119,7 +1119,7 @@ static const char *LLIR_NODE_TYPE_TO_STRING[] = {
 	[LLIR_NODE_TYPE_BRANCH] = "BRANCH",
 	[LLIR_NODE_TYPE_JUMP] = "JUMP",
 	[LLIR_NODE_TYPE_RETURN] = "RETURN",
-	[LLIR_NODE_TYPE_BLOCK_END] = "BLOCK_END",
+	[LLIR_NODE_TYPE_METHOD_END] = "METHOD_END",
 };
 
 void llir_node_print(struct llir_node *node)
@@ -1155,7 +1155,7 @@ void llir_node_print(struct llir_node *node)
 	case LLIR_NODE_TYPE_FIELD:
 		g_print("field %s\n", node->field->identifier);
 		break;
-	case LLIR_NODE_TYPE_METHOD:
+	case LLIR_NODE_TYPE_METHOD_START:
 		g_print("method %s\n", node->method->identifier);
 		break;
 	case LLIR_NODE_TYPE_ASSIGNMENT:
