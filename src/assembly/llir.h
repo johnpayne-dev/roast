@@ -40,6 +40,7 @@ struct llir_node {
 		struct llir_branch *branch;
 		struct llir_jump *jump;
 		struct llir_label *label;
+		struct llir_return *llir_return;
 	};
 
 	struct llir_node *next;
@@ -209,3 +210,10 @@ struct llir_label {
 
 struct llir_label *llir_label_new(void);
 void llir_label_free(struct llir_label *label);
+
+struct llir_return {
+	char *source;
+};
+
+struct llir_return *llir_return_new(char *source);
+void llir_return_free(struct llir_return *llir_return);
