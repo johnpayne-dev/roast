@@ -1,5 +1,8 @@
 #include "assembly/assembly.h"
 
+static const char *ARGUMENT_REGISTERS[] = { "rdi", "rsi", "rdx",
+					    "rcx", "r8",  "r9" };
+
 static void generate_global_string(struct code_generator *generator,
 				   char *string)
 {
@@ -75,9 +78,25 @@ static void generate_global_field_initialization(struct llir_field *field)
 	}
 }
 
-static void generate_method_arguments(GArray *arguments)
+static void generate_method_arguments(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	GArray *arguments = generator->node->method->arguments;
+
+	for (uint32_t i = 0; i < arguments->len; i++) {
+		struct llir_field *field =
+			g_array_index(arguments, struct llir_field *, i);
+		g_array_append_val(generator->fields, field->identifier);
+
+		g_print("\tsubq $16, %%rsp\n");
+		if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
+			g_print("\tmovq %%%s, 0(%%rsp)\n",
+				ARGUMENT_REGISTERS[i]);
+		} else {
+			int32_t offset =
+				(i - G_N_ELEMENTS(ARGUMENT_REGISTERS)) * 16;
+			g_print("\tmovq %i(%%rbp), 0(%%rsp)\n", offset);
+		}
+	}
 }
 
 static void generate_method_declaration(struct code_generator *generator)
@@ -86,7 +105,7 @@ static void generate_method_declaration(struct code_generator *generator)
 	g_print("\tpushq %%rbp\n");
 	g_print("\tmovq %%rsp, %%rbp\n");
 
-	generate_method_arguments(generator->node->method->arguments);
+	generate_method_arguments(generator);
 
 	if (g_strcmp0(generator->node->method->identifier, "main") != 0)
 		return;
