@@ -304,7 +304,12 @@ static void generate_array_index(struct code_generator *generator)
 
 static void generate_label(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_assert(generator->node->type == LLIR_NODE_TYPE_LABEL);
+
+	struct llir_label *label = generator->node->label;
+
+	g_print("# generate_label");
+	g_print("%s:", label->name);
 }
 
 static void generate_branch(struct code_generator *generator)
