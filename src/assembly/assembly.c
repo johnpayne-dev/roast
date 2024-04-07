@@ -1,8 +1,38 @@
 #include "assembly/assembly.h"
 
+static void generate_global_string(struct code_generator *generator,
+				   char *string)
+{
+	g_print("string_%i:\n", generator->string_counter);
+	g_print("\t.string %s\n", string);
+	g_print("\t.align 16");
+
+	g_hash_table_insert(generator->strings, string,
+			    generator->string_counter);
+	generator->string_counter++;
+}
+
 static void generate_global_strings(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	for (struct llir_node *node = generator->node; node != NULL;
+	     node = node->next) {
+		if (node->type != LLIR_NODE_TYPE_METHOD_CALL)
+			continue;
+
+		GArray *arguments = node->method_call->arguments;
+		for (uint32_t i = 0; i < arguments->len; i++) {
+			struct llir_method_call_argument argument =
+				g_array_index(arguments,
+					      struct llir_method_call_argument,
+					      i);
+
+			if (argument.type !=
+			    LLIR_METHOD_CALL_ARGUMENT_TYPE_STRING)
+				continue;
+
+			generate_global_string(generator, argument.string);
+		}
+	}
 }
 
 static void generate_global_fields(struct code_generator *generator)
@@ -77,7 +107,9 @@ static void generate_return(struct code_generator *generator)
 
 static void generate_data_section(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_print(".data\n");
+	generate_global_strings(generator);
+	generate_global_fields(generator);
 }
 
 static void generate_text_section(struct code_generator *generator)
@@ -152,10 +184,15 @@ int code_generator_generate(struct code_generator *generator,
 {
 	struct llir_node *head = llir_node_new_program(ir);
 	generator->node = head;
+	generator->strings = g_hash_table_new(g_str_hash, g_str_equal);
+
+	while (generator->node->type == LLIR_NODE_TYPE_IMPORT)
+		generator->node = generator->node->next;
 
 	generate_data_section(generator);
 	generate_text_section(generator);
 
+	g_hash_table_unref(generator->strings);
 	llir_node_free(head);
 	return 0;
 }
