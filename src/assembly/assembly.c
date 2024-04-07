@@ -82,7 +82,62 @@ static void generate_data_section(struct code_generator *generator)
 
 static void generate_text_section(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_print(".text\n.globl _main\n");
+
+	for (; generator->node->next != NULL;
+	     generator->node = generator->node->next) {
+		switch (generator->node->type) {
+		case LLIR_NODE_TYPE_FIELD:
+			generate_fields(generator);
+			break;
+		case LLIR_NODE_TYPE_METHOD:
+			generate_method_declaration(generator);
+			break;
+		case LLIR_NODE_TYPE_BLOCK_START:
+			g_assert(!"TODO create field table");
+			break;
+		case LLIR_NODE_TYPE_ASSIGNMENT:
+			generate_assignment(generator);
+			break;
+		case LLIR_NODE_TYPE_LITERAL_ASSIGNMENT:
+			generate_literal_assignment(generator);
+			break;
+		case LLIR_NODE_TYPE_INDEXED_ASSIGNMENT:
+			generate_indexed_assignment(generator);
+			break;
+		case LLIR_NODE_TYPE_BINARY_OPERATION:
+			generate_binary_operation(generator);
+			break;
+		case LLIR_NODE_TYPE_UNARY_OPERATION:
+			generate_unary_operation(generator);
+			break;
+		case LLIR_NODE_TYPE_METHOD_CALL:
+			generate_method_call(generator);
+			break;
+		case LLIR_NODE_TYPE_ARRAY_INDEX:
+			generate_array_index(generator);
+			break;
+		case LLIR_NODE_TYPE_LABEL:
+			generate_label(generator);
+			break;
+		case LLIR_NODE_TYPE_BRANCH:
+			generate_branch(generator);
+			break;
+		case LLIR_NODE_TYPE_JUMP:
+			generate_jump(generator);
+			break;
+		case LLIR_NODE_TYPE_RETURN:
+			generate_return(generator);
+			break;
+		case LLIR_NODE_TYPE_BLOCK_END:
+			g_assert(!"TODO figure out the fuck this does");
+			break;
+		default:
+			g_assert(
+				!"bruh the fuck kinda of bombaclot node is this arf arf");
+			break;
+		}
+	}
 }
 
 struct code_generator *code_generator_new(void)

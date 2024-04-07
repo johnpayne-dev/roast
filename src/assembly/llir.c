@@ -134,7 +134,6 @@ struct llir_node *llir_node_new_program(struct ir_program *ir_program)
 		append_nodes(&node, llir_node_new_method(ir_method));
 	}
 
-	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_PROGRAM_END, NULL));
 	return program;
 }
 
@@ -1114,7 +1113,6 @@ static const char *LLIR_NODE_TYPE_TO_STRING[] = {
 	[LLIR_NODE_TYPE_JUMP] = "JUMP",
 	[LLIR_NODE_TYPE_RETURN] = "RETURN",
 	[LLIR_NODE_TYPE_BLOCK_END] = "BLOCK_END",
-	[LLIR_NODE_TYPE_PROGRAM_END] = "PROGRAM_END",
 };
 
 void llir_node_print(struct llir_node *node)
