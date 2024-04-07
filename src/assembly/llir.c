@@ -88,6 +88,10 @@ struct llir_node *llir_node_new(enum llir_node_type type, void *data)
 		break;
 	case LLIR_NODE_TYPE_JUMP:
 		node->jump = data;
+		break;
+	case LLIR_NODE_TYPE_LABEL:
+		node->label = data;
+		break;
 	default:
 		node->import = NULL;
 		break;
@@ -210,7 +214,8 @@ nodes_from_short_circuit(struct ir_binary_expression *binary_expression)
 	char *left = last_temporary_variable();
 	struct llir_node *node = head;
 
-	struct llir_node *label = llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+	struct llir_node *label =
+		llir_node_new(LLIR_NODE_TYPE_LABEL, llir_label_new());
 	struct llir_branch *branch = llir_branch_new(
 		left, label,
 		binary_expression->binary_operator == IR_BINARY_OPERATOR_AND);
@@ -604,7 +609,7 @@ nodes_from_if_statement(struct ir_if_statement *ir_if_statement)
 	struct llir_node *node = head;
 
 	struct llir_node *end_if_label =
-		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+		llir_node_new(LLIR_NODE_TYPE_LABEL, llir_label_new());
 	struct llir_branch *branch =
 		llir_branch_new(condition, end_if_label, true);
 	append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_BRANCH, branch));
@@ -612,7 +617,7 @@ nodes_from_if_statement(struct ir_if_statement *ir_if_statement)
 
 	if (ir_if_statement->else_block != NULL) {
 		struct llir_node *end_else_label =
-			llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+			llir_node_new(LLIR_NODE_TYPE_LABEL, llir_label_new());
 		struct llir_jump *jump = llir_jump_new(end_else_label);
 		append_nodes(&node, llir_node_new(LLIR_NODE_TYPE_JUMP, jump));
 		append_nodes(&node, end_if_label);
@@ -649,11 +654,11 @@ nodes_from_for_statement(struct ir_for_statement *ir_for_statement)
 	struct llir_node *node = head;
 
 	struct llir_node *start_label =
-		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+		llir_node_new(LLIR_NODE_TYPE_LABEL, llir_label_new());
 	struct llir_node *break_label =
-		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+		llir_node_new(LLIR_NODE_TYPE_LABEL, llir_label_new());
 	struct llir_node *continue_label =
-		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+		llir_node_new(LLIR_NODE_TYPE_LABEL, llir_label_new());
 	push_loop(break_label, continue_label);
 
 	append_nodes(&node, start_label);
@@ -681,9 +686,9 @@ static struct llir_node *
 nodes_from_while_statement(struct ir_while_statement *ir_while_statement)
 {
 	struct llir_node *break_label =
-		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+		llir_node_new(LLIR_NODE_TYPE_LABEL, llir_label_new());
 	struct llir_node *continue_label =
-		llir_node_new(LLIR_NODE_TYPE_LABEL, NULL);
+		llir_node_new(LLIR_NODE_TYPE_LABEL, llir_label_new());
 	push_loop(break_label, continue_label);
 
 	struct llir_node *head = continue_label;
@@ -809,6 +814,10 @@ void llir_node_free(struct llir_node *node)
 		break;
 	case LLIR_NODE_TYPE_JUMP:
 		llir_jump_free(node->jump);
+		break;
+	case LLIR_NODE_TYPE_LABEL:
+		llir_label_free(node->label);
+		break;
 	default:
 		break;
 	}
@@ -1074,6 +1083,19 @@ void llir_jump_free(struct llir_jump *jump)
 	g_free(jump);
 }
 
+struct llir_label *llir_label_new(void)
+{
+	struct llir_label *label = g_new(struct llir_label, 1);
+	label->name = next_label();
+	return label;
+}
+
+void llir_label_free(struct llir_label *label)
+{
+	g_free(label->name);
+	g_free(label);
+}
+
 static const char *LLIR_NODE_TYPE_TO_STRING[] = {
 	[LLIR_NODE_TYPE_PROGRAM] = "PROGRAM",
 	[LLIR_NODE_TYPE_IMPORT] = "IMPORT",
@@ -1164,11 +1186,19 @@ void llir_node_print(struct llir_node *node)
 		g_print("%s = %s[%s]\n", node->array_index->destination,
 			node->array_index->source, node->array_index->index);
 		break;
+	case LLIR_NODE_TYPE_JUMP:
+		g_print("jump %s\n", node->jump->label->label->name);
+		break;
 	case LLIR_NODE_TYPE_BRANCH:
 		if (node->branch->negate)
-			g_print("branch !%s\n", node->branch->condition);
+			g_print("branch !%s %s\n", node->branch->condition,
+				node->branch->label->label->name);
 		else
-			g_print("branch %s\n", node->branch->condition);
+			g_print("branch %s %s\n", node->branch->condition,
+				node->branch->label->label->name);
+		break;
+	case LLIR_NODE_TYPE_LABEL:
+		g_print("%s\n", node->label->name);
 		break;
 	default:
 		g_print("%s\n", LLIR_NODE_TYPE_TO_STRING[node->type]);

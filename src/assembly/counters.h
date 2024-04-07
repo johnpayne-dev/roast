@@ -7,3 +7,5 @@ char *last_temporary_variable(void);
 char *peek_temporary_variable(void);
 
 char *next_temporary_variable(void);
+
+char *next_label(void);

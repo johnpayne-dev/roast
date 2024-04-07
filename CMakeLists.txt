@@ -10,8 +10,8 @@ set(PROJECT_FILES
     src/assembly/assembly.h
     src/assembly/llir.c
     src/assembly/llir.h
-    src/assembly/temporary_variables.c
-    src/assembly/temporary_variables.h
+    src/assembly/counters.c
+    src/assembly/counters.h
     src/parser/ast.c
     src/parser/ast.h
     src/parser/parser.c
