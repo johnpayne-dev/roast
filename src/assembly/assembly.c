@@ -161,13 +161,13 @@ static void generate_method_arguments(struct code_generator *generator)
 
 		g_print("\tsubq $%i, %%rsp\n", info->size);
 		if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
-			g_print("\tmovq %%%s, %i(%%rbp)\n",
+			g_print("\tmovq %%%s, -%i(%%rbp)\n",
 				ARGUMENT_REGISTERS[i], info->offset);
 		} else {
 			int32_t offset =
-				(i - G_N_ELEMENTS(ARGUMENT_REGISTERS)) * 16;
+				(i - G_N_ELEMENTS(ARGUMENT_REGISTERS)) * 8 + 16;
 			g_print("\tmovq %i(%%rbp), %%r10\n", offset);
-			g_print("\tmovq %%r10, %i(%%rbp)\n", info->offset);
+			g_print("\tmovq %%r10, -%i(%%rbp)\n", info->offset);
 		}
 	}
 }
@@ -412,11 +412,13 @@ static void generate_binary_operation(struct code_generator *generator)
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_DIV:
 		g_print("\tmovq %%r10, %%rax\n");
+		g_print("\tmovq $0, %%rdx\n");
 		g_print("\tidivq %%r11\n");
 		g_print("\tmovq %%rax, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_MOD:
 		g_print("\tmovq %%r10, %%rax\n");
+		g_print("\tmovq $0, %%rdx\n");
 		g_print("\tidivq %%r11\n");
 		g_print("\tmovq %%rdx, %%r10\n");
 		break;
@@ -487,7 +489,7 @@ generate_method_call_argument(struct code_generator *generator,
 			get_field_offset(generator, argument->identifier);
 		g_assert(offset != -1);
 
-		g_print("\tmovq %d(%%rbp), %%r10\n", offset);
+		g_print("\tmovq -%d(%%rbp), %%r10\n", offset);
 	}
 
 	if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
