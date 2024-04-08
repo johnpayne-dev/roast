@@ -530,12 +530,12 @@ static struct llir_node *nodes_from_location(struct ir_location *location)
 {
 	struct llir_node *head_node = NULL, *node = NULL, *location_node = NULL;
 
-	char *destination = next_temporary_variable();
-
 	if (location->index == NULL) {
+		char *destination = next_temporary_variable();
 		head_node = llir_node_new(
 			LLIR_NODE_TYPE_ASSIGNMENT,
 			llir_assignment_new(destination, location->identifier));
+		g_free(destination);
 	} else {
 		head_node = nodes_from_expression(location->index);
 
@@ -546,17 +546,17 @@ static struct llir_node *nodes_from_location(struct ir_location *location)
 		append_nodes(&node, nodes_from_bounds_check(
 					    index, location->identifier));
 
+		char *destination = next_temporary_variable();
 		location_node = llir_node_new(
 			LLIR_NODE_TYPE_ARRAY_INDEX,
 			llir_array_index_new(destination, location->identifier,
 					     index));
 
+		g_free(destination);
 		g_free(index);
 
 		append_nodes(&node, location_node);
 	}
-
-	g_free(destination);
 
 	return head_node;
 }
@@ -1247,6 +1247,7 @@ static const char *LLIR_NODE_TYPE_TO_STRING[] = {
 	[LLIR_NODE_TYPE_RETURN] = "RETURN",
 	[LLIR_NODE_TYPE_BLOCK_END] = "BLOCK_END",
 	[LLIR_NODE_TYPE_METHOD_END] = "METHOD_END",
+	[LLIR_NODE_TYPE_SHIT_YOURSELF] = "SHIT_YOURSELF",
 };
 
 void llir_node_print(struct llir_node *node)

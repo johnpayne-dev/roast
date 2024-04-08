@@ -230,7 +230,9 @@ static int32_t get_destination_offset(struct code_generator *generator,
 {
 	g_assert(destination != NULL);
 
-	if (destination[0] == '$') {
+	int32_t offset = get_field_offset(generator, destination);
+
+	if (offset == -1 && destination[0] == '$') {
 		struct symbol_info *info =
 			push_field(generator, destination, 1);
 
@@ -239,7 +241,7 @@ static int32_t get_destination_offset(struct code_generator *generator,
 		return info->offset;
 	}
 
-	return get_field_offset(generator, destination);
+	return offset;
 }
 
 static void generate_assignment(struct code_generator *generator)
