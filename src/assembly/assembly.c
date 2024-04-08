@@ -75,7 +75,7 @@ static void generate_global_string(struct code_generator *generator,
 	if (g_hash_table_lookup(generator->strings, string) != 0)
 		return;
 
-	g_print("string_%lu:\n", generator->string_counter);
+	g_print("string_%llu:\n", generator->string_counter);
 	g_print("\t.string %s\n", string);
 	g_print("\t.align 16\n");
 
@@ -111,7 +111,7 @@ static void generate_global_field(struct llir_field *field)
 {
 	uint64_t length = 8 * (field->values->len + field->array);
 	g_print("%s:\n", field->identifier);
-	g_print("\t.fill %lu\n", length);
+	g_print("\t.fill %llu\n", length);
 	g_print("\t.align 16\n");
 }
 
@@ -131,7 +131,7 @@ static void generate_global_field_initialization(struct llir_field *field)
 	if (!field->array) {
 		uint64_t value = g_array_index(field->values, uint64_t, 0);
 		if (value != 0)
-			g_print("\tmovq $%lu, %s(%%rip)\n", value,
+			g_print("\tmovq $%llu, %s(%%rip)\n", value,
 				field->identifier);
 		return;
 	}
@@ -143,7 +143,7 @@ static void generate_global_field_initialization(struct llir_field *field)
 		uint64_t value = g_array_index(field->values, uint64_t, i);
 
 		if (value != 0)
-			g_print("\tmovq $%lu, %s+%i(%%rip)\n", value,
+			g_print("\tmovq $%llu, %s+%i(%%rip)\n", value,
 				field->identifier, 8 * (i + 1));
 	}
 }
@@ -213,13 +213,13 @@ static void generate_field(struct code_generator *generator)
 
 	g_print("\t# generate_field\n");
 	g_print("\tsubq $%u, %%rsp\n", symbol_info->size);
-	g_print("\tmovq $%ld, -%u(%%rbp)\n",
+	g_print("\tmovq $%lld, -%u(%%rbp)\n",
 		field->array ? field->values->len :
 			       g_array_index(field->values, int64_t, 0),
 		symbol_info->offset);
 
 	for (uint32_t i = 0; field->array && i < field->values->len; i++) {
-		g_print("\tmovq $%ld, -%u(%%rbp)\n",
+		g_print("\tmovq $%lld, -%u(%%rbp)\n",
 			g_array_index(field->values, int64_t, i),
 			(uint32_t)(8 * (i + 1)) + symbol_info->offset);
 	}
@@ -279,11 +279,11 @@ static void generate_literal_assignment(struct code_generator *generator)
 	g_print("\t# generate_literal_assignment\n");
 
 	if (destination_offset == -1)
-		g_print("\tmovq $%ld, %s(%%rip)\n",
+		g_print("\tmovq $%lld, %s(%%rip)\n",
 			literal_assignment->literal,
 			literal_assignment->destination);
 	else
-		g_print("\tmovq $%ld, -%d(%%rbp)\n",
+		g_print("\tmovq $%lld, -%d(%%rbp)\n",
 			literal_assignment->literal, destination_offset);
 }
 
@@ -481,7 +481,7 @@ generate_method_call_argument(struct code_generator *generator,
 			generator->strings, argument->string);
 		g_assert(string_index != 0);
 
-		g_print("\tleaq string_%lu(%%rip), %%r10\n", string_index);
+		g_print("\tleaq string_%llu(%%rip), %%r10\n", string_index);
 	} else {
 		int32_t offset =
 			get_field_offset(generator, argument->identifier);

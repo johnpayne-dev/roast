@@ -35,7 +35,6 @@ set(FLAGS
     "-Wno-unused-variable"
     "-Wno-unused-function"
     "-Wno-unused-but-set-variable"
-    "-Werror"
     "-std=c11")
 
 add_executable(roast ${PROJECT_FILES})
