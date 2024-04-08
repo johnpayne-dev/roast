@@ -309,7 +309,7 @@ static void generate_indexed_assignment(struct code_generator *generator)
 	else
 		g_print("\tmovq %%r11, %s(%%r10)\n",
 			indexed_assignment->destination);
-g}
+}
 
 static void generate_binary_operation(struct code_generator *generator)
 {
