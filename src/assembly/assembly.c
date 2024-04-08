@@ -410,17 +410,17 @@ static void generate_binary_operation(struct code_generator *generator)
 		g_print("\tsubq %%r11, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_MUL:
-		g_print("\timul %%r11, %%r10\n");
+		g_print("\timulq %%r11, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_DIV:
 		g_print("\tmovq %%r10, %%rax\n");
-		g_print("\tmovq $0, %%rdx\n");
+		g_print("\tcqto\n");
 		g_print("\tidivq %%r11\n");
 		g_print("\tmovq %%rax, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_MOD:
 		g_print("\tmovq %%r10, %%rax\n");
-		g_print("\tmovq $0, %%rdx\n");
+		g_print("\tcqto\n");
 		g_print("\tidivq %%r11\n");
 		g_print("\tmovq %%rdx, %%r10\n");
 		break;
@@ -461,7 +461,13 @@ static void generate_unary_operation(struct code_generator *generator)
 		g_print("\tnegq %%r10\n");
 		break;
 	case LLIR_UNARY_OPERATION_TYPE_NOT:
-		g_print("\tnotq %%r10\n");
+		g_print("\tcmpq $0, %%r10\n");
+		g_print("\tsetne %%al\n");
+		g_print("\txorb $-1, %%al\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbl  %%al, %%eax\n");
+		g_print("\tcltq\n");
+		g_print("\tmovq %%rax, %%r10\n");
 		break;
 	default:
 		g_assert(!"you fucked up");
