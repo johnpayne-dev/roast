@@ -109,9 +109,10 @@ static void generate_global_strings(struct code_generator *generator)
 
 static void generate_global_field(struct llir_field *field)
 {
-	uint64_t length = 8 * (field->array ? field->values->len + 1 : 1);
-
-	g_print("\t.comm %s, %llu\n\t.align 16\n", field->identifier, length);
+	uint64_t length = 8 * (field->values->len + field->array);
+	g_print("%s:\n", field->identifier);
+	g_print("\t.fill %llu\n", length);
+	g_print("\t.align 16\n");
 }
 
 static void generate_global_fields(struct code_generator *generator)
@@ -130,17 +131,18 @@ static void generate_global_field_initialization(struct llir_field *field)
 	if (!field->array) {
 		uint64_t value = g_array_index(field->values, uint64_t, 0);
 		if (value != 0)
-			g_print("\tmovq $%llu, %s\n", value, field->identifier);
+			g_print("\tmovq $%llu, %s(%%rip)\n", value,
+				field->identifier);
 		return;
 	}
 
-	g_print("\tmovq $%i, %s\n", field->values->len, field->identifier);
+	g_print("\tmovq $%i, %s(%%rip)\n", field->values->len, field->identifier);
 
 	for (uint32_t i = 0; i < field->values->len; i++) {
 		uint64_t value = g_array_index(field->values, uint64_t, i);
 
 		if (value != 0)
-			g_print("\tmovq $%llu, %s + %i\n", value,
+			g_print("\tmovq $%llu, %s+%i(%%rip)\n", value,
 				field->identifier, 8 * (i + 1));
 	}
 }
@@ -173,6 +175,7 @@ static void generate_method_declaration(struct code_generator *generator)
 {
 	push_scope(generator);
 
+	g_print(".globl _%s\n", generator->node->method->identifier);
 	g_print("_%s:\n", generator->node->method->identifier);
 	g_print("\tpushq %%rbp\n");
 	g_print("\tmovq %%rsp, %%rbp\n");
@@ -247,12 +250,12 @@ static void generate_assignment(struct code_generator *generator)
 	g_print("\t# generate_assignment\n");
 
 	if (source_offset == -1)
-		g_print("\tmovq %s, %%r10\n", assignment->source);
+		g_print("\tmovq %s(%%rip), %%r10\n", assignment->source);
 	else
 		g_print("\tmovq -%d(%%rbp), %%r10\n", source_offset);
 
 	if (destination_offset == -1)
-		g_print("\tmovq %%r10, %s\n", assignment->destination);
+		g_print("\tmovq %%r10, %s(%%rip)\n", assignment->destination);
 	else
 		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
 }
@@ -270,7 +273,7 @@ static void generate_literal_assignment(struct code_generator *generator)
 	g_print("\t# generate_literal_assignment\n");
 
 	if (destination_offset == -1)
-		g_print("\tmovq $%lld, %s\n", literal_assignment->literal,
+		g_print("\tmovq $%lld, %s(%%rip)\n", literal_assignment->literal,
 			literal_assignment->destination);
 	else
 		g_print("\tmovq $%lld, -%d(%%rbp)\n",
@@ -302,13 +305,15 @@ static void generate_indexed_assignment(struct code_generator *generator)
 	if (source_offset != -1)
 		g_print("\tmovq -%u(%%rbp), %%r11\n", source_offset);
 	else
-		g_print("\tmovq %s, %%r11\n", indexed_assignment->source);
+		g_print("\tmovq %s(%%rip), %%r11\n", indexed_assignment->source);
 
-	if (destination_offset != -1)
+	if (destination_offset != -1) {
 		g_print("\tmovq %%r11, -(%%rbp, %%r10)\n");
-	else
-		g_print("\tmovq %%r11, %s(%%r10)\n",
-			indexed_assignment->destination);
+	} else {
+		g_print("\tleaq %s(%%rip), %%rax\n", indexed_assignment->destination);
+		g_print("\taddq %%rax, %%r10\n");
+		g_print("\tmovq %%r11, 0(%%r10)\n");
+	}
 }
 
 static void generate_binary_operation(struct code_generator *generator)
@@ -330,7 +335,7 @@ static void generate_binary_operation(struct code_generator *generator)
 	g_print("\t# generate_binary_operation\n");
 
 	if (left_operand_offset == -1)
-		g_print("\tmovq %s, %%r10\n", binary_operation->left_operand);
+		g_print("\tmovq %s(%%rip), %%r10\n", binary_operation->left_operand);
 	else
 		g_print("\tmovq -%d(%%rbp), %%r10\n", left_operand_offset);
 
@@ -401,7 +406,7 @@ static void generate_binary_operation(struct code_generator *generator)
 	}
 
 	if (destination_offset == -1)
-		g_print("\tmovq %%r10, %s\n", binary_operation->destination);
+		g_print("\tmovq %%r10, %s(%%rip)\n", binary_operation->destination);
 	else
 		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
 }
@@ -422,7 +427,7 @@ static void generate_unary_operation(struct code_generator *generator)
 	g_print("\t# generate_unary_operation\n");
 
 	if (source_offset == -1)
-		g_print("\tmovq %s, %%r10\n", unary_operation->source);
+		g_print("\tmovq %s(%%rip), %%r10\n", unary_operation->source);
 	else
 		g_print("\tmovq -%d(%%rbp), %%r10\n", source_offset);
 
@@ -439,7 +444,7 @@ static void generate_unary_operation(struct code_generator *generator)
 	}
 
 	if (destination_offset == -1)
-		g_print("\tmovq %%r10, %s\n", unary_operation->destination);
+		g_print("\tmovq %%r10, %s(%%rip)\n", unary_operation->destination);
 	else
 		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
 }
@@ -520,15 +525,18 @@ static void generate_array_index(struct code_generator *generator)
 	g_print("\taddq $1, %%r10\n");
 	g_print("\timul $8, %%r10\n");
 
-	if (source_offset != -1)
+	if (source_offset != -1) {
 		g_print("\tmovq -(%%rbp, %%r10), %%r11\n");
-	else
-		g_print("\tmovq %s(%%r10), %%r11\n", array_index->source);
+	} else {
+		g_print("\tleaq %s(%%rip), %%r11\n", array_index->source);
+		g_print("\taddq %%r11, %%r10\n");
+		g_print("\tmovq 0(%%r10), %%r11\n");
+	}
 
 	if (destination_offset != -1)
 		g_print("\tmovq %%r11, -%u(%%rbp)\n", destination_offset);
 	else
-		g_print("\tmovq %%r11, %s\n", array_index->destination);
+		g_print("\tmovq %%r11, %s(%%rip)\n", array_index->destination);
 }
 
 static void generate_label(struct code_generator *generator)
@@ -537,8 +545,8 @@ static void generate_label(struct code_generator *generator)
 
 	struct llir_label *label = generator->node->label;
 
-	g_print("# generate_label");
-	g_print("%s:", label->name);
+	g_print("# generate_label\n");
+	g_print("%s:\n", label->name);
 }
 
 static void generate_branch(struct code_generator *generator)
@@ -550,7 +558,7 @@ static void generate_branch(struct code_generator *generator)
 
 	g_print("\t# generate_branch\n");
 	g_print("\tmovq -%d(%%rbp), %%r10\n", offset);
-	g_print("\tcmp %%r10, $0\n");
+	g_print("\tcmpq $0, %%r10\n");
 	g_print(branch->negate ? "\tje %s\n" : "\tjne %s\n",
 		label_node->label->name);
 }
@@ -609,7 +617,7 @@ static void generate_data_section(struct code_generator *generator)
 
 static void generate_text_section(struct code_generator *generator)
 {
-	g_print(".text\n.globl _main\n");
+	g_print(".text\n");
 
 	for (; generator->node != NULL;
 	     generator->node = generator->node->next) {
@@ -699,7 +707,7 @@ int code_generator_generate(struct code_generator *generator,
 
 	g_array_free(generator->symbol_tables, true);
 	g_hash_table_unref(generator->strings);
-	llir_node_free(head);
+	//llir_node_free(head); - something is fucked with this
 	return 0;
 }
 
