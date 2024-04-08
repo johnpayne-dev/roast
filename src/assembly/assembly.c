@@ -614,9 +614,11 @@ static void generate_return(struct code_generator *generator)
 	if (llir_return->source == NULL) {
 		g_print("\tmov $0, %%rax\n");
 	} else {
-		uint32_t offset =
+		int32_t offset =
 			get_field_offset(generator, llir_return->source);
-		g_print("\tmovq -%u(%%rbp), %%rax\n", offset);
+		g_assert(offset != -1);
+
+		g_print("\tmovq -%d(%%rbp), %%rax\n", offset);
 	}
 
 	g_print("\tmovq %%rbp, %%rsp\n");

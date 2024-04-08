@@ -1218,7 +1218,7 @@ void llir_label_free(struct llir_label *label)
 struct llir_return *llir_return_new(char *source)
 {
 	struct llir_return *llir_return = g_new(struct llir_return, 1);
-	llir_return->source = source;
+	llir_return->source = g_strdup(source);
 	return llir_return;
 }
 
