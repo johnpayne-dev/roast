@@ -640,6 +640,18 @@ static void generate_method_end(struct code_generator *generator)
 	g_print("\tsyscall\n");
 }
 
+static void generate_shit_yourself(struct code_generator *generator)
+{
+	g_print("\t# generate_shit_yourself\n");
+#ifdef __APPLE__
+	g_print("\tmovl $0x2000001, %%eax\n");
+#else
+	g_print("\tmovl $1, %%eax\n");
+#endif
+	g_print("\tmovl $-1, %%edi\n");
+	g_print("\tsyscall\n");
+}
+
 static void generate_data_section(struct code_generator *generator)
 {
 	g_print(".data\n");
@@ -701,6 +713,9 @@ static void generate_text_section(struct code_generator *generator)
 			break;
 		case LLIR_NODE_TYPE_METHOD_END:
 			generate_method_end(generator);
+			break;
+		case LLIR_NODE_TYPE_SHIT_YOURSELF:
+			generate_shit_yourself(generator);
 			break;
 		default:
 			g_assert(
