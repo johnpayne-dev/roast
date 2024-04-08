@@ -225,7 +225,7 @@ static int32_t get_destination_offset(struct code_generator *generator,
 		struct symbol_info *info =
 			push_field(generator, destination, 1);
 
-		g_print("\tsubq $%u, %%rsp", info->offset);
+		g_print("\tsubq $%u, %%rsp\n", info->size);
 
 		return info->offset;
 	}
@@ -318,9 +318,62 @@ static void generate_unary_operation(struct code_generator *generator)
 	g_assert(!"TODO");
 }
 
+static void
+generate_method_call_argument(struct code_generator *generator,
+			      struct llir_method_call_argument *argument,
+			      uint32_t i)
+{
+	if (argument->type == LLIR_METHOD_CALL_ARGUMENT_TYPE_STRING) {
+		uint64_t string_index = (uint64_t)g_hash_table_lookup(
+			generator->strings, argument->string);
+		g_assert(string_index != 0);
+
+		g_print("\tleaq string_%llu(%%rip), %%r10\n", string_index);
+	} else {
+		int32_t offset =
+			get_field_offset(generator, argument->identifier);
+		g_assert(offset != -1);
+
+		g_print("\tmovq %d(%%rbp), %%r10\n", offset);
+	}
+
+	if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
+		g_print("\tmovq %%r10, %%%s\n", ARGUMENT_REGISTERS[i]);
+	} else {
+		uint32_t offset = 8 * (i - G_N_ELEMENTS(ARGUMENT_REGISTERS));
+		g_print("\tmovq %%r10, %u(%%rsp)\n", offset);
+	}
+}
+
 static void generate_method_call(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	struct llir_method_call *method_call = generator->node->method_call;
+
+	g_print("\t# generate_method_call\n");
+
+	int32_t stack_argument_count =
+		method_call->arguments->len - G_N_ELEMENTS(ARGUMENT_REGISTERS);
+	int32_t extra_stack_size =
+		8 * (stack_argument_count + stack_argument_count % 2);
+
+	if (stack_argument_count > 0)
+		g_print("\tsubq $%d, %%rsp\n", extra_stack_size);
+
+	for (uint32_t i = 0; i < method_call->arguments->len; i++) {
+		struct llir_method_call_argument argument =
+			g_array_index(method_call->arguments,
+				      struct llir_method_call_argument, i);
+		generate_method_call_argument(generator, &argument, i);
+	}
+
+	g_print("\tmovq $0, %%rax\n");
+	g_print("\tcall _%s\n", method_call->identifier);
+	if (stack_argument_count > 0)
+		g_print("\taddq $%i, %%rsp\n", extra_stack_size);
+
+	int32_t offset =
+		get_destination_offset(generator, method_call->destination);
+	g_print("\tmovq %%rax, -%d(%%rbp)\n", offset);
 }
 
 static void generate_array_index(struct code_generator *generator)
