@@ -406,9 +406,9 @@ static void generate_binary_operation(struct code_generator *generator)
 		g_print("\timul %%r11, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_DIV:
-		g_print("\tmovq %%r10, %%eax\n");
+		g_print("\tmovq %%r10, %%rax\n");
 		g_print("\tidivq %%r11\n");
-		g_print("\tmovq %%eax, %%r10\n");
+		g_print("\tmovq %%rax, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_MOD:
 		g_print("\tmovq %%r10, %%rax\n");
