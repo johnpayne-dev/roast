@@ -629,7 +629,11 @@ static void generate_method_end(struct code_generator *generator)
 {
 	pop_scope(generator);
 	g_print("\t# generate_method_end\n");
+#ifdef __APPLE__
 	g_print("\tmovl $0x2000001, %%eax\n");
+#else
+	g_print("\tmovl $1, %%eax\n");
+#endif
 	g_print("\tmovl $-2, %%edi\n");
 	g_print("\tsyscall\n");
 }
