@@ -491,7 +491,7 @@ static struct llir_node *nodes_from_bounds_check(char *index, char *array)
 
 	struct llir_node *and = llir_node_new(
 		LLIR_NODE_TYPE_BINARY_OPERATION,
-		llir_binary_operation_new(le_temp_var,
+		llir_binary_operation_new(and_temp_var,
 					  LLIR_BINARY_OPERATION_TYPE_AND,
 					  lte_temp_var, le_temp_var));
 

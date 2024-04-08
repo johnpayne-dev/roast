@@ -585,7 +585,11 @@ static void generate_branch(struct code_generator *generator)
 	int32_t offset = get_field_offset(generator, branch->condition);
 
 	g_print("\t# generate_branch\n");
-	g_print("\tmovq -%d(%%rbp), %%r10\n", offset);
+	if (offset != -1)
+		g_print("\tmovq -%d(%%rbp), %%r10\n", offset);
+	else
+		g_print("\tmovq %s(%%rip), %%r10\n", branch->condition);
+
 	g_print("\tcmpq $0, %%r10\n");
 	g_print(branch->negate ? "\tje %s\n" : "\tjne %s\n",
 		label_node->label->name);
