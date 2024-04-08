@@ -163,8 +163,8 @@ static void generate_method_arguments(struct code_generator *generator)
 		} else {
 			int32_t offset =
 				(i - G_N_ELEMENTS(ARGUMENT_REGISTERS)) * 16;
-			g_print("\tmovq %i(%%rbp), %i(%%rbp)\n", offset,
-				info->offset);
+			g_print("\tmovq %i(%%rbp), %%r10\n", offset);
+			g_print("\tmovq %%r10, %i(%%rbp)\n", info->offset);
 		}
 	}
 }
@@ -289,24 +289,27 @@ static void generate_indexed_assignment(struct code_generator *generator)
 
 	int32_t index_offset =
 		get_field_offset(generator, indexed_assignment->index);
+	g_assert(index_offset != -1);
 
 	int32_t destination_offset = get_destination_offset(
 		generator, indexed_assignment->destination);
-	g_assert(destination_offset != -1);
 
 	g_print("\t# generate_indexed_assignment\n");
+	g_print("\tmovq -%u(%%rbp), %%r10\n", index_offset);
+	g_print("\taddq $1, %%r10\n");
+	g_print("\timul $8, %%r10\n");
 
-	if (source_offset == -1)
-		g_print("\tmovq %s, %%r10\n", indexed_assignment->source);
+	if (source_offset != -1)
+		g_print("\tmovq -%u(%%rbp), %%r11\n", source_offset);
 	else
-		g_print("\tmovq -%d(%%rbp), %%r10\n", source_offset);
+		g_print("\tmovq %s, %%r11\n", indexed_assignment->source);
 
-	g_print("\tmovq -%d(%%rbp), %%r11\n", index_offset);
-	g_print("\taddq %%r11, $1");
-	g_print("\timul $8, %%r11");
-	g_print("\taddq %%r11, $%d", destination_offset);
-	g_print("\tmovq %%r10, -(%%rbp,%%r11)\n");
-}
+	if (destination_offset != -1)
+		g_print("\tmovq %%r11, -(%%rbp, %%r10)\n");
+	else
+		g_print("\tmovq %%r11, %s(%%r10)\n",
+			indexed_assignment->destination);
+g}
 
 static void generate_binary_operation(struct code_generator *generator)
 {
@@ -378,7 +381,31 @@ static void generate_method_call(struct code_generator *generator)
 
 static void generate_array_index(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	struct llir_array_index *array_index = generator->node->array_index;
+
+	int32_t source_offset =
+		get_field_offset(generator, array_index->source);
+
+	int32_t index_offset = get_field_offset(generator, array_index->index);
+	g_assert(index_offset != -1);
+
+	int32_t destination_offset =
+		get_destination_offset(generator, array_index->destination);
+
+	g_print("\t# generate_array_index\n");
+	g_print("\tmovq -%u(%%rbp), %%r10\n", index_offset);
+	g_print("\taddq $1, %%r10\n");
+	g_print("\timul $8, %%r10\n");
+
+	if (source_offset != -1)
+		g_print("\tmovq -(%%rbp, %%r10), %%r11\n");
+	else
+		g_print("\tmovq %s(%%r10), %%r11\n", array_index->source);
+
+	if (destination_offset != -1)
+		g_print("\tmovq %%r11, -%u(%%rbp)\n", destination_offset);
+	else
+		g_print("\tmovq %%r11, %s\n", array_index->destination);
 }
 
 static void generate_label(struct code_generator *generator)
@@ -393,7 +420,16 @@ static void generate_label(struct code_generator *generator)
 
 static void generate_branch(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	struct llir_branch *branch = generator->node->branch;
+	struct llir_node *label_node = branch->label;
+
+	int32_t offset = get_field_offset(generator, branch->condition);
+
+	g_print("\t# generate_branch\n");
+	g_print("\tmovq -%d(%%rbp), %%r10\n", offset);
+	g_print("\tcmp %%r10, $0\n");
+	g_print(branch->negate ? "\tje %s\n" : "\tjne %s\n",
+		label_node->label->name);
 }
 
 static void generate_jump(struct code_generator *generator)
@@ -404,7 +440,7 @@ static void generate_jump(struct code_generator *generator)
 	struct llir_node *label_node = jump->label;
 
 	g_print("\t# generate_jump\n");
-	g_print("\tj %s", label_node->label->name);
+	g_print("\tjmp %s\n", label_node->label->name);
 }
 
 static void generate_return(struct code_generator *generator)
