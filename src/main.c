@@ -48,7 +48,7 @@ static int parse_options(int *argc, char ***argv, struct options *options)
 			.description = "Print debugging information.",
 			.arg_description = NULL,
 		},
-		G_OPTION_ENTRY_NULL,
+		{ 0 },
 	};
 
 	GOptionContext *context = g_option_context_new("- decaf compiler.");

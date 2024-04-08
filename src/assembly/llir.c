@@ -1199,7 +1199,7 @@ void llir_node_print(struct llir_node *node)
 			node->assignment->source);
 		break;
 	case LLIR_NODE_TYPE_LITERAL_ASSIGNMENT:
-		g_print("%s = %lld\n", node->literal_assignment->destination,
+		g_print("%s = %ld\n", node->literal_assignment->destination,
 			node->literal_assignment->literal);
 		break;
 	case LLIR_NODE_TYPE_INDEXED_ASSIGNMENT:
