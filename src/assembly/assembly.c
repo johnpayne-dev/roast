@@ -458,10 +458,10 @@ static void generate_unary_operation(struct code_generator *generator)
 
 	switch (unary_operation->operation) {
 	case LLIR_UNARY_OPERATION_TYPE_NEGATE:
-		g_print("\tnegq %%r10");
+		g_print("\tnegq %%r10\n");
 		break;
 	case LLIR_UNARY_OPERATION_TYPE_NOT:
-		g_print("\tnotq %%r10");
+		g_print("\tnotq %%r10\n");
 		break;
 	default:
 		g_assert(!"you fucked up");
