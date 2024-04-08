@@ -47,7 +47,7 @@ for stage_dir in "./tests/"{"scan","parse","inter","assembly"}"/"; do
                 executables_dir=./bin/"${build_system}"_"${compiler}"/executables
                 mkdir -p "${executables_dir}"
                 exectuable_file="${executables_dir}"/"$(basename "${test_file%????}")"
-                gcc -arch x86_64 -O0 "${assembly_file}" -o "${exectuable_file}"
+                gcc -g -arch x86_64 -O0 "${assembly_file}" -o "${exectuable_file}"
 
                 chmod +x "${exectuable_file}"
 

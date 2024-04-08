@@ -21,6 +21,7 @@ enum llir_node_type {
 	LLIR_NODE_TYPE_RETURN,
 	LLIR_NODE_TYPE_BLOCK_END,
 	LLIR_NODE_TYPE_METHOD_END,
+	LLIR_NODE_TYPE_SHIT_YOURSELF,
 };
 
 struct llir_node {

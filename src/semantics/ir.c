@@ -437,12 +437,13 @@ struct ir_method_call *ir_method_call_new(struct ast_node **nodes)
 	call->arguments = g_array_new(false, false,
 				      sizeof(struct ir_method_call_argument *));
 
-	while (peek_node(nodes)->type == AST_NODE_TYPE_METHOD_CALL_ARGUMENT) {
+	while (peek_node(nodes)->type != AST_NODE_TYPE_METHOD_CALL_END) {
 		struct ir_method_call_argument *argument =
 			ir_method_call_argument_new(nodes);
 		g_array_append_val(call->arguments, argument);
 	}
 
+	g_assert(next_node(nodes)->type == AST_NODE_TYPE_METHOD_CALL_END);
 	return call;
 }
 

@@ -443,34 +443,120 @@ static struct llir_node *nodes_from_literal(struct ir_literal *literal)
 	return literal_node;
 }
 
+static struct llir_node *nodes_from_bounds_check(char *index, char *array)
+{
+	struct llir_node *head_node = NULL, *node = NULL;
+
+	char *zero_temp_var = next_temporary_variable();
+
+	struct llir_node *zero =
+		llir_node_new(LLIR_NODE_TYPE_LITERAL_ASSIGNMENT,
+			      llir_literal_assignment_new(zero_temp_var, 0));
+
+	char *lte_temp_var = next_temporary_variable();
+
+	struct llir_node *lte = llir_node_new(
+		LLIR_NODE_TYPE_BINARY_OPERATION,
+		llir_binary_operation_new(lte_temp_var,
+					  LLIR_BINARY_OPERATION_TYPE_LESS_EQUAL,
+					  zero_temp_var, index));
+
+	g_free(zero_temp_var);
+
+	char *neg_one_temp_var = next_temporary_variable();
+
+	struct llir_node *neg_one = llir_node_new(
+		LLIR_NODE_TYPE_LITERAL_ASSIGNMENT,
+		llir_literal_assignment_new(neg_one_temp_var, -1));
+
+	char *length_temp_var = next_temporary_variable();
+
+	struct llir_node *length = llir_node_new(
+		LLIR_NODE_TYPE_ARRAY_INDEX,
+		llir_array_index_new(length_temp_var, array, neg_one_temp_var));
+
+	g_free(neg_one_temp_var);
+
+	char *le_temp_var = next_temporary_variable();
+
+	struct llir_node *lt = llir_node_new(
+		LLIR_NODE_TYPE_BINARY_OPERATION,
+		llir_binary_operation_new(le_temp_var,
+					  LLIR_BINARY_OPERATION_TYPE_LESS,
+					  index, length_temp_var));
+
+	g_free(length_temp_var);
+
+	char *and_temp_var = next_temporary_variable();
+
+	struct llir_node *and = llir_node_new(
+		LLIR_NODE_TYPE_BINARY_OPERATION,
+		llir_binary_operation_new(and_temp_var,
+					  LLIR_BINARY_OPERATION_TYPE_AND,
+					  lte_temp_var, le_temp_var));
+
+	g_free(lte_temp_var);
+	g_free(le_temp_var);
+
+	struct llir_node *label =
+		llir_node_new(LLIR_NODE_TYPE_LABEL, llir_label_new());
+
+	struct llir_node *branch =
+		llir_node_new(LLIR_NODE_TYPE_BRANCH,
+			      llir_branch_new(and_temp_var, label, false));
+
+	g_free(and_temp_var);
+
+	struct llir_node *shit_yourself =
+		llir_node_new(LLIR_NODE_TYPE_SHIT_YOURSELF, NULL);
+
+	head_node = zero;
+
+	node = head_node;
+
+	append_nodes(&node, lte);
+	append_nodes(&node, neg_one);
+	append_nodes(&node, length);
+	append_nodes(&node, lt);
+	append_nodes(&node, and);
+	append_nodes(&node, branch);
+	append_nodes(&node, shit_yourself);
+	append_nodes(&node, label);
+
+	return head_node;
+}
+
 static struct llir_node *nodes_from_location(struct ir_location *location)
 {
 	struct llir_node *head_node = NULL, *node = NULL, *location_node = NULL;
 
-	char *destination = next_temporary_variable();
-
 	if (location->index == NULL) {
+		char *destination = next_temporary_variable();
 		head_node = llir_node_new(
 			LLIR_NODE_TYPE_ASSIGNMENT,
 			llir_assignment_new(destination, location->identifier));
+		g_free(destination);
 	} else {
 		head_node = nodes_from_expression(location->index);
 
 		char *index = last_temporary_variable();
 
+		node = head_node;
+
+		append_nodes(&node, nodes_from_bounds_check(
+					    index, location->identifier));
+
+		char *destination = next_temporary_variable();
 		location_node = llir_node_new(
 			LLIR_NODE_TYPE_ARRAY_INDEX,
 			llir_array_index_new(destination, location->identifier,
 					     index));
 
+		g_free(destination);
 		g_free(index);
-
-		node = head_node;
 
 		append_nodes(&node, location_node);
 	}
-
-	g_free(destination);
 
 	return head_node;
 }
@@ -599,6 +685,11 @@ nodes_from_assignment(struct ir_assignment *ir_assignment)
 		append_nodes(&node, nodes_from_expression(
 					    ir_assignment->location->index));
 		char *index = last_temporary_variable();
+
+		append_nodes(&node,
+			     nodes_from_bounds_check(
+				     index,
+				     ir_assignment->location->identifier));
 
 		struct llir_indexed_assignment *assignment =
 			llir_indexed_assignment_new(destination, index, source);
@@ -1127,7 +1218,7 @@ void llir_label_free(struct llir_label *label)
 struct llir_return *llir_return_new(char *source)
 {
 	struct llir_return *llir_return = g_new(struct llir_return, 1);
-	llir_return->source = source;
+	llir_return->source = g_strdup(source);
 	return llir_return;
 }
 
@@ -1156,6 +1247,7 @@ static const char *LLIR_NODE_TYPE_TO_STRING[] = {
 	[LLIR_NODE_TYPE_RETURN] = "RETURN",
 	[LLIR_NODE_TYPE_BLOCK_END] = "BLOCK_END",
 	[LLIR_NODE_TYPE_METHOD_END] = "METHOD_END",
+	[LLIR_NODE_TYPE_SHIT_YOURSELF] = "SHIT_YOURSELF",
 };
 
 void llir_node_print(struct llir_node *node)

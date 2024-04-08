@@ -675,18 +675,18 @@ static void analyze_program(struct semantics *semantics,
 		analyze_method(semantics, method);
 	}
 
-	struct ir_method *main =
+	struct ir_method *main_method =
 		methods_table_get(semantics->methods_table, "main");
-	if (main == NULL)
+	if (main_method == NULL)
 		semantic_error(semantics, program->token,
 			       "Program must have a definition for main");
-	else if (main->imported)
+	else if (main_method->imported)
 		semantic_error(semantics, program->token,
 			       "main method cannot be imported");
-	else if (main->return_type != IR_DATA_TYPE_VOID)
+	else if (main_method->return_type != IR_DATA_TYPE_VOID)
 		semantic_error(semantics, program->token,
 			       "main method must return void");
-	else if (main->arguments->len > 0)
+	else if (main_method->arguments->len > 0)
 		semantic_error(semantics, program->token,
 			       "main method must have no arguments");
 
