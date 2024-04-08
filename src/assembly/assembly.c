@@ -354,31 +354,41 @@ static void generate_binary_operation(struct code_generator *generator)
 	case LLIR_BINARY_OPERATION_TYPE_EQUAL:
 		g_print("\tcmpq %%r11, %%r10\n");
 		g_print("\tsete %%al\n");
-		g_print("\tmovzbq %%al, %%r10\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbl  %%al, %%eax\n");
+		g_print("\tcltq\n");
+		g_print("\tmovq %%rax, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_NOT_EQUAL:
 		g_print("\tcmpq %%r11, %%r10\n");
 		g_print("\tsetne %%al\n");
-		g_print("\tmovzbq %%al, %%r10\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbl  %%al, %%eax\n");
+		g_print("\tcltq\n");
+		g_print("\tmovq %%rax, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_LESS:
 		g_print("\tcmpq %%r11, %%r10\n");
 		g_print("\tsetl %%al\n");
+		g_print("\tandb $1, %%al\n");
 		g_print("\tmovzbq %%al, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_LESS_EQUAL:
 		g_print("\tcmpq %%r11, %%r10\n");
 		g_print("\tsetle %%al\n");
+		g_print("\tandb $1, %%al\n");
 		g_print("\tmovzbq %%al, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_GREATER_EQUAL:
 		g_print("\tcmpq %%r11, %%r10\n");
 		g_print("\tsetge %%al\n");
+		g_print("\tandb $1, %%al\n");
 		g_print("\tmovzbq %%al, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_GREATER:
 		g_print("\tcmpq %%r11, %%r10\n");
 		g_print("\tsetg %%al\n");
+		g_print("\tandb $1, %%al\n");
 		g_print("\tmovzbq %%al, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_ADD:
@@ -391,14 +401,14 @@ static void generate_binary_operation(struct code_generator *generator)
 		g_print("\timul %%r11, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_DIV:
-		g_print("\tmov %%r10, %%rax\n");
+		g_print("\tmov %%r10, %%eax\n");
 		g_print("\tidivq %%r11\n");
-		g_print("\tmov %%rax, %%r10\n");
+		g_print("\tmov %%eax, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_MOD:
-		g_print("\tmov %%r10, %%rax\n");
+		g_print("\tmov %%r10, %%eax\n");
 		g_print("\tidivq %%r11\n");
-		g_print("\tmov %%rdx, %%r10\n");
+		g_print("\tmov %%edx, %%r10\n");
 		break;
 	default:
 		g_assert(!"you fucked up");
