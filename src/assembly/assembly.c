@@ -313,12 +313,135 @@ static void generate_indexed_assignment(struct code_generator *generator)
 
 static void generate_binary_operation(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_assert(generator->node->type == LLIR_NODE_TYPE_BINARY_OPERATION);
+
+	struct llir_binary_operation *binary_operation =
+		generator->node->binary_operation;
+
+	int32_t left_operand_offset =
+		get_field_offset(generator, binary_operation->left_operand);
+
+	int32_t right_operand_offset =
+		get_field_offset(generator, binary_operation->right_operand);
+
+	int32_t destination_offset = get_destination_offset(
+		generator, binary_operation->destination);
+
+	g_print("\t# generate_binary_operation\n");
+
+	if (left_operand_offset == -1)
+		g_print("\tmovq %s, %%r10\n", binary_operation->left_operand);
+	else
+		g_print("\tmovq -%d(%%rbp), %%r10\n", left_operand_offset);
+
+	if (right_operand_offset == -1)
+		g_print("\tmovq %s, %%r11\n", binary_operation->right_operand);
+	else
+		g_print("\tmovq -%d(%%rbp), %%r11\n", right_operand_offset);
+
+	switch (binary_operation->operation) {
+	case LLIR_BINARY_OPERATION_TYPE_OR:
+		g_print("\torq %%r11, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_AND:
+		g_print("\tandq %%r11, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_EQUAL:
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsete %%al\n");
+		g_print("\tmovzbq %%al, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_NOT_EQUAL:
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsetne %%al\n");
+		g_print("\tmovzbq %%al, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_LESS:
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsetl %%al\n");
+		g_print("\tmovzbq %%al, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_LESS_EQUAL:
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsetle %%al\n");
+		g_print("\tmovzbq %%al, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_GREATER_EQUAL:
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsetge %%al\n");
+		g_print("\tmovzbq %%al, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_GREATER:
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsetg %%al\n");
+		g_print("\tmovzbq %%al, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_ADD:
+		g_print("\taddq %%r11, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_SUB:
+		g_print("\tsubq %%r11, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_MUL:
+		g_print("\timul %%r11, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_DIV:
+		g_print("\tmov %%r10, %%rax\n");
+		g_print("\tidivq %%r11\n");
+		g_print("\tmov %%rax, %%r10\n");
+		break;
+	case LLIR_BINARY_OPERATION_TYPE_MOD:
+		g_print("\tmov %%r10, %%rax\n");
+		g_print("\tidivq %%r11\n");
+		g_print("\tmov %%rdx, %%r10\n");
+		break;
+	default:
+		g_assert(!"you fucked up");
+		break;
+	}
+
+	if (destination_offset == -1)
+		g_print("\tmovq %%r10, %s\n", binary_operation->destination);
+	else
+		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
 }
 
 static void generate_unary_operation(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_assert(generator->node->type == LLIR_NODE_TYPE_UNARY_OPERATION);
+
+	struct llir_unary_operation *unary_operation =
+		generator->node->unary_operation;
+
+	int32_t source_offset =
+		get_field_offset(generator, unary_operation->source);
+
+	int32_t destination_offset =
+		get_destination_offset(generator, unary_operation->destination);
+
+	g_print("\t# generate_unary_operation\n");
+
+	if (source_offset == -1)
+		g_print("\tmovq %s, %%r10\n", unary_operation->source);
+	else
+		g_print("\tmovq -%d(%%rbp), %%r10\n", source_offset);
+
+	switch (unary_operation->operation) {
+	case LLIR_UNARY_OPERATION_TYPE_NEGATE:
+		g_print("\tnegq %%r10");
+		break;
+	case LLIR_UNARY_OPERATION_TYPE_NOT:
+		g_print("\tnotq %%r10");
+		break;
+	default:
+		g_assert(!"you fucked up");
+		break;
+	}
+
+	if (destination_offset == -1)
+		g_print("\tmovq %%r10, %s\n", unary_operation->destination);
+	else
+		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
 }
 
 static void
