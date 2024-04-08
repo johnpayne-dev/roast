@@ -22,7 +22,7 @@ static struct symbol_info *push_field(struct code_generator *generator,
 					  generator->symbol_tables->len - 1);
 
 	struct symbol_info *info = g_new(struct symbol_info, 1);
-	info->offset = generator->stack_pointer;
+	info->offset = generator->stack_pointer + 8;
 	info->size = 8 * (length + length % 2);
 	g_hash_table_insert(table, identifier, info);
 
@@ -176,8 +176,13 @@ static void generate_method_declaration(struct code_generator *generator)
 {
 	push_scope(generator);
 
+#ifdef __APPLE__
 	g_print(".globl _%s\n", generator->node->method->identifier);
 	g_print("_%s:\n", generator->node->method->identifier);
+#else
+	g_print(".globl %s\n", generator->node->method->identifier);
+	g_print("%s:\n", generator->node->method->identifier);
+#endif
 	g_print("\tpushq %%rbp\n");
 	g_print("\tmovq %%rsp, %%rbp\n");
 
@@ -515,7 +520,11 @@ static void generate_method_call(struct code_generator *generator)
 	}
 
 	g_print("\tmovq $0, %%rax\n");
+#ifdef __APPLE__
 	g_print("\tcall _%s\n", method_call->identifier);
+#else
+	g_print("\tcall %s\n", method_call->identifier);
+#endif
 	if (stack_argument_count > 0)
 		g_print("\taddq $%i, %%rsp\n", extra_stack_size);
 
