@@ -314,7 +314,13 @@ static void generate_branch(struct code_generator *generator)
 
 static void generate_jump(struct code_generator *generator)
 {
-	g_assert(!"TODO");
+	g_assert(generator->node->type == LLIR_NODE_TYPE_JUMP);
+
+	struct llir_jump *jump = generator->node->jump;
+	struct llir_node *label_node = jump->label;
+
+	g_print("\t# generate_jump\n");
+	g_print("\tj %s", label_node->label->name);
 }
 
 static void generate_return(struct code_generator *generator)
