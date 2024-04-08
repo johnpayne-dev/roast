@@ -136,7 +136,8 @@ static void generate_global_field_initialization(struct llir_field *field)
 		return;
 	}
 
-	g_print("\tmovq $%i, %s(%%rip)\n", field->values->len, field->identifier);
+	g_print("\tmovq $%i, %s(%%rip)\n", field->values->len,
+		field->identifier);
 
 	for (uint32_t i = 0; i < field->values->len; i++) {
 		uint64_t value = g_array_index(field->values, uint64_t, i);
@@ -273,7 +274,8 @@ static void generate_literal_assignment(struct code_generator *generator)
 	g_print("\t# generate_literal_assignment\n");
 
 	if (destination_offset == -1)
-		g_print("\tmovq $%lld, %s(%%rip)\n", literal_assignment->literal,
+		g_print("\tmovq $%lld, %s(%%rip)\n",
+			literal_assignment->literal,
 			literal_assignment->destination);
 	else
 		g_print("\tmovq $%lld, -%d(%%rbp)\n",
@@ -305,12 +307,14 @@ static void generate_indexed_assignment(struct code_generator *generator)
 	if (source_offset != -1)
 		g_print("\tmovq -%u(%%rbp), %%r11\n", source_offset);
 	else
-		g_print("\tmovq %s(%%rip), %%r11\n", indexed_assignment->source);
+		g_print("\tmovq %s(%%rip), %%r11\n",
+			indexed_assignment->source);
 
 	if (destination_offset != -1) {
 		g_print("\tmovq %%r11, -(%%rbp, %%r10)\n");
 	} else {
-		g_print("\tleaq %s(%%rip), %%rax\n", indexed_assignment->destination);
+		g_print("\tleaq %s(%%rip), %%rax\n",
+			indexed_assignment->destination);
 		g_print("\taddq %%rax, %%r10\n");
 		g_print("\tmovq %%r11, 0(%%r10)\n");
 	}
@@ -335,7 +339,8 @@ static void generate_binary_operation(struct code_generator *generator)
 	g_print("\t# generate_binary_operation\n");
 
 	if (left_operand_offset == -1)
-		g_print("\tmovq %s(%%rip), %%r10\n", binary_operation->left_operand);
+		g_print("\tmovq %s(%%rip), %%r10\n",
+			binary_operation->left_operand);
 	else
 		g_print("\tmovq -%d(%%rbp), %%r10\n", left_operand_offset);
 
@@ -401,14 +406,14 @@ static void generate_binary_operation(struct code_generator *generator)
 		g_print("\timul %%r11, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_DIV:
-		g_print("\tmov %%r10, %%eax\n");
+		g_print("\tmovq %%r10, %%eax\n");
 		g_print("\tidivq %%r11\n");
-		g_print("\tmov %%eax, %%r10\n");
+		g_print("\tmovq %%eax, %%r10\n");
 		break;
 	case LLIR_BINARY_OPERATION_TYPE_MOD:
-		g_print("\tmov %%r10, %%eax\n");
+		g_print("\tmovq %%r10, %%rax\n");
 		g_print("\tidivq %%r11\n");
-		g_print("\tmov %%edx, %%r10\n");
+		g_print("\tmovq %%rdx, %%r10\n");
 		break;
 	default:
 		g_assert(!"you fucked up");
@@ -416,7 +421,8 @@ static void generate_binary_operation(struct code_generator *generator)
 	}
 
 	if (destination_offset == -1)
-		g_print("\tmovq %%r10, %s(%%rip)\n", binary_operation->destination);
+		g_print("\tmovq %%r10, %s(%%rip)\n",
+			binary_operation->destination);
 	else
 		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
 }
@@ -454,7 +460,8 @@ static void generate_unary_operation(struct code_generator *generator)
 	}
 
 	if (destination_offset == -1)
-		g_print("\tmovq %%r10, %s(%%rip)\n", unary_operation->destination);
+		g_print("\tmovq %%r10, %s(%%rip)\n",
+			unary_operation->destination);
 	else
 		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
 }
