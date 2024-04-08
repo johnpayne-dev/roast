@@ -346,8 +346,11 @@ static struct ast_node *parse_method_call(struct parser *parser)
 
 	next_token(parser, TOKEN_TYPE_OPEN_PARENTHESIS, NULL);
 
-	if (next_token(parser, TOKEN_TYPE_CLOSE_PARENTHESIS, NULL))
+	if (next_token(parser, TOKEN_TYPE_CLOSE_PARENTHESIS, NULL)) {
+		ast_node_add_child(
+			call, new_node(parser, AST_NODE_TYPE_METHOD_CALL_END));
 		return call;
+	}
 
 	while (true) {
 		struct ast_node *argument = parse_method_call_argument(parser);
@@ -366,6 +369,9 @@ static struct ast_node *parse_method_call(struct parser *parser)
 			"Expected comma or closing parenthesis in method call");
 		break;
 	}
+
+	ast_node_add_child(call,
+			   new_node(parser, AST_NODE_TYPE_METHOD_CALL_END));
 
 	return call;
 }
