@@ -637,25 +637,23 @@ static void generate_method_end(struct code_generator *generator)
 {
 	pop_scope(generator);
 	g_print("\t# generate_method_end\n");
+	g_print("\tmovq $-1, %%rax\n");
 #ifdef __APPLE__
-	g_print("\tmovl $0x2000001, %%eax\n");
+	g_print("\tcall _exit\n");
 #else
-	g_print("\tmovl $1, %%eax\n");
+	g_print("\tcall exit\n");
 #endif
-	g_print("\tmovl $-2, %%edi\n");
-	g_print("\tsyscall\n");
 }
 
 static void generate_shit_yourself(struct code_generator *generator)
 {
 	g_print("\t# generate_shit_yourself\n");
+	g_print("\tmovq $-1, %%rax\n");
 #ifdef __APPLE__
-	g_print("\tmovl $0x2000001, %%eax\n");
+	g_print("\tcall _exit\n");
 #else
-	g_print("\tmovl $1, %%eax\n");
+	g_print("\tcall exit\n");
 #endif
-	g_print("\tmovl $-1, %%edi\n");
-	g_print("\tsyscall\n");
 }
 
 static void generate_data_section(struct code_generator *generator)
