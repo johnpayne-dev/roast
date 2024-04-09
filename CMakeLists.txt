@@ -8,10 +8,12 @@ set(PROJECT_FILES
     src/main.c
     src/assembly/assembly.c
     src/assembly/assembly.h
+    src/assembly/code_generator.c
+    src/assembly/code_generator.h
     src/assembly/llir.c
     src/assembly/llir.h
-    src/assembly/counters.c
-    src/assembly/counters.h
+    src/assembly/symbol_table.c
+    src/assembly/symbol_table.h
     src/parser/ast.c
     src/parser/ast.h
     src/parser/parser.c
