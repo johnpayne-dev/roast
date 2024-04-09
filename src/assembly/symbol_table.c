@@ -25,10 +25,17 @@ void symbol_table_set(struct symbol_table *symbol_table, char *identifier,
 void *symbol_table_get(struct symbol_table *symbol_table, char *identifier)
 {
 	g_assert(symbol_table->tables->len > 0);
-	GHashTable *table = g_array_index(symbol_table->tables, GHashTable *,
-					  symbol_table->tables->len - 1);
 
-	return g_hash_table_lookup(table, identifier);
+	for (int32_t i = symbol_table->tables->len - 1; i >= 0; i--) {
+		GHashTable *table =
+			g_array_index(symbol_table->tables, GHashTable *, i);
+
+		void *data = g_hash_table_lookup(table, identifier);
+		if (data != NULL)
+			return data;
+	}
+
+	return NULL;
 }
 
 void symbol_table_push_scope(struct symbol_table *symbol_table)

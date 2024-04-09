@@ -1,6 +1,5 @@
 #pragma once
 #include "semantics/ir.h"
-#include "assembly/counters.h"
 
 struct llir_node {
 	enum llir_node_type {
