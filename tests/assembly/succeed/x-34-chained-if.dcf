@@ -1,0 +1,7 @@
+import printf;
+
+void main() {
+  int x;
+
+  if (printf("a\n") == printf("b\n")) { printf("c\n"); } else { printf("d\n"); }
+}

@@ -1,0 +1,68 @@
+import printf;
+
+int global_int_1[] = {1, '2', -3}, global_int_2[4], global_int_3;
+bool global_bool_1[] = {true, false, true}, global_bool_2[4], global_bool_3;
+
+void main() {
+  int method_int_1[] = {1, '2', 3}, method_int_2[4], method_int_3;
+  bool method_bool_1[] = {true, false, true}, method_bool_2[4], method_bool_3;
+
+  if (true) {
+    int block_int_1[] = {1, '2', 3}, block_int_2[4], block_int_3;
+    bool block_bool_1[] = {true, false, true}, block_bool_2[4], block_bool_3;
+    int it;
+
+    for (it = 0; it < len(global_int_1); it++) {
+      printf("global_int_1[%d] = %d\n", it, global_int_1[it]);
+    }
+    for (it = 0; it < len(global_int_2); it++) {
+      printf("global_int_2[%d] = %d\n", it, global_int_2[it]);
+    }
+    printf("global_int_3: %d\n", global_int_3);
+
+    for (it = 0; it < len(global_bool_1); it++) {
+      printf("global_bool_1[%d] = %d\n", it, global_bool_1[it]);
+    }
+    for (it = 0; it < len(global_bool_2); it++) {
+      printf("global_bool_2[%d] = %d\n", it, global_bool_2[it]);
+    }
+    printf("global_bool_3: %d\n", global_bool_3);
+
+
+    for (it = 0; it < len(method_int_1); it++) {
+      printf("method_int_1[%d] = %d\n", it, method_int_1[it]);
+    }
+    for (it = 0; it < len(method_int_2); it++) {
+      printf("method_int_2[%d] = %d\n", it, method_int_2[it]);
+    }
+    printf("method_int_3: %d\n", method_int_3);
+
+    for (it = 0; it < len(method_bool_1); it++) {
+      printf("method_bool_1[%d] = %d\n", it, method_bool_1[it]);
+    }
+    for (it = 0; it < len(method_bool_2); it++) {
+      printf("method_bool_2[%d] = %d\n", it, method_bool_2[it]);
+    }
+    printf("method_bool_3: %d\n", method_bool_3);
+
+
+    for (it = 0; it < len(block_int_1); it++) {
+      printf("block_int_1[%d] = %d\n", it, block_int_1[it]);
+    }
+    for (it = 0; it < len(block_int_2); it++) {
+      printf("block_int_2[%d] = %d\n", it, block_int_2[it]);
+    }
+    printf("block_int_3: %d\n", block_int_3);
+
+    for (it = 0; it < len(block_bool_1); it++) {
+      printf("block_bool_1[%d] = %d\n", it, block_bool_1[it]);
+    }
+    for (it = 0; it < len(block_bool_2); it++) {
+      printf("block_bool_2[%d] = %d\n", it, block_bool_2[it]);
+    }
+    printf("block_bool_3: %d\n", block_bool_3);
+
+
+  }
+
+}
