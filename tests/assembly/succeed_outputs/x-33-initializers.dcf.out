@@ -1,0 +1,48 @@
+global_int_1[0] = 1
+global_int_1[1] = 50
+global_int_1[2] = -3
+global_int_2[0] = 0
+global_int_2[1] = 0
+global_int_2[2] = 0
+global_int_2[3] = 0
+global_int_3: 0
+global_bool_1[0] = 1
+global_bool_1[1] = 0
+global_bool_1[2] = 1
+global_bool_2[0] = 0
+global_bool_2[1] = 0
+global_bool_2[2] = 0
+global_bool_2[3] = 0
+global_bool_3: 0
+method_int_1[0] = 1
+method_int_1[1] = 50
+method_int_1[2] = 3
+method_int_2[0] = 0
+method_int_2[1] = 0
+method_int_2[2] = 0
+method_int_2[3] = 0
+method_int_3: 0
+method_bool_1[0] = 1
+method_bool_1[1] = 0
+method_bool_1[2] = 1
+method_bool_2[0] = 0
+method_bool_2[1] = 0
+method_bool_2[2] = 0
+method_bool_2[3] = 0
+method_bool_3: 0
+block_int_1[0] = 1
+block_int_1[1] = 50
+block_int_1[2] = 3
+block_int_2[0] = 0
+block_int_2[1] = 0
+block_int_2[2] = 0
+block_int_2[3] = 0
+block_int_3: 0
+block_bool_1[0] = 1
+block_bool_1[1] = 0
+block_bool_1[2] = 1
+block_bool_2[0] = 0
+block_bool_2[1] = 0
+block_bool_2[2] = 0
+block_bool_2[3] = 0
+block_bool_3: 0
