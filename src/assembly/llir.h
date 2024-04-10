@@ -114,7 +114,7 @@ struct llir_operation *llir_operation_new(enum llir_operation_type type,
 void llir_operation_free(struct llir_operation *operation);
 
 struct llir_method_call {
-	char *method;
+	char *identifier;
 	struct llir_operand *arguments;
 	uint32_t argument_count;
 	struct llir_operand destination;
@@ -139,12 +139,12 @@ void llir_label_free(struct llir_label *label);
 
 struct llir_branch {
 	enum llir_branch_type {
-		LLIR_BRANCH_EQUAL,
-		LLIR_BRANCH_NOT_EQUAL,
-		LLIR_BRANCH_LESS,
-		LLIR_BRANCH_LESS_EQUAL,
-		LLIR_BRANCH_GREATER,
-		LLIR_BRANCH_GREATER_EQUAL,
+		LLIR_BRANCH_TYPE_EQUAL,
+		LLIR_BRANCH_TYPE_NOT_EQUAL,
+		LLIR_BRANCH_TYPE_LESS,
+		LLIR_BRANCH_TYPE_LESS_EQUAL,
+		LLIR_BRANCH_TYPE_GREATER,
+		LLIR_BRANCH_TYPE_GREATER_EQUAL,
 	} type;
 
 	bool unsigned_comparison;

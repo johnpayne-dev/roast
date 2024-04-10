@@ -51,9 +51,12 @@ void llir_node_print(struct llir_node *node)
 	};
 
 	static const char *BRANCH_TYPE_TO_STRING[] = {
-		[LLIR_BRANCH_EQUAL] = "==",  [LLIR_BRANCH_NOT_EQUAL] = "!=",
-		[LLIR_BRANCH_LESS] = "<",    [LLIR_BRANCH_LESS_EQUAL] = "<=",
-		[LLIR_BRANCH_GREATER] = ">", [LLIR_BRANCH_GREATER_EQUAL] = ">=",
+		[LLIR_BRANCH_TYPE_EQUAL] = "==",
+		[LLIR_BRANCH_TYPE_NOT_EQUAL] = "!=",
+		[LLIR_BRANCH_TYPE_LESS] = "<",
+		[LLIR_BRANCH_TYPE_LESS_EQUAL] = "<=",
+		[LLIR_BRANCH_TYPE_GREATER] = ">",
+		[LLIR_BRANCH_TYPE_GREATER_EQUAL] = ">=",
 	};
 
 	switch (node->type) {
@@ -88,7 +91,7 @@ void llir_node_print(struct llir_node *node)
 		break;
 	case LLIR_NODE_TYPE_METHOD_CALL:
 		print_operand(node->method_call->destination);
-		g_print(" = %s(...)\n", node->method_call->method);
+		g_print(" = %s(...)\n", node->method_call->identifier);
 		break;
 	case LLIR_NODE_TYPE_LABEL:
 		g_print("%s:\n", node->label->name);
@@ -293,7 +296,7 @@ struct llir_method_call *llir_method_call_new(char *method,
 {
 	struct llir_method_call *call = g_new(struct llir_method_call, 1);
 
-	call->method = g_strdup(method);
+	call->identifier = g_strdup(method);
 	call->argument_count = argument_count;
 	call->arguments = g_new(struct llir_operand, argument_count);
 	call->destination = destination;
@@ -317,7 +320,7 @@ struct llir_operand llir_method_call_get_argument(struct llir_method_call *call,
 
 void llir_method_call_free(struct llir_method_call *call)
 {
-	g_free(call->method);
+	g_free(call->identifier);
 	g_free(call->arguments);
 	g_free(call);
 }

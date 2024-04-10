@@ -90,7 +90,7 @@ static void nodes_from_bounds_check(struct assembly *assembly,
 
 	struct llir_operand length_operand = llir_operand_from_literal(length);
 	struct llir_branch *branch = llir_branch_new(
-		LLIR_BRANCH_LESS, true, index, length_operand, label);
+		LLIR_BRANCH_TYPE_LESS, true, index, length_operand, label);
 	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
 
 	struct llir_shit_yourself *exit = llir_shit_yourself_new(-1);
@@ -243,13 +243,13 @@ nodes_from_short_circuit(struct assembly *assembly,
 
 	enum llir_branch_type comparison =
 		ir_binary_expression->binary_operator == IR_BINARY_OPERATOR_OR ?
-			LLIR_BRANCH_EQUAL :
-			LLIR_BRANCH_NOT_EQUAL;
+			LLIR_BRANCH_TYPE_EQUAL :
+			LLIR_BRANCH_TYPE_NOT_EQUAL;
 	struct llir_operand literal = llir_operand_from_literal(1);
 	struct llir_label *label = new_label(assembly);
 
 	struct llir_branch *branch = llir_branch_new(
-		LLIR_BRANCH_EQUAL, false, destination, literal, label);
+		LLIR_BRANCH_TYPE_EQUAL, false, destination, literal, label);
 	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
 
 	struct llir_operand right =
@@ -290,7 +290,7 @@ nodes_from_binary_expression(struct assembly *assembly,
 		[IR_BINARY_OPERATOR_MOD] = LLIR_OPERATION_TYPE_MODULO,
 	};
 
-	enum llir_operand_type operation =
+	enum llir_operation_type operation =
 		IR_OPERATOR_TO_LLIR_OPERATION[ir_binary_expression
 						      ->binary_operator];
 	add_operation(assembly, operation, right, left);
@@ -431,7 +431,7 @@ static void nodes_from_if_statement(struct assembly *assembly,
 
 	struct llir_label *end_if = new_label(assembly);
 	struct llir_branch *branch =
-		llir_branch_new(LLIR_BRANCH_EQUAL, false, expression,
+		llir_branch_new(LLIR_BRANCH_TYPE_EQUAL, false, expression,
 				llir_operand_from_literal(0), end_if);
 	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
 	nodes_from_block(assembly, ir_if_statement->if_block);
@@ -480,7 +480,7 @@ static void nodes_from_for_statement(struct assembly *assembly,
 		nodes_from_expression(assembly, ir_for_statement->condition);
 
 	struct llir_branch *branch =
-		llir_branch_new(LLIR_BRANCH_EQUAL, false, condition,
+		llir_branch_new(LLIR_BRANCH_TYPE_EQUAL, false, condition,
 				llir_operand_from_literal(0), break_label);
 	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
 
@@ -507,7 +507,7 @@ nodes_from_while_statement(struct assembly *assembly,
 		nodes_from_expression(assembly, ir_while_statement->condition);
 
 	struct llir_branch *branch =
-		llir_branch_new(LLIR_BRANCH_EQUAL, false, condition,
+		llir_branch_new(LLIR_BRANCH_TYPE_EQUAL, false, condition,
 				llir_operand_from_literal(0), break_label);
 	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
 
