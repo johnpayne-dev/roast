@@ -1,5 +1,6 @@
 #pragma once
 #include <glib.h>
+#include <stdint.h>
 
 struct symbol_table {
 	GArray *tables;
