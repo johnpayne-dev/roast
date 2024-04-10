@@ -30,7 +30,7 @@ static struct llir_operand new_temporary(struct assembly *assembly)
 	char *identifier =
 		g_strdup_printf("$%u", assembly->temporary_variable_counter++);
 
-	struct llir_field *field = llir_field_new(identifier, false, 1);
+	struct llir_field *field = llir_field_new(identifier, 0, false, 1);
 	add_node(assembly, LLIR_NODE_TYPE_FIELD, field);
 
 	symbol_table_set(assembly->symbol_table, field->identifier, field);
@@ -617,14 +617,16 @@ static void nodes_from_method(struct assembly *assembly,
 	for (uint32_t i = 0; i < ir_method->arguments->len; i++) {
 		struct ir_field *ir_field = g_array_index(ir_method->arguments,
 							  struct ir_field *, i);
+		uint32_t scope_level =
+			symbol_table_get_scope_level(assembly->symbol_table);
 		struct llir_field *field =
-			llir_field_new(ir_field->identifier,
+			llir_field_new(ir_field->identifier, scope_level,
 				       ir_data_type_is_array(ir_field->type),
 				       ir_field->array_length);
 
 		llir_method_set_argument(method, i, field);
 
-		symbol_table_set(assembly->symbol_table, field->identifier,
+		symbol_table_set(assembly->symbol_table, ir_field->identifier,
 				 field);
 	}
 
@@ -647,12 +649,14 @@ static void nodes_from_method(struct assembly *assembly,
 static void nodes_from_field(struct assembly *assembly,
 			     struct ir_field *ir_field)
 {
+	uint32_t scope_level =
+		symbol_table_get_scope_level(assembly->symbol_table);
 	struct llir_field *field = llir_field_new(
-		ir_field->identifier, ir_data_type_is_array(ir_field->type),
-		ir_field->array_length);
+		ir_field->identifier, scope_level,
+		ir_data_type_is_array(ir_field->type), ir_field->array_length);
 	add_node(assembly, LLIR_NODE_TYPE_FIELD, field);
 
-	symbol_table_set(assembly->symbol_table, field->identifier, field);
+	symbol_table_set(assembly->symbol_table, ir_field->identifier, field);
 }
 
 static void nodes_from_program(struct assembly *assembly,

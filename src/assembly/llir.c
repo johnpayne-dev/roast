@@ -161,12 +161,17 @@ void llir_node_free(struct llir_node *node)
 	g_free(node);
 }
 
-struct llir_field *llir_field_new(char *identifier, bool is_array,
-				  int64_t length)
+struct llir_field *llir_field_new(char *identifier, uint32_t scope_level,
+				  bool is_array, int64_t length)
 {
 	struct llir_field *field = g_new(struct llir_field, 1);
 
-	field->identifier = g_strdup(identifier);
+	if (scope_level > 0)
+		field->identifier =
+			g_strdup_printf("%s@%u", identifier, scope_level);
+	else
+		field->identifier = g_strdup(identifier);
+
 	field->is_array = is_array;
 	field->values = g_new(int64_t, length);
 	field->value_count = length;

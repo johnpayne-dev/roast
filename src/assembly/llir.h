@@ -41,8 +41,8 @@ struct llir_field {
 	int64_t *values;
 };
 
-struct llir_field *llir_field_new(char *identifier, bool is_array,
-				  int64_t length);
+struct llir_field *llir_field_new(char *identifier, uint32_t scope_level,
+				  bool is_array, int64_t length);
 void llir_field_set_value(struct llir_field *field, uint32_t index,
 			  int64_t value);
 int64_t llir_field_get_value(struct llir_field *field, uint32_t index);

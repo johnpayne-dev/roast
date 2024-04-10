@@ -44,6 +44,11 @@ void symbol_table_push_scope(struct symbol_table *symbol_table)
 	g_array_append_val(symbol_table->tables, table);
 }
 
+uint32_t symbol_table_get_scope_level(struct symbol_table *symbol_table)
+{
+	return symbol_table->tables->len - 1;
+}
+
 void symbol_table_pop_scope(struct symbol_table *symbol_table)
 {
 	g_assert(symbol_table->tables->len > 0);
