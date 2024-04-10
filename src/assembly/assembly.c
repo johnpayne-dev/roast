@@ -1,776 +1,674 @@
 #include "assembly/assembly.h"
 
-static const char *ARGUMENT_REGISTERS[] = { "rdi", "rsi", "rdx",
-					    "rcx", "r8",  "r9" };
-
-struct symbol_info {
-	int32_t offset;
-	int32_t size;
-};
-
-static void push_scope(struct code_generator *generator)
+static void add_node(struct assembly *assembly, enum llir_node_type type,
+		     void *data)
 {
-	GHashTable *table = g_hash_table_new(g_str_hash, g_str_equal);
-	g_array_append_val(generator->symbol_tables, table);
-}
+	struct llir_node *node = llir_node_new(type, data);
 
-static struct symbol_info *push_field(struct code_generator *generator,
-				      char *identifier, uint32_t length)
-{
-	GHashTable *table = g_array_index(generator->symbol_tables,
-					  GHashTable *,
-					  generator->symbol_tables->len - 1);
-
-	struct symbol_info *info = g_new(struct symbol_info, 1);
-	info->offset = generator->stack_pointer + 8;
-	info->size = 8 * (length + length % 2);
-	g_hash_table_insert(table, identifier, info);
-
-	generator->stack_pointer += info->size;
-	return info;
-}
-
-static int32_t get_field_offset(struct code_generator *generator,
-				char *identifier)
-{
-	for (int32_t i = generator->symbol_tables->len - 1; i >= 0; i--) {
-		GHashTable *table = g_array_index(generator->symbol_tables,
-						  GHashTable *, i);
-
-		struct symbol_info *info =
-			g_hash_table_lookup(table, identifier);
-		if (info != NULL)
-			return info->offset;
-	}
-
-	return -1;
-}
-
-static int32_t pop_scope(struct code_generator *generator)
-{
-	GHashTable *table = g_array_index(generator->symbol_tables,
-					  GHashTable *,
-					  generator->symbol_tables->len - 1);
-	GList *list = g_hash_table_get_values(table);
-
-	int32_t size = 0;
-	while (list != NULL) {
-		struct symbol_info *info = list->data;
-		size += info->size;
-		list = list->next;
-	}
-
-	generator->stack_pointer -= size;
-
-	g_list_free(list);
-	g_hash_table_unref(table);
-	g_array_remove_index(generator->symbol_tables,
-			     generator->symbol_tables->len - 1);
-	return size;
-}
-
-static void generate_global_string(struct code_generator *generator,
-				   char *string)
-{
-	if (g_hash_table_lookup(generator->strings, string) != 0)
-		return;
-
-	g_print("string_%llu:\n", generator->string_counter);
-	g_print("\t.string %s\n", string);
-	g_print("\t.align 16\n");
-
-	g_hash_table_insert(generator->strings, string,
-			    (gpointer)generator->string_counter);
-	generator->string_counter++;
-}
-
-static void generate_global_strings(struct code_generator *generator)
-{
-	for (struct llir_node *node = generator->node; node != NULL;
-	     node = node->next) {
-		if (node->type != LLIR_NODE_TYPE_METHOD_CALL)
-			continue;
-
-		GArray *arguments = node->method_call->arguments;
-		for (uint32_t i = 0; i < arguments->len; i++) {
-			struct llir_method_call_argument argument =
-				g_array_index(arguments,
-					      struct llir_method_call_argument,
-					      i);
-
-			if (argument.type !=
-			    LLIR_METHOD_CALL_ARGUMENT_TYPE_STRING)
-				continue;
-
-			generate_global_string(generator, argument.string);
-		}
-	}
-}
-
-static void generate_global_field(struct llir_field *field)
-{
-	uint64_t length = 8 * (field->values->len + field->array);
-	g_print("%s:\n", field->identifier);
-	g_print("\t.fill %llu\n", length);
-	g_print("\t.align 16\n");
-}
-
-static void generate_global_fields(struct code_generator *generator)
-{
-	generator->global_fields_head_node = generator->node;
-
-	for (; generator->node->type == LLIR_NODE_TYPE_FIELD;
-	     generator->node = generator->node->next) {
-		generate_global_field(generator->node->field);
-	}
-}
-
-static void generate_global_field_initialization(struct llir_field *field)
-{
-	g_print("\t# generate_global_field_initialization\n");
-	if (!field->array) {
-		uint64_t value = g_array_index(field->values, uint64_t, 0);
-		if (value != 0)
-			g_print("\tmovq $%llu, %s(%%rip)\n", value,
-				field->identifier);
+	if (assembly->head == NULL) {
+		assembly->head = node;
+		assembly->current = node;
 		return;
 	}
 
-	g_print("\tmovq $%i, %s(%%rip)\n", field->values->len,
-		field->identifier);
+	assembly->current->next = node;
+	assembly->current = node;
+}
 
-	for (uint32_t i = 0; i < field->values->len; i++) {
-		uint64_t value = g_array_index(field->values, uint64_t, i);
+static void add_operation(struct assembly *assembly,
+			  enum llir_operation_type type,
+			  struct llir_operand source,
+			  struct llir_operand destination)
+{
+	struct llir_operation *operation =
+		llir_operation_new(type, source, destination);
+	add_node(assembly, LLIR_NODE_TYPE_OPERATION, operation);
+}
 
-		if (value != 0)
-			g_print("\tmovq $%llu, %s+%i(%%rip)\n", value,
-				field->identifier, 8 * (i + 1));
+static struct llir_operand new_temporary(struct assembly *assembly)
+{
+	char *identifier =
+		g_strdup_printf("$%u", assembly->temporary_variable_counter++);
+
+	struct llir_field *field = llir_field_new(identifier, 0, false, 1);
+	add_node(assembly, LLIR_NODE_TYPE_FIELD, field);
+
+	symbol_table_set(assembly->symbol_table, field->identifier, field);
+
+	g_free(identifier);
+	return llir_operand_from_identifier(field->identifier);
+}
+
+static struct llir_label *new_label(struct assembly *assembly)
+{
+	return llir_label_new(assembly->label_counter++);
+}
+
+static void push_loop(struct assembly *assembly, struct llir_label *break_label,
+		      struct llir_label *continue_label)
+{
+	g_array_append_val(assembly->break_labels, break_label);
+	g_array_append_val(assembly->continue_labels, continue_label);
+}
+
+static struct llir_label *get_break_label(struct assembly *assembly)
+{
+	g_assert(assembly->break_labels->len > 0);
+	return g_array_index(assembly->break_labels, struct llir_label *,
+			     assembly->break_labels->len - 1);
+}
+
+static struct llir_label *get_continue_label(struct assembly *assembly)
+{
+	g_assert(assembly->continue_labels->len > 0);
+	return g_array_index(assembly->continue_labels, struct llir_label *,
+			     assembly->continue_labels->len - 1);
+}
+
+static void pop_loop(struct assembly *assembly)
+{
+	g_assert(assembly->break_labels->len > 0);
+	g_assert(assembly->continue_labels->len > 0);
+	g_array_remove_index(assembly->break_labels,
+			     assembly->break_labels->len - 1);
+	g_array_remove_index(assembly->continue_labels,
+			     assembly->continue_labels->len - 1);
+}
+
+static void nodes_from_field(struct assembly *assembly,
+			     struct ir_field *ir_field);
+static struct llir_operand
+nodes_from_expression(struct assembly *assembly,
+		      struct ir_expression *ir_expression);
+static void nodes_from_block(struct assembly *assembly,
+			     struct ir_block *ir_block);
+
+static void nodes_from_bounds_check(struct assembly *assembly,
+				    struct llir_operand index, int64_t length)
+{
+	struct llir_label *label = new_label(assembly);
+
+	struct llir_operand length_operand = llir_operand_from_literal(length);
+	struct llir_branch *branch = llir_branch_new(
+		LLIR_BRANCH_TYPE_LESS, true, index, length_operand, label);
+	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
+
+	struct llir_shit_yourself *exit = llir_shit_yourself_new(-1);
+	add_node(assembly, LLIR_NODE_TYPE_SHIT_YOURSELF, exit);
+
+	add_node(assembly, LLIR_NODE_TYPE_LABEL, label);
+}
+
+static struct llir_operand nodes_from_location(struct assembly *assembly,
+					       struct ir_location *ir_location)
+{
+	struct llir_field *source_field = symbol_table_get(
+		assembly->symbol_table, ir_location->identifier);
+	g_assert(source_field != NULL);
+
+	struct llir_operand source =
+		llir_operand_from_identifier(source_field->identifier);
+	struct llir_operand destination = new_temporary(assembly);
+
+	if (ir_location->index == NULL) {
+		add_operation(assembly, LLIR_OPERATION_TYPE_MOVE, source,
+			      destination);
+		return destination;
+	}
+
+	struct llir_operand array = new_temporary(assembly);
+	add_operation(assembly, LLIR_OPERATION_TYPE_MOVE, source, array);
+
+	struct llir_operand index =
+		nodes_from_expression(assembly, ir_location->index);
+
+	nodes_from_bounds_check(assembly, index, source_field->value_count);
+
+	add_operation(assembly, LLIR_OPERATION_TYPE_MULTIPLY,
+		      llir_operand_from_literal(8), index);
+	add_operation(assembly, LLIR_OPERATION_TYPE_ADD, index, array);
+
+	struct llir_operand dereference =
+		llir_operand_from_dereference(array.identifier, 0);
+	add_operation(assembly, LLIR_OPERATION_TYPE_MOVE, dereference,
+		      destination);
+
+	return destination;
+}
+
+static int64_t literal_to_int64(struct ir_literal *literal)
+{
+	const uint64_t MAX_INT64_POSSIBLE_MAGNITUDE = ((uint64_t)1)
+						      << 63; // what the fuck?
+
+	g_assert(literal->value <= MAX_INT64_POSSIBLE_MAGNITUDE);
+
+	bool actually_negate = literal->negate &&
+			       (literal->value != MAX_INT64_POSSIBLE_MAGNITUDE);
+
+	int64_t value = (int64_t)literal->value * (actually_negate ? -1 : 1);
+	return value;
+}
+
+static struct llir_operand nodes_from_literal(struct assembly *assembly,
+					      struct ir_literal *literal)
+{
+	int64_t value = literal_to_int64(literal);
+
+	struct llir_operand source = llir_operand_from_literal(value);
+	struct llir_operand destination = new_temporary(assembly);
+	add_operation(assembly, LLIR_OPERATION_TYPE_MOVE, source, destination);
+
+	return destination;
+}
+
+static struct llir_operand
+nodes_from_method_call(struct assembly *assembly,
+		       struct ir_method_call *ir_method_call)
+{
+	struct llir_operand destination = new_temporary(assembly);
+	struct llir_method_call *call = llir_method_call_new(
+		ir_method_call->identifier, ir_method_call->arguments->len,
+		destination);
+
+	for (uint32_t i = 0; i < call->argument_count; i++) {
+		struct ir_method_call_argument *ir_method_call_argument =
+			g_array_index(ir_method_call->arguments,
+				      struct ir_method_call_argument *, i);
+
+		struct llir_operand argument;
+		if (ir_method_call_argument->type ==
+		    IR_METHOD_CALL_ARGUMENT_TYPE_STRING)
+			argument = llir_operand_from_string(
+				ir_method_call_argument->string);
+		else
+			argument = nodes_from_expression(
+				assembly, ir_method_call_argument->expression);
+
+		llir_method_call_set_argument(call, i, argument);
+	}
+
+	add_node(assembly, LLIR_NODE_TYPE_METHOD_CALL, call);
+	return destination;
+}
+
+static struct llir_operand
+nodes_from_len_expression(struct assembly *assembly,
+			  struct ir_length_expression *length_expression)
+{
+	struct llir_operand source =
+		llir_operand_from_literal(length_expression->length);
+	struct llir_operand destination = new_temporary(assembly);
+	add_operation(assembly, LLIR_OPERATION_TYPE_MOVE, source, destination);
+
+	return destination;
+}
+
+static struct llir_operand
+nodes_from_not_expression(struct assembly *assembly,
+			  struct ir_expression *ir_expression)
+{
+	struct llir_operand source =
+		nodes_from_expression(assembly, ir_expression);
+	struct llir_operand destination = new_temporary(assembly);
+	add_operation(assembly, LLIR_OPERATION_TYPE_NOT, source, destination);
+
+	return destination;
+}
+
+static struct llir_operand
+nodes_from_negate_expression(struct assembly *assembly,
+			     struct ir_expression *ir_expression)
+{
+	struct llir_operand source =
+		nodes_from_expression(assembly, ir_expression);
+	struct llir_operand destination = new_temporary(assembly);
+	add_operation(assembly, LLIR_OPERATION_TYPE_NEGATE, source,
+		      destination);
+
+	return destination;
+}
+
+static struct llir_operand
+nodes_from_short_circuit(struct assembly *assembly,
+			 struct ir_binary_expression *ir_binary_expression)
+{
+	g_assert(ir_binary_expression->binary_operator ==
+			 IR_BINARY_OPERATOR_AND ||
+		 ir_binary_expression->binary_operator ==
+			 IR_BINARY_OPERATOR_OR);
+
+	struct llir_operand destination =
+		nodes_from_expression(assembly, ir_binary_expression->left);
+
+	enum llir_branch_type comparison =
+		ir_binary_expression->binary_operator == IR_BINARY_OPERATOR_OR ?
+			LLIR_BRANCH_TYPE_EQUAL :
+			LLIR_BRANCH_TYPE_NOT_EQUAL;
+	struct llir_operand literal = llir_operand_from_literal(1);
+	struct llir_label *label = new_label(assembly);
+
+	struct llir_branch *branch =
+		llir_branch_new(comparison, false, destination, literal, label);
+	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
+
+	struct llir_operand right =
+		nodes_from_expression(assembly, ir_binary_expression->right);
+	add_operation(assembly, LLIR_OPERATION_TYPE_MOVE, right, destination);
+
+	add_node(assembly, LLIR_NODE_TYPE_LABEL, label);
+
+	return destination;
+}
+
+static struct llir_operand
+nodes_from_binary_expression(struct assembly *assembly,
+			     struct ir_binary_expression *ir_binary_expression)
+{
+	if (ir_binary_expression->binary_operator == IR_BINARY_OPERATOR_OR ||
+	    ir_binary_expression->binary_operator == IR_BINARY_OPERATOR_AND)
+		return nodes_from_short_circuit(assembly, ir_binary_expression);
+
+	struct llir_operand left =
+		nodes_from_expression(assembly, ir_binary_expression->left);
+	struct llir_operand right =
+		nodes_from_expression(assembly, ir_binary_expression->right);
+
+	static enum llir_operation_type IR_OPERATOR_TO_LLIR_OPERATION[] = {
+		[IR_BINARY_OPERATOR_EQUAL] = LLIR_OPERATION_TYPE_EQUAL,
+		[IR_BINARY_OPERATOR_NOT_EQUAL] = LLIR_OPERATION_TYPE_NOT_EQUAL,
+		[IR_BINARY_OPERATOR_LESS] = LLIR_OPERATION_TYPE_LESS,
+		[IR_BINARY_OPERATOR_LESS_EQUAL] =
+			LLIR_OPERATION_TYPE_LESS_EQUAL,
+		[IR_BINARY_OPERATOR_GREATER_EQUAL] =
+			LLIR_OPERATION_TYPE_GREATER_EQUAL,
+		[IR_BINARY_OPERATOR_GREATER] = LLIR_OPERATION_TYPE_GREATER,
+		[IR_BINARY_OPERATOR_ADD] = LLIR_OPERATION_TYPE_ADD,
+		[IR_BINARY_OPERATOR_SUB] = LLIR_OPERATION_TYPE_SUBTRACT,
+		[IR_BINARY_OPERATOR_MUL] = LLIR_OPERATION_TYPE_MULTIPLY,
+		[IR_BINARY_OPERATOR_DIV] = LLIR_OPERATION_TYPE_DIVIDE,
+		[IR_BINARY_OPERATOR_MOD] = LLIR_OPERATION_TYPE_MODULO,
+	};
+
+	enum llir_operation_type operation =
+		IR_OPERATOR_TO_LLIR_OPERATION[ir_binary_expression
+						      ->binary_operator];
+	add_operation(assembly, operation, right, left);
+	return left;
+}
+
+static struct llir_operand
+nodes_from_expression(struct assembly *assembly,
+		      struct ir_expression *ir_expression)
+{
+	switch (ir_expression->type) {
+	case IR_EXPRESSION_TYPE_BINARY:
+		return nodes_from_binary_expression(
+			assembly, ir_expression->binary_expression);
+	case IR_EXPRESSION_TYPE_NOT:
+		return nodes_from_not_expression(assembly,
+						 ir_expression->not_expression);
+	case IR_EXPRESSION_TYPE_NEGATE:
+		return nodes_from_negate_expression(
+			assembly, ir_expression->negate_expression);
+	case IR_EXPRESSION_TYPE_LEN:
+		return nodes_from_len_expression(
+			assembly, ir_expression->length_expression);
+	case IR_EXPRESSION_TYPE_METHOD_CALL:
+		return nodes_from_method_call(assembly,
+					      ir_expression->method_call);
+	case IR_EXPRESSION_TYPE_LITERAL:
+		return nodes_from_literal(assembly, ir_expression->literal);
+	case IR_EXPRESSION_TYPE_LOCATION:
+		return nodes_from_location(assembly, ir_expression->location);
+	default:
+		g_assert(!"you fucked up");
+		return (struct llir_operand){ 0 };
 	}
 }
 
-static void generate_method_arguments(struct code_generator *generator)
+static void nodes_from_assignment(struct assembly *assembly,
+				  struct ir_assignment *ir_assignment)
 {
-	GArray *arguments = generator->node->method->arguments;
+	struct llir_field *field = symbol_table_get(
+		assembly->symbol_table, ir_assignment->location->identifier);
+	struct llir_operand destination =
+		llir_operand_from_identifier(field->identifier);
 
-	g_print("\t# generate_method_arguments\n");
-	for (uint32_t i = 0; i < arguments->len; i++) {
-		struct llir_field *field =
-			g_array_index(arguments, struct llir_field *, i);
-		struct symbol_info *info =
-			push_field(generator, field->identifier, 1);
+	if (ir_assignment->location->index != NULL) {
+		struct llir_operand index = nodes_from_expression(
+			assembly, ir_assignment->location->index);
+		nodes_from_bounds_check(assembly, index, field->value_count);
 
-		g_print("\tsubq $%i, %%rsp\n", info->size);
-		if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
-			g_print("\tmovq %%%s, -%i(%%rbp)\n",
-				ARGUMENT_REGISTERS[i], info->offset);
-		} else {
-			int32_t offset =
-				(i - G_N_ELEMENTS(ARGUMENT_REGISTERS)) * 8 + 16;
-			g_print("\tmovq %i(%%rbp), %%r10\n", offset);
-			g_print("\tmovq %%r10, -%i(%%rbp)\n", info->offset);
-		}
-	}
-}
+		struct llir_operand array = new_temporary(assembly);
+		add_operation(assembly, LLIR_OPERATION_TYPE_MOVE, destination,
+			      array);
+		add_operation(assembly, LLIR_OPERATION_TYPE_MULTIPLY,
+			      llir_operand_from_literal(8), index);
+		add_operation(assembly, LLIR_OPERATION_TYPE_ADD, index, array);
 
-static void generate_method_declaration(struct code_generator *generator)
-{
-	push_scope(generator);
-
-#ifdef __APPLE__
-	g_print(".globl _%s\n", generator->node->method->identifier);
-	g_print("_%s:\n", generator->node->method->identifier);
-#else
-	g_print(".globl %s\n", generator->node->method->identifier);
-	g_print("%s:\n", generator->node->method->identifier);
-#endif
-	g_print("\tpushq %%rbp\n");
-	g_print("\tmovq %%rsp, %%rbp\n");
-
-	generate_method_arguments(generator);
-
-	if (g_strcmp0(generator->node->method->identifier, "main") != 0)
-		return;
-
-	for (struct llir_node *node = generator->global_fields_head_node;
-	     node->type == LLIR_NODE_TYPE_FIELD; node = node->next)
-		generate_global_field_initialization(node->field);
-}
-
-static void generate_block_start(struct code_generator *generator)
-{
-	push_scope(generator);
-}
-
-static void generate_field(struct code_generator *generator)
-{
-	g_assert(generator->node->type == LLIR_NODE_TYPE_FIELD);
-
-	struct llir_field *field = generator->node->field;
-
-	struct symbol_info *symbol_info =
-		push_field(generator, field->identifier,
-			   field->values->len + field->array);
-
-	g_print("\t# generate_field\n");
-	g_print("\tsubq $%u, %%rsp\n", symbol_info->size);
-	g_print("\tmovq $%lld, -%u(%%rbp)\n",
-		field->array ? field->values->len :
-			       g_array_index(field->values, int64_t, 0),
-		symbol_info->offset);
-
-	for (uint32_t i = 0; field->array && i < field->values->len; i++) {
-		g_print("\tmovq $%lld, -%u(%%rbp)\n",
-			g_array_index(field->values, int64_t, i),
-			(uint32_t)(8 * (i + 1)) + symbol_info->offset);
-	}
-}
-
-static int32_t get_destination_offset(struct code_generator *generator,
-				      char *destination)
-{
-	g_assert(destination != NULL);
-
-	int32_t offset = get_field_offset(generator, destination);
-
-	if (offset == -1 && destination[0] == '$') {
-		struct symbol_info *info =
-			push_field(generator, destination, 1);
-
-		g_print("\tsubq $%u, %%rsp\n", info->size);
-
-		return info->offset;
+		destination =
+			llir_operand_from_dereference(array.identifier, 0);
 	}
 
-	return offset;
+	struct llir_operand source;
+	if (ir_assignment->expression == NULL)
+		source = llir_operand_from_literal(1);
+	else
+		source = nodes_from_expression(assembly,
+					       ir_assignment->expression);
+
+	static enum llir_operation_type OPERATION_TYPE[] = {
+		[IR_ASSIGN_OPERATOR_SET] = LLIR_OPERATION_TYPE_MOVE,
+		[IR_ASSIGN_OPERATOR_ADD] = LLIR_OPERATION_TYPE_ADD,
+		[IR_ASSIGN_OPERATOR_SUB] = LLIR_OPERATION_TYPE_SUBTRACT,
+		[IR_ASSIGN_OPERATOR_MUL] = LLIR_OPERATION_TYPE_MULTIPLY,
+		[IR_ASSIGN_OPERATOR_DIV] = LLIR_OPERATION_TYPE_DIVIDE,
+		[IR_ASSIGN_OPERATOR_MOD] = LLIR_OPERATION_TYPE_MODULO,
+		[IR_ASSIGN_OPERATOR_INCREMENT] = LLIR_OPERATION_TYPE_ADD,
+		[IR_ASSIGN_OPERATOR_DECREMENT] = LLIR_OPERATION_TYPE_SUBTRACT,
+	};
+
+	add_operation(assembly, OPERATION_TYPE[ir_assignment->assign_operator],
+		      source, destination);
 }
 
-static void generate_assignment(struct code_generator *generator)
+static void nodes_from_if_statement(struct assembly *assembly,
+				    struct ir_if_statement *ir_if_statement)
 {
-	g_assert(generator->node->type == LLIR_NODE_TYPE_ASSIGNMENT);
+	struct llir_operand expression =
+		nodes_from_expression(assembly, ir_if_statement->condition);
 
-	struct llir_assignment *assignment = generator->node->assignment;
+	struct llir_label *end_if = new_label(assembly);
+	struct llir_branch *branch =
+		llir_branch_new(LLIR_BRANCH_TYPE_EQUAL, false, expression,
+				llir_operand_from_literal(0), end_if);
+	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
+	nodes_from_block(assembly, ir_if_statement->if_block);
 
-	int32_t source_offset = get_field_offset(generator, assignment->source);
+	if (ir_if_statement->else_block != NULL) {
+		struct llir_label *end_else = new_label(assembly);
+		struct llir_jump *jump = llir_jump_new(end_else);
 
-	int32_t destination_offset =
-		get_destination_offset(generator, assignment->destination);
-
-	g_print("\t# generate_assignment\n");
-
-	if (source_offset == -1)
-		g_print("\tmovq %s(%%rip), %%r10\n", assignment->source);
-	else
-		g_print("\tmovq -%d(%%rbp), %%r10\n", source_offset);
-
-	if (destination_offset == -1)
-		g_print("\tmovq %%r10, %s(%%rip)\n", assignment->destination);
-	else
-		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
-}
-
-static void generate_literal_assignment(struct code_generator *generator)
-{
-	g_assert(generator->node->type == LLIR_NODE_TYPE_LITERAL_ASSIGNMENT);
-
-	struct llir_literal_assignment *literal_assignment =
-		generator->node->literal_assignment;
-
-	int32_t destination_offset = get_destination_offset(
-		generator, literal_assignment->destination);
-
-	g_print("\t# generate_literal_assignment\n");
-
-	if (destination_offset == -1)
-		g_print("\tmovq $%lld, %s(%%rip)\n",
-			literal_assignment->literal,
-			literal_assignment->destination);
-	else
-		g_print("\tmovq $%lld, -%d(%%rbp)\n",
-			literal_assignment->literal, destination_offset);
-}
-
-static void generate_indexed_assignment(struct code_generator *generator)
-{
-	g_assert(generator->node->type == LLIR_NODE_TYPE_INDEXED_ASSIGNMENT);
-
-	struct llir_indexed_assignment *indexed_assignment =
-		generator->node->indexed_assignment;
-
-	int32_t source_offset =
-		get_field_offset(generator, indexed_assignment->source);
-
-	int32_t index_offset =
-		get_field_offset(generator, indexed_assignment->index);
-	g_assert(index_offset != -1);
-
-	int32_t destination_offset = get_destination_offset(
-		generator, indexed_assignment->destination);
-
-	g_print("\t# generate_indexed_assignment\n");
-	g_print("\tmovq -%u(%%rbp), %%r10\n", index_offset);
-	g_print("\taddq $1, %%r10\n");
-	g_print("\timul $8, %%r10\n");
-
-	if (source_offset != -1)
-		g_print("\tmovq -%u(%%rbp), %%r11\n", source_offset);
-	else
-		g_print("\tmovq %s(%%rip), %%r11\n",
-			indexed_assignment->source);
-
-	if (destination_offset != -1) {
-		g_print("\tmovq %%r11, -(%%rbp, %%r10)\n");
+		add_node(assembly, LLIR_NODE_TYPE_JUMP, jump);
+		add_node(assembly, LLIR_NODE_TYPE_LABEL, end_if);
+		nodes_from_block(assembly, ir_if_statement->else_block);
+		add_node(assembly, LLIR_NODE_TYPE_LABEL, end_else);
 	} else {
-		g_print("\tleaq %s(%%rip), %%rax\n",
-			indexed_assignment->destination);
-		g_print("\taddq %%rax, %%r10\n");
-		g_print("\tmovq %%r11, 0(%%r10)\n");
+		add_node(assembly, LLIR_NODE_TYPE_LABEL, end_if);
 	}
 }
 
-static void generate_binary_operation(struct code_generator *generator)
+static void nodes_from_for_update(struct assembly *assembly,
+				  struct ir_for_update *ir_for_update)
 {
-	g_assert(generator->node->type == LLIR_NODE_TYPE_BINARY_OPERATION);
-
-	struct llir_binary_operation *binary_operation =
-		generator->node->binary_operation;
-
-	int32_t left_operand_offset =
-		get_field_offset(generator, binary_operation->left_operand);
-
-	int32_t right_operand_offset =
-		get_field_offset(generator, binary_operation->right_operand);
-
-	int32_t destination_offset = get_destination_offset(
-		generator, binary_operation->destination);
-
-	g_print("\t# generate_binary_operation\n");
-
-	if (left_operand_offset == -1)
-		g_print("\tmovq %s(%%rip), %%r10\n",
-			binary_operation->left_operand);
-	else
-		g_print("\tmovq -%d(%%rbp), %%r10\n", left_operand_offset);
-
-	if (right_operand_offset == -1)
-		g_print("\tmovq %s, %%r11\n", binary_operation->right_operand);
-	else
-		g_print("\tmovq -%d(%%rbp), %%r11\n", right_operand_offset);
-
-	switch (binary_operation->operation) {
-	case LLIR_BINARY_OPERATION_TYPE_OR:
-		g_print("\torq %%r11, %%r10\n");
+	switch (ir_for_update->type) {
+	case IR_FOR_UPDATE_TYPE_ASSIGNMENT:
+		nodes_from_assignment(assembly, ir_for_update->assignment);
 		break;
-	case LLIR_BINARY_OPERATION_TYPE_AND:
-		g_print("\tandq %%r11, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_EQUAL:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsete %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbl  %%al, %%eax\n");
-		g_print("\tcltq\n");
-		g_print("\tmovq %%rax, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_NOT_EQUAL:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsetne %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbl  %%al, %%eax\n");
-		g_print("\tcltq\n");
-		g_print("\tmovq %%rax, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_LESS:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsetl %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbq %%al, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_LESS_EQUAL:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsetle %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbq %%al, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_GREATER_EQUAL:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsetge %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbq %%al, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_GREATER:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsetg %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbq %%al, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_ADD:
-		g_print("\taddq %%r11, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_SUB:
-		g_print("\tsubq %%r11, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_MUL:
-		g_print("\timulq %%r11, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_DIV:
-		g_print("\tmovq %%r10, %%rax\n");
-		g_print("\tcqto\n");
-		g_print("\tidivq %%r11\n");
-		g_print("\tmovq %%rax, %%r10\n");
-		break;
-	case LLIR_BINARY_OPERATION_TYPE_MOD:
-		g_print("\tmovq %%r10, %%rax\n");
-		g_print("\tcqto\n");
-		g_print("\tidivq %%r11\n");
-		g_print("\tmovq %%rdx, %%r10\n");
+	case IR_FOR_UPDATE_TYPE_METHOD_CALL:
+		nodes_from_method_call(assembly, ir_for_update->method_call);
 		break;
 	default:
 		g_assert(!"you fucked up");
 		break;
 	}
-
-	if (destination_offset == -1)
-		g_print("\tmovq %%r10, %s(%%rip)\n",
-			binary_operation->destination);
-	else
-		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
 }
 
-static void generate_unary_operation(struct code_generator *generator)
+static void nodes_from_for_statement(struct assembly *assembly,
+				     struct ir_for_statement *ir_for_statement)
 {
-	g_assert(generator->node->type == LLIR_NODE_TYPE_UNARY_OPERATION);
+	nodes_from_assignment(assembly, ir_for_statement->initial);
 
-	struct llir_unary_operation *unary_operation =
-		generator->node->unary_operation;
+	struct llir_label *start_label = new_label(assembly);
+	struct llir_label *break_label = new_label(assembly);
+	struct llir_label *continue_label = new_label(assembly);
+	push_loop(assembly, break_label, continue_label);
 
-	int32_t source_offset =
-		get_field_offset(generator, unary_operation->source);
+	add_node(assembly, LLIR_NODE_TYPE_LABEL, start_label);
+	struct llir_operand condition =
+		nodes_from_expression(assembly, ir_for_statement->condition);
 
-	int32_t destination_offset =
-		get_destination_offset(generator, unary_operation->destination);
+	struct llir_branch *branch =
+		llir_branch_new(LLIR_BRANCH_TYPE_EQUAL, false, condition,
+				llir_operand_from_literal(0), break_label);
+	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
 
-	g_print("\t# generate_unary_operation\n");
+	nodes_from_block(assembly, ir_for_statement->block);
+	add_node(assembly, LLIR_NODE_TYPE_LABEL, continue_label);
+	nodes_from_for_update(assembly, ir_for_statement->update);
 
-	if (source_offset == -1)
-		g_print("\tmovq %s(%%rip), %%r10\n", unary_operation->source);
-	else
-		g_print("\tmovq -%d(%%rbp), %%r10\n", source_offset);
+	struct llir_jump *jump = llir_jump_new(start_label);
+	add_node(assembly, LLIR_NODE_TYPE_JUMP, jump);
+	add_node(assembly, LLIR_NODE_TYPE_LABEL, break_label);
 
-	switch (unary_operation->operation) {
-	case LLIR_UNARY_OPERATION_TYPE_NEGATE:
-		g_print("\tnegq %%r10\n");
-		break;
-	case LLIR_UNARY_OPERATION_TYPE_NOT:
-		g_print("\tcmpq $0, %%r10\n");
-		g_print("\tsetne %%al\n");
-		g_print("\txorb $-1, %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbl  %%al, %%eax\n");
-		g_print("\tcltq\n");
-		g_print("\tmovq %%rax, %%r10\n");
-		break;
-	default:
-		g_assert(!"you fucked up");
-		break;
-	}
-
-	if (destination_offset == -1)
-		g_print("\tmovq %%r10, %s(%%rip)\n",
-			unary_operation->destination);
-	else
-		g_print("\tmovq %%r10, -%d(%%rbp)\n", destination_offset);
+	pop_loop(assembly);
 }
 
 static void
-generate_method_call_argument(struct code_generator *generator,
-			      struct llir_method_call_argument *argument,
-			      uint32_t i)
+nodes_from_while_statement(struct assembly *assembly,
+			   struct ir_while_statement *ir_while_statement)
 {
-	if (argument->type == LLIR_METHOD_CALL_ARGUMENT_TYPE_STRING) {
-		uint64_t string_index = (uint64_t)g_hash_table_lookup(
-			generator->strings, argument->string);
-		g_assert(string_index != 0);
+	struct llir_label *break_label = new_label(assembly);
+	struct llir_label *continue_label = new_label(assembly);
+	push_loop(assembly, break_label, continue_label);
 
-		g_print("\tleaq string_%llu(%%rip), %%r10\n", string_index);
-	} else {
-		int32_t offset =
-			get_field_offset(generator, argument->identifier);
-		g_assert(offset != -1);
+	add_node(assembly, LLIR_NODE_TYPE_LABEL, continue_label);
+	struct llir_operand condition =
+		nodes_from_expression(assembly, ir_while_statement->condition);
 
-		g_print("\tmovq -%d(%%rbp), %%r10\n", offset);
-	}
+	struct llir_branch *branch =
+		llir_branch_new(LLIR_BRANCH_TYPE_EQUAL, false, condition,
+				llir_operand_from_literal(0), break_label);
+	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
 
-	if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
-		g_print("\tmovq %%r10, %%%s\n", ARGUMENT_REGISTERS[i]);
-	} else {
-		uint32_t offset = 8 * (i - G_N_ELEMENTS(ARGUMENT_REGISTERS));
-		g_print("\tmovq %%r10, %u(%%rsp)\n", offset);
-	}
+	nodes_from_block(assembly, ir_while_statement->block);
+
+	struct llir_jump *jump = llir_jump_new(continue_label);
+	add_node(assembly, LLIR_NODE_TYPE_JUMP, jump);
+
+	add_node(assembly, LLIR_NODE_TYPE_LABEL, break_label);
+
+	pop_loop(assembly);
 }
 
-static void generate_method_call(struct code_generator *generator)
+static void nodes_from_return_statement(struct assembly *assembly,
+					struct ir_expression *ir_expression)
 {
-	struct llir_method_call *method_call = generator->node->method_call;
-
-	g_print("\t# generate_method_call\n");
-
-	int32_t stack_argument_count =
-		method_call->arguments->len - G_N_ELEMENTS(ARGUMENT_REGISTERS);
-	int32_t extra_stack_size =
-		8 * (stack_argument_count + stack_argument_count % 2);
-
-	if (stack_argument_count > 0)
-		g_print("\tsubq $%d, %%rsp\n", extra_stack_size);
-
-	for (uint32_t i = 0; i < method_call->arguments->len; i++) {
-		struct llir_method_call_argument argument =
-			g_array_index(method_call->arguments,
-				      struct llir_method_call_argument, i);
-		generate_method_call_argument(generator, &argument, i);
-	}
-
-	g_print("\tmovq $0, %%rax\n");
-#ifdef __APPLE__
-	g_print("\tcall _%s\n", method_call->identifier);
-#else
-	g_print("\tcall %s\n", method_call->identifier);
-#endif
-	if (stack_argument_count > 0)
-		g_print("\taddq $%i, %%rsp\n", extra_stack_size);
-
-	int32_t offset =
-		get_destination_offset(generator, method_call->destination);
-	g_print("\tmovq %%rax, -%d(%%rbp)\n", offset);
-}
-
-static void generate_array_index(struct code_generator *generator)
-{
-	struct llir_array_index *array_index = generator->node->array_index;
-
-	int32_t source_offset =
-		get_field_offset(generator, array_index->source);
-
-	int32_t index_offset = get_field_offset(generator, array_index->index);
-	g_assert(index_offset != -1);
-
-	int32_t destination_offset =
-		get_destination_offset(generator, array_index->destination);
-
-	g_print("\t# generate_array_index\n");
-	g_print("\tmovq -%u(%%rbp), %%r10\n", index_offset);
-	g_print("\taddq $1, %%r10\n");
-	g_print("\timul $8, %%r10\n");
-
-	if (source_offset != -1) {
-		g_print("\tmovq -(%%rbp, %%r10), %%r11\n");
-	} else {
-		g_print("\tleaq %s(%%rip), %%r11\n", array_index->source);
-		g_print("\taddq %%r11, %%r10\n");
-		g_print("\tmovq 0(%%r10), %%r11\n");
-	}
-
-	if (destination_offset != -1)
-		g_print("\tmovq %%r11, -%u(%%rbp)\n", destination_offset);
+	struct llir_operand return_value;
+	if (ir_expression == NULL)
+		return_value = llir_operand_from_literal(0);
 	else
-		g_print("\tmovq %%r11, %s(%%rip)\n", array_index->destination);
+		return_value = nodes_from_expression(assembly, ir_expression);
+
+	struct llir_return *llir_return = llir_return_new(return_value);
+	add_node(assembly, LLIR_NODE_TYPE_RETURN, llir_return);
 }
 
-static void generate_label(struct code_generator *generator)
+static void nodes_from_break_statement(struct assembly *assembly)
 {
-	g_assert(generator->node->type == LLIR_NODE_TYPE_LABEL);
-
-	struct llir_label *label = generator->node->label;
-
-	g_print("# generate_label\n");
-	g_print("%s:\n", label->name);
+	struct llir_label *label = get_break_label(assembly);
+	struct llir_jump *jump = llir_jump_new(label);
+	add_node(assembly, LLIR_NODE_TYPE_JUMP, jump);
 }
 
-static void generate_branch(struct code_generator *generator)
+static void nodes_from_continue_statement(struct assembly *assembly)
 {
-	struct llir_branch *branch = generator->node->branch;
-	struct llir_node *label_node = branch->label;
-
-	int32_t offset = get_field_offset(generator, branch->condition);
-
-	g_print("\t# generate_branch\n");
-	if (offset != -1)
-		g_print("\tmovq -%d(%%rbp), %%r10\n", offset);
-	else
-		g_print("\tmovq %s(%%rip), %%r10\n", branch->condition);
-
-	g_print("\tcmpq $0, %%r10\n");
-	g_print(branch->negate ? "\tje %s\n" : "\tjne %s\n",
-		label_node->label->name);
+	struct llir_label *label = get_continue_label(assembly);
+	struct llir_jump *jump = llir_jump_new(label);
+	add_node(assembly, LLIR_NODE_TYPE_JUMP, jump);
 }
 
-static void generate_jump(struct code_generator *generator)
+static void nodes_from_statement(struct assembly *assembly,
+				 struct ir_statement *ir_statement)
 {
-	g_assert(generator->node->type == LLIR_NODE_TYPE_JUMP);
-
-	struct llir_jump *jump = generator->node->jump;
-	struct llir_node *label_node = jump->label;
-
-	g_print("\t# generate_jump\n");
-	g_print("\tjmp %s\n", label_node->label->name);
+	switch (ir_statement->type) {
+	case IR_STATEMENT_TYPE_ASSIGNMENT:
+		nodes_from_assignment(assembly, ir_statement->assignment);
+		break;
+	case IR_STATEMENT_TYPE_METHOD_CALL:
+		nodes_from_method_call(assembly, ir_statement->method_call);
+		break;
+	case IR_STATEMENT_TYPE_IF:
+		nodes_from_if_statement(assembly, ir_statement->if_statement);
+		break;
+	case IR_STATEMENT_TYPE_FOR:
+		nodes_from_for_statement(assembly, ir_statement->for_statement);
+		break;
+	case IR_STATEMENT_TYPE_WHILE:
+		nodes_from_while_statement(assembly,
+					   ir_statement->while_statement);
+		break;
+	case IR_STATEMENT_TYPE_RETURN:
+		nodes_from_return_statement(assembly,
+					    ir_statement->return_expression);
+		break;
+	case IR_STATEMENT_TYPE_BREAK:
+		nodes_from_break_statement(assembly);
+		break;
+	case IR_STATEMENT_TYPE_CONTINUE:
+		nodes_from_continue_statement(assembly);
+		break;
+	default:
+		g_assert(!"you fucked up");
+		break;
+	}
 }
 
-static void generate_return(struct code_generator *generator)
+static void nodes_from_block(struct assembly *assembly,
+			     struct ir_block *ir_block)
 {
-	g_print("\t# generate_return\n");
+	symbol_table_push_scope(assembly->symbol_table);
 
-	struct llir_return *llir_return = generator->node->llir_return;
-	if (llir_return->source == NULL) {
-		g_print("\tmov $0, %%rax\n");
-	} else {
-		int32_t offset =
-			get_field_offset(generator, llir_return->source);
-		g_assert(offset != -1);
-
-		g_print("\tmovq -%d(%%rbp), %%rax\n", offset);
+	for (uint32_t i = 0; i < ir_block->fields->len; i++) {
+		struct ir_field *ir_field =
+			g_array_index(ir_block->fields, struct ir_field *, i);
+		nodes_from_field(assembly, ir_field);
 	}
 
-	g_print("\tmovq %%rbp, %%rsp\n");
-	g_print("\tpopq %%rbp\n");
-	g_print("\tret\n");
+	for (uint32_t i = 0; i < ir_block->statements->len; i++) {
+		struct ir_statement *ir_statement = g_array_index(
+			ir_block->statements, struct ir_statement *, i);
+		nodes_from_statement(assembly, ir_statement);
+	}
+
+	symbol_table_pop_scope(assembly->symbol_table);
 }
 
-static void generate_block_end(struct code_generator *generator)
+static void nodes_from_method(struct assembly *assembly,
+			      struct ir_method *ir_method)
 {
-	int32_t size = pop_scope(generator);
-	g_print("\t# generate_block_end\n");
-	g_print("\taddq $%i, %%rsp\n", size);
+	g_assert(!ir_method->imported);
+
+	symbol_table_push_scope(assembly->symbol_table);
+
+	struct llir_method *method = llir_method_new(ir_method->identifier,
+						     ir_method->arguments->len);
+
+	for (uint32_t i = 0; i < ir_method->arguments->len; i++) {
+		struct ir_field *ir_field = g_array_index(ir_method->arguments,
+							  struct ir_field *, i);
+		uint32_t scope_level =
+			symbol_table_get_scope_level(assembly->symbol_table);
+		struct llir_field *field =
+			llir_field_new(ir_field->identifier, scope_level,
+				       ir_data_type_is_array(ir_field->type),
+				       ir_field->array_length);
+
+		llir_method_set_argument(method, i, field);
+
+		symbol_table_set(assembly->symbol_table, ir_field->identifier,
+				 field);
+	}
+
+	add_node(assembly, LLIR_NODE_TYPE_METHOD, method);
+
+	nodes_from_block(assembly, ir_method->block);
+
+	if (ir_method->return_type == IR_DATA_TYPE_VOID) {
+		struct llir_operand return_value = llir_operand_from_literal(0);
+		struct llir_return *llir_return = llir_return_new(return_value);
+		add_node(assembly, LLIR_NODE_TYPE_RETURN, llir_return);
+	} else {
+		struct llir_shit_yourself *exit = llir_shit_yourself_new(-2);
+		add_node(assembly, LLIR_NODE_TYPE_SHIT_YOURSELF, exit);
+	}
+
+	symbol_table_pop_scope(assembly->symbol_table);
 }
 
-static void generate_method_end(struct code_generator *generator)
+static void nodes_from_field(struct assembly *assembly,
+			     struct ir_field *ir_field)
 {
-	pop_scope(generator);
-	g_print("\t# generate_method_end\n");
-	g_print("\tmovq $-1, %%rax\n");
-#ifdef __APPLE__
-	g_print("\tcall _exit\n");
-#else
-	g_print("\tcall exit\n");
-#endif
-}
+	uint32_t scope_level =
+		symbol_table_get_scope_level(assembly->symbol_table);
+	struct llir_field *field = llir_field_new(
+		ir_field->identifier, scope_level,
+		ir_data_type_is_array(ir_field->type), ir_field->array_length);
 
-static void generate_shit_yourself(struct code_generator *generator)
-{
-	g_print("\t# generate_shit_yourself\n");
-	g_print("\tmovq $-1, %%rax\n");
-#ifdef __APPLE__
-	g_print("\tcall _exit\n");
-#else
-	g_print("\tcall exit\n");
-#endif
-}
+	if (ir_field->initializer != NULL) {
+		for (uint32_t i = 0; i < ir_field->initializer->literals->len;
+		     i++) {
+			struct ir_literal *ir_literal =
+				g_array_index(ir_field->initializer->literals,
+					      struct ir_literal *, i);
+			int64_t value = literal_to_int64(ir_literal);
 
-static void generate_data_section(struct code_generator *generator)
-{
-	g_print(".data\n");
-	generate_global_strings(generator);
-	generate_global_fields(generator);
-}
-
-static void generate_text_section(struct code_generator *generator)
-{
-	g_print(".text\n");
-
-	for (; generator->node != NULL;
-	     generator->node = generator->node->next) {
-		switch (generator->node->type) {
-		case LLIR_NODE_TYPE_FIELD:
-			generate_field(generator);
-			break;
-		case LLIR_NODE_TYPE_METHOD_START:
-			generate_method_declaration(generator);
-			break;
-		case LLIR_NODE_TYPE_BLOCK_START:
-			generate_block_start(generator);
-			break;
-		case LLIR_NODE_TYPE_ASSIGNMENT:
-			generate_assignment(generator);
-			break;
-		case LLIR_NODE_TYPE_LITERAL_ASSIGNMENT:
-			generate_literal_assignment(generator);
-			break;
-		case LLIR_NODE_TYPE_INDEXED_ASSIGNMENT:
-			generate_indexed_assignment(generator);
-			break;
-		case LLIR_NODE_TYPE_BINARY_OPERATION:
-			generate_binary_operation(generator);
-			break;
-		case LLIR_NODE_TYPE_UNARY_OPERATION:
-			generate_unary_operation(generator);
-			break;
-		case LLIR_NODE_TYPE_METHOD_CALL:
-			generate_method_call(generator);
-			break;
-		case LLIR_NODE_TYPE_ARRAY_INDEX:
-			generate_array_index(generator);
-			break;
-		case LLIR_NODE_TYPE_LABEL:
-			generate_label(generator);
-			break;
-		case LLIR_NODE_TYPE_BRANCH:
-			generate_branch(generator);
-			break;
-		case LLIR_NODE_TYPE_JUMP:
-			generate_jump(generator);
-			break;
-		case LLIR_NODE_TYPE_RETURN:
-			generate_return(generator);
-			break;
-		case LLIR_NODE_TYPE_BLOCK_END:
-			generate_block_end(generator);
-			break;
-		case LLIR_NODE_TYPE_METHOD_END:
-			generate_method_end(generator);
-			break;
-		case LLIR_NODE_TYPE_SHIT_YOURSELF:
-			generate_shit_yourself(generator);
-			break;
-		default:
-			g_assert(
-				!"bruh the fuck kinda of bombaclot node is this arf arf");
-			break;
+			llir_field_set_value(field, i, value);
 		}
 	}
+
+	add_node(assembly, LLIR_NODE_TYPE_FIELD, field);
+
+	symbol_table_set(assembly->symbol_table, ir_field->identifier, field);
 }
 
-struct code_generator *code_generator_new(void)
+static void nodes_from_program(struct assembly *assembly,
+			       struct ir_program *ir_program)
 {
-	struct code_generator *generator = g_new(struct code_generator, 1);
-	generator->node = NULL;
-	return generator;
+	for (uint32_t i = 0; i < ir_program->fields->len; i++) {
+		struct ir_field *ir_field =
+			g_array_index(ir_program->fields, struct ir_field *, i);
+		nodes_from_field(assembly, ir_field);
+	}
+
+	for (uint32_t i = 0; i < ir_program->methods->len; i++) {
+		struct ir_method *ir_method = g_array_index(
+			ir_program->methods, struct ir_method *, i);
+		nodes_from_method(assembly, ir_method);
+	}
 }
 
-int code_generator_generate(struct code_generator *generator,
-			    struct ir_program *ir)
+struct assembly *assembly_new(void)
 {
-	struct llir_node *head = llir_node_new_program(ir);
-	generator->node = head;
-	generator->strings = g_hash_table_new(g_str_hash, g_str_equal);
-	generator->string_counter = 1;
-	generator->symbol_tables =
-		g_array_new(false, false, sizeof(GHashTable *));
-	generator->stack_pointer = 0;
+	struct assembly *assembly = g_new(struct assembly, 1);
 
-	g_assert(generator->node->type == LLIR_NODE_TYPE_PROGRAM);
-	generator->node = generator->node->next;
+	assembly->break_labels =
+		g_array_new(false, false, sizeof(struct llir_label *));
+	assembly->continue_labels =
+		g_array_new(false, false, sizeof(struct llir_label *));
+	assembly->symbol_table = symbol_table_new();
 
-	while (generator->node->type == LLIR_NODE_TYPE_IMPORT)
-		generator->node = generator->node->next;
-
-	generate_data_section(generator);
-	generate_text_section(generator);
-
-	g_array_free(generator->symbol_tables, true);
-	g_hash_table_unref(generator->strings);
-	//llir_node_free(head); - something is fucked with this
-	return 0;
+	return assembly;
 }
 
-void code_generator_free(struct code_generator *generator)
+struct llir_node *assembly_generate_llir(struct assembly *assembly,
+					 struct ir_program *ir)
 {
-	g_free(generator);
+	assembly->temporary_variable_counter = 0;
+	assembly->label_counter = 0;
+	assembly->current = NULL;
+	assembly->head = NULL;
+
+	nodes_from_program(assembly, ir);
+
+	return assembly->head;
+}
+
+void assembly_free(struct assembly *assembly)
+{
+	g_array_free(assembly->break_labels, true);
+	g_array_free(assembly->continue_labels, true);
+	symbol_table_free(assembly->symbol_table);
+	g_free(assembly);
 }

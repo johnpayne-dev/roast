@@ -1,18 +1,20 @@
 #pragma once
 #include "assembly/llir.h"
+#include "assembly/symbol_table.h"
 
-struct code_generator {
-	struct llir_node *node;
-	GHashTable *strings;
-	uint64_t string_counter;
-	struct llir_node *global_fields_head_node;
-	GArray *symbol_tables;
-	uint32_t stack_pointer;
+struct assembly {
+	struct llir_node *head;
+	struct llir_node *current;
+	uint32_t temporary_variable_counter;
+	uint32_t label_counter;
+	struct symbol_table *symbol_table;
+	GArray *break_labels;
+	GArray *continue_labels;
 };
 
-struct code_generator *code_generator_new(void);
+struct assembly *assembly_new(void);
 
-int code_generator_generate(struct code_generator *generator,
-			    struct ir_program *ir);
+struct llir_node *assembly_generate_llir(struct assembly *assembly,
+					 struct ir_program *ir);
 
-void code_generator_free(struct code_generator *generator);
+void assembly_free(struct assembly *assembly);
