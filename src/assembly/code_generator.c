@@ -38,11 +38,17 @@ static void generate_global_strings(struct code_generator *generator)
 	}
 }
 
-static void generate_global_field(struct llir_field *field)
+static void generate_global_field(struct code_generator *generator)
 {
+	struct llir_field *field = generator->node->field;
+
 	g_print("%s:\n", field->identifier);
 	g_print("\t.fill %llu\n", 8 * field->value_count);
 	g_print("\t.align 16\n");
+
+	if (field->is_array)
+		g_hash_table_insert(generator->is_array, field->identifier,
+				    (gpointer)1);
 }
 
 static void generate_global_fields(struct code_generator *generator)
@@ -51,7 +57,7 @@ static void generate_global_fields(struct code_generator *generator)
 
 	for (; generator->node->type == LLIR_NODE_TYPE_FIELD;
 	     generator->node = generator->node->next)
-		generate_global_field(generator->node->field);
+		generate_global_field(generator);
 }
 
 static void generate_data_section(struct code_generator *generator)
@@ -85,6 +91,9 @@ static void generate_stack_allocation(struct code_generator *generator)
 		stack_size += field->value_count * 8;
 		g_hash_table_insert(generator->offsets, field->identifier,
 				    (gpointer)stack_size);
+		if (field->is_array)
+			g_hash_table_insert(generator->is_array,
+					    field->identifier, (gpointer)1);
 	}
 
 	if (stack_size % 16 != 0)
@@ -169,7 +178,7 @@ static void load_to_register(struct code_generator *generator,
 			     struct llir_operand operand,
 			     const char *destination)
 {
-	uint64_t offset, string_id;
+	uint64_t offset, is_array, string_id;
 
 	switch (operand.type) {
 	case LLIR_OPERAND_TYPE_LITERAL:
@@ -178,16 +187,28 @@ static void load_to_register(struct code_generator *generator,
 	case LLIR_OPERAND_TYPE_VARIABLE:
 		offset = (uint64_t)g_hash_table_lookup(generator->offsets,
 						       operand.identifier);
-		if (offset != 0)
-			g_print("\tmovq -%llu(%%rbp), %%%s\n", offset,
-				destination);
+		is_array = (uint64_t)g_hash_table_lookup(generator->is_array,
+							 operand.identifier);
+
+		if (is_array)
+			g_print("\tleaq ");
 		else
-			g_print("\tmovq %s(%%rip), %%%s\n", operand.identifier,
+			g_print("\tmovq ");
+
+		if (offset != 0)
+			g_print("-%llu(%%rbp), %%%s\n", offset, destination);
+		else
+			g_print("%s(%%rip), %%%s\n", operand.identifier,
 				destination);
 		break;
 	case LLIR_OPERAND_TYPE_DEREFERENCE:
 		offset = (uint64_t)g_hash_table_lookup(
 			generator->offsets, operand.dereference.identifier);
+		is_array = (uint64_t)g_hash_table_lookup(generator->is_array,
+							 operand.identifier);
+		if (is_array)
+			g_assert(!"not implemented");
+
 		if (offset != 0) {
 			g_print("\tmovq -%llu(%%rbp), %%rax\n", offset);
 			g_print("\tmovq %lld(%%rax), %%%s\n",
@@ -316,6 +337,20 @@ static void generate_operation(struct code_generator *generator)
 		g_print("\tandb $1, %%al\n");
 		g_print("\tmovzbq %%al, %%r10\n");
 		break;
+	case LLIR_OPERATION_TYPE_NEGATE:
+		g_print("\tmovq %%r11, %%r10\n");
+		g_print("\tnegq %%r10\n");
+		break;
+	case LLIR_OPERATION_TYPE_NOT:
+		g_print("\tmovq %%r11, %%r10\n");
+		g_print("\tcmpq $0, %%r10\n");
+		g_print("\tsetne %%al\n");
+		g_print("\txorb $-1, %%al\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbl  %%al, %%eax\n");
+		g_print("\tcltq\n");
+		g_print("\tmovq %%rax, %%r10\n");
+		break;
 	default:
 		g_assert(!"you fucked up");
 		break;
@@ -328,7 +363,7 @@ static void generate_method_call(struct code_generator *generator)
 {
 	struct llir_method_call *method_call = generator->node->method_call;
 
-	uint32_t stack_argument_count =
+	int32_t stack_argument_count =
 		method_call->argument_count - G_N_ELEMENTS(ARGUMENT_REGISTERS);
 	int32_t extra_stack_size =
 		8 * (stack_argument_count + stack_argument_count % 2);
@@ -372,8 +407,8 @@ static void generate_branch(struct code_generator *generator)
 {
 	struct llir_branch *branch = generator->node->branch;
 
-	load_to_register(generator, branch->left, "r10");
-	load_to_register(generator, branch->right, "r11");
+	load_to_register(generator, branch->left, "r11");
+	load_to_register(generator, branch->right, "r10");
 
 	g_print("\tcmpq %%r10, %%r11\n");
 
@@ -491,6 +526,7 @@ struct code_generator *code_generator_new(void)
 {
 	struct code_generator *generator = g_new(struct code_generator, 1);
 	generator->offsets = g_hash_table_new(g_str_hash, g_str_equal);
+	generator->is_array = g_hash_table_new(g_str_hash, g_str_equal);
 	return generator;
 }
 
@@ -509,6 +545,7 @@ void code_generator_generate(struct code_generator *generator,
 
 void code_generator_free(struct code_generator *generator)
 {
+	g_hash_table_unref(generator->is_array);
 	g_hash_table_unref(generator->offsets);
 	g_free(generator);
 }

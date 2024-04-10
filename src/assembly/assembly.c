@@ -248,8 +248,8 @@ nodes_from_short_circuit(struct assembly *assembly,
 	struct llir_operand literal = llir_operand_from_literal(1);
 	struct llir_label *label = new_label(assembly);
 
-	struct llir_branch *branch = llir_branch_new(
-		LLIR_BRANCH_TYPE_EQUAL, false, destination, literal, label);
+	struct llir_branch *branch =
+		llir_branch_new(comparison, false, destination, literal, label);
 	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
 
 	struct llir_operand right =
@@ -327,89 +327,22 @@ nodes_from_expression(struct assembly *assembly,
 	}
 }
 
-static struct llir_operand
-nodes_from_increment_expression(struct assembly *assembly,
-				struct ir_assignment *ir_assignment)
-{
-	static enum llir_operation_type INCREMENT_OPERATORS[] = {
-		[IR_ASSIGN_OPERATOR_INCREMENT] = LLIR_OPERATION_TYPE_ADD,
-		[IR_ASSIGN_OPERATOR_DECREMENT] = LLIR_OPERATION_TYPE_SUBTRACT,
-	};
-	g_assert(ir_assignment->assign_operator ==
-			 IR_ASSIGN_OPERATOR_INCREMENT ||
-		 ir_assignment->assign_operator ==
-			 IR_ASSIGN_OPERATOR_DECREMENT);
-
-	struct llir_operand location =
-		nodes_from_location(assembly, ir_assignment->location);
-
-	enum llir_operation_type operation_type =
-		INCREMENT_OPERATORS[ir_assignment->assign_operator];
-	add_operation(assembly, operation_type, llir_operand_from_literal(1),
-		      location);
-
-	return location;
-}
-
-static struct llir_operand
-nodes_from_compound_assignment(struct assembly *assembly,
-			       struct ir_assignment *ir_assignment,
-			       struct llir_operand expression_operand)
-{
-	static enum llir_operation_type BINARY_OPERATORS[] = {
-		[IR_ASSIGN_OPERATOR_ADD] = LLIR_OPERATION_TYPE_ADD,
-		[IR_ASSIGN_OPERATOR_SUB] = LLIR_OPERATION_TYPE_SUBTRACT,
-		[IR_ASSIGN_OPERATOR_MUL] = LLIR_OPERATION_TYPE_MULTIPLY,
-		[IR_ASSIGN_OPERATOR_DIV] = LLIR_OPERATION_TYPE_DIVIDE,
-		[IR_ASSIGN_OPERATOR_MOD] = LLIR_OPERATION_TYPE_MODULO,
-	};
-	g_assert(ir_assignment->assign_operator == IR_ASSIGN_OPERATOR_ADD ||
-		 ir_assignment->assign_operator == IR_ASSIGN_OPERATOR_SUB ||
-		 ir_assignment->assign_operator == IR_ASSIGN_OPERATOR_MUL ||
-		 ir_assignment->assign_operator == IR_ASSIGN_OPERATOR_DIV ||
-		 ir_assignment->assign_operator == IR_ASSIGN_OPERATOR_MOD);
-
-	struct llir_operand location =
-		nodes_from_location(assembly, ir_assignment->location);
-
-	enum llir_operation_type operation_type =
-		BINARY_OPERATORS[ir_assignment->assign_operator];
-	add_operation(assembly, operation_type, expression_operand, location);
-
-	return location;
-}
-
 static void nodes_from_assignment(struct assembly *assembly,
 				  struct ir_assignment *ir_assignment)
 {
-	struct llir_operand source;
-	if (ir_assignment->expression == NULL)
-		source = nodes_from_increment_expression(assembly,
-							 ir_assignment);
-	else
-		source = nodes_from_expression(assembly,
-					       ir_assignment->expression);
-
-	if (ir_assignment->assign_operator == IR_ASSIGN_OPERATOR_ADD ||
-	    ir_assignment->assign_operator == IR_ASSIGN_OPERATOR_SUB ||
-	    ir_assignment->assign_operator == IR_ASSIGN_OPERATOR_MUL ||
-	    ir_assignment->assign_operator == IR_ASSIGN_OPERATOR_DIV ||
-	    ir_assignment->assign_operator == IR_ASSIGN_OPERATOR_MOD)
-		source = nodes_from_compound_assignment(assembly, ir_assignment,
-							source);
-
 	struct llir_field *field = symbol_table_get(
 		assembly->symbol_table, ir_assignment->location->identifier);
 	struct llir_operand destination =
 		llir_operand_from_identifier(field->identifier);
 
 	if (ir_assignment->location->index != NULL) {
+		struct llir_operand index = nodes_from_expression(
+			assembly, ir_assignment->location->index);
+		nodes_from_bounds_check(assembly, index, field->value_count);
+
 		struct llir_operand array = new_temporary(assembly);
 		add_operation(assembly, LLIR_OPERATION_TYPE_MOVE, destination,
 			      array);
-
-		struct llir_operand index = nodes_from_expression(
-			assembly, ir_assignment->location->index);
 		add_operation(assembly, LLIR_OPERATION_TYPE_MULTIPLY,
 			      llir_operand_from_literal(8), index);
 		add_operation(assembly, LLIR_OPERATION_TYPE_ADD, index, array);
@@ -418,9 +351,26 @@ static void nodes_from_assignment(struct assembly *assembly,
 			llir_operand_from_dereference(array.identifier, 0);
 	}
 
-	struct llir_operation *operation = llir_operation_new(
-		LLIR_OPERATION_TYPE_MOVE, source, destination);
-	add_node(assembly, LLIR_NODE_TYPE_OPERATION, operation);
+	struct llir_operand source;
+	if (ir_assignment->expression == NULL)
+		source = llir_operand_from_literal(1);
+	else
+		source = nodes_from_expression(assembly,
+					       ir_assignment->expression);
+
+	static enum llir_operation_type OPERATION_TYPE[] = {
+		[IR_ASSIGN_OPERATOR_SET] = LLIR_OPERATION_TYPE_MOVE,
+		[IR_ASSIGN_OPERATOR_ADD] = LLIR_OPERATION_TYPE_ADD,
+		[IR_ASSIGN_OPERATOR_SUB] = LLIR_OPERATION_TYPE_SUBTRACT,
+		[IR_ASSIGN_OPERATOR_MUL] = LLIR_OPERATION_TYPE_MULTIPLY,
+		[IR_ASSIGN_OPERATOR_DIV] = LLIR_OPERATION_TYPE_DIVIDE,
+		[IR_ASSIGN_OPERATOR_MOD] = LLIR_OPERATION_TYPE_MODULO,
+		[IR_ASSIGN_OPERATOR_INCREMENT] = LLIR_OPERATION_TYPE_ADD,
+		[IR_ASSIGN_OPERATOR_DECREMENT] = LLIR_OPERATION_TYPE_SUBTRACT,
+	};
+
+	add_operation(assembly, OPERATION_TYPE[ir_assignment->assign_operator],
+		      source, destination);
 }
 
 static void nodes_from_if_statement(struct assembly *assembly,
@@ -503,6 +453,7 @@ nodes_from_while_statement(struct assembly *assembly,
 	struct llir_label *continue_label = new_label(assembly);
 	push_loop(assembly, break_label, continue_label);
 
+	add_node(assembly, LLIR_NODE_TYPE_LABEL, continue_label);
 	struct llir_operand condition =
 		nodes_from_expression(assembly, ir_while_statement->condition);
 
