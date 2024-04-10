@@ -1,3 +1,4 @@
+#pragma once
 #include "assembly/llir.h"
 #include "assembly/symbol_table.h"
 

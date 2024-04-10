@@ -1,3 +1,4 @@
+#pragma once
 #include <glib.h>
 
 struct symbol_table {

@@ -6,6 +6,7 @@
 #include "parser/parser.h"
 #include "semantics/semantics.h"
 #include "assembly/assembly.h"
+#include "assembly/code_generator.h"
 
 struct options {
 	char *target;
@@ -153,11 +154,14 @@ static int run_assembly_target(char *file_name, char *source)
 		return -1;
 
 	struct assembly *assembly = assembly_new();
-
 	struct llir_node *llir = assembly_generate_llir(assembly, ir);
-	llir_node_print(llir);
-
 	assembly_free(assembly);
+
+	struct code_generator *generator = code_generator_new();
+	code_generator_generate(generator, llir);
+	code_generator_free(generator);
+
+	llir_node_free(llir);
 	ir_program_free(ir);
 	return 0;
 }

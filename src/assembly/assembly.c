@@ -654,6 +654,19 @@ static void nodes_from_field(struct assembly *assembly,
 	struct llir_field *field = llir_field_new(
 		ir_field->identifier, scope_level,
 		ir_data_type_is_array(ir_field->type), ir_field->array_length);
+
+	if (ir_field->initializer != NULL) {
+		for (uint32_t i = 0; i < ir_field->initializer->literals->len;
+		     i++) {
+			struct ir_literal *ir_literal =
+				g_array_index(ir_field->initializer->literals,
+					      struct ir_literal *, i);
+			int64_t value = literal_to_int64(ir_literal);
+
+			llir_field_set_value(field, i, value);
+		}
+	}
+
 	add_node(assembly, LLIR_NODE_TYPE_FIELD, field);
 
 	symbol_table_set(assembly->symbol_table, ir_field->identifier, field);
