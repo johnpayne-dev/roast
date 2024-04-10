@@ -21,6 +21,10 @@ static void print_operand(struct llir_operand operand)
 		break;
 	case LLIR_OPERAND_TYPE_LITERAL:
 		g_print("%lld", operand.literal);
+		break;
+	case LLIR_OPERAND_TYPE_STRING:
+		g_print("%s", operand.string);
+		break;
 	default:
 		g_assert(!"you fucked up");
 		break;
@@ -42,6 +46,8 @@ void llir_node_print(struct llir_node *node)
 		[LLIR_OPERATION_TYPE_MULTIPLY] = "*",
 		[LLIR_OPERATION_TYPE_DIVIDE] = "/",
 		[LLIR_OPERATION_TYPE_MODULO] = "%",
+		[LLIR_OPERATION_TYPE_NEGATE] = "-",
+		[LLIR_OPERATION_TYPE_NOT] = "!",
 	};
 
 	static const char *BRANCH_TYPE_TO_STRING[] = {
@@ -53,7 +59,7 @@ void llir_node_print(struct llir_node *node)
 	switch (node->type) {
 		break;
 	case LLIR_NODE_TYPE_FIELD:
-		g_print("field %s\n", node->field->identifier);
+		g_print("field %s", node->field->identifier);
 		if (node->field->is_array)
 			g_print("[%lld]", node->field->value_count);
 		g_print("\n");
@@ -64,9 +70,20 @@ void llir_node_print(struct llir_node *node)
 	case LLIR_NODE_TYPE_OPERATION:
 		print_operand(node->operation->destination);
 		g_print(" = ");
-		print_operand(node->operation->destination);
-		g_print("%s ", OPERATION_TYPE_TO_STRING[node->operation->type]);
-		print_operand(node->operation->source);
+		if (node->operation->type == LLIR_OPERATION_TYPE_MOVE) {
+			print_operand(node->operation->source);
+		} else if (node->operation->type == LLIR_OPERATION_TYPE_NOT ||
+			   node->operation->type ==
+				   LLIR_OPERATION_TYPE_NEGATE) {
+			g_print("%s",
+				OPERATION_TYPE_TO_STRING[node->operation->type]);
+			print_operand(node->operation->source);
+		} else {
+			print_operand(node->operation->destination);
+			g_print(" %s ",
+				OPERATION_TYPE_TO_STRING[node->operation->type]);
+			print_operand(node->operation->source);
+		}
 		g_print("\n");
 		break;
 	case LLIR_NODE_TYPE_METHOD_CALL:
@@ -211,7 +228,7 @@ void llir_method_free(struct llir_method *method)
 	g_free(method);
 }
 
-struct llir_operand llir_operand_variable(char *identifier)
+struct llir_operand llir_operand_from_identifier(char *identifier)
 {
 	return (struct llir_operand){
 		.type = LLIR_OPERAND_TYPE_VARIABLE,
@@ -219,7 +236,8 @@ struct llir_operand llir_operand_variable(char *identifier)
 	};
 }
 
-struct llir_operand llir_operand_dereference(char *identifier, int64_t offset)
+struct llir_operand llir_operand_from_dereference(char *identifier,
+						  int64_t offset)
 {
 	return (struct llir_operand){
 		.type = LLIR_OPERAND_TYPE_DEREFERENCE,
@@ -230,11 +248,19 @@ struct llir_operand llir_operand_dereference(char *identifier, int64_t offset)
 	};
 }
 
-struct llir_operand llir_operand_literal(int64_t literal)
+struct llir_operand llir_operand_from_literal(int64_t literal)
 {
 	return (struct llir_operand){
 		.type = LLIR_OPERAND_TYPE_LITERAL,
 		.literal = literal,
+	};
+}
+
+struct llir_operand llir_operand_from_string(char *string)
+{
+	return (struct llir_operand){
+		.type = LLIR_OPERAND_TYPE_STRING,
+		.string = string,
 	};
 }
 
@@ -307,6 +333,7 @@ void llir_label_free(struct llir_label *label)
 }
 
 struct llir_branch *llir_branch_new(enum llir_branch_type type,
+				    bool unsigned_comparison,
 				    struct llir_operand left,
 				    struct llir_operand right,
 				    struct llir_label *label)
@@ -314,6 +341,7 @@ struct llir_branch *llir_branch_new(enum llir_branch_type type,
 	struct llir_branch *branch = g_new(struct llir_branch, 1);
 
 	branch->type = type;
+	branch->unsigned_comparison = unsigned_comparison;
 	branch->left = left;
 	branch->right = right;
 	branch->label = label;

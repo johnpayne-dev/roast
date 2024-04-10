@@ -31,7 +31,6 @@ struct llir_node {
 };
 
 struct llir_node *llir_node_new(enum llir_node_type type, void *data);
-struct llir_node *llir_node_from_program(struct ir_program *program);
 void llir_node_print(struct llir_node *node);
 void llir_node_free(struct llir_node *node);
 
@@ -67,6 +66,7 @@ struct llir_operand {
 		LLIR_OPERAND_TYPE_VARIABLE,
 		LLIR_OPERAND_TYPE_DEREFERENCE,
 		LLIR_OPERAND_TYPE_LITERAL,
+		LLIR_OPERAND_TYPE_STRING,
 	} type;
 
 	union {
@@ -76,12 +76,15 @@ struct llir_operand {
 			char *identifier;
 			int64_t offset;
 		} dereference;
+		char *string;
 	};
 };
 
-struct llir_operand llir_operand_variable(char *identifier);
-struct llir_operand llir_operand_dereference(char *identifier, int64_t offset);
-struct llir_operand llir_operand_literal(int64_t literal);
+struct llir_operand llir_operand_from_identifier(char *identifier);
+struct llir_operand llir_operand_from_dereference(char *identifier,
+						  int64_t offset);
+struct llir_operand llir_operand_from_literal(int64_t literal);
+struct llir_operand llir_operand_from_string(char *string);
 
 struct llir_operation {
 	enum llir_operation_type {
@@ -97,6 +100,8 @@ struct llir_operation {
 		LLIR_OPERATION_TYPE_LESS_EQUAL,
 		LLIR_OPERATION_TYPE_EQUAL,
 		LLIR_OPERATION_TYPE_NOT_EQUAL,
+		LLIR_OPERATION_TYPE_NEGATE,
+		LLIR_OPERATION_TYPE_NOT,
 	} type;
 
 	struct llir_operand source;
@@ -142,6 +147,8 @@ struct llir_branch {
 		LLIR_BRANCH_GREATER_EQUAL,
 	} type;
 
+	bool unsigned_comparison;
+
 	struct llir_operand left;
 	struct llir_operand right;
 
@@ -149,6 +156,7 @@ struct llir_branch {
 };
 
 struct llir_branch *llir_branch_new(enum llir_branch_type type,
+				    bool unsigned_comparison,
 				    struct llir_operand left,
 				    struct llir_operand right,
 				    struct llir_label *label);
