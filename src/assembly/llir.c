@@ -17,7 +17,7 @@ static void print_operand(struct llir_operand operand)
 		break;
 	case LLIR_OPERAND_TYPE_DEREFERENCE:
 		g_print("%s[%lld]", operand.dereference.identifier,
-			operand.dereference.offset);
+			operand.dereference.offset / 8);
 		break;
 	case LLIR_OPERAND_TYPE_LITERAL:
 		g_print("%lld", operand.literal);
@@ -60,28 +60,38 @@ void llir_node_print(struct llir_node *node)
 	};
 
 	switch (node->type) {
-		break;
 	case LLIR_NODE_TYPE_FIELD:
-		g_print("field %s", node->field->identifier);
-		if (node->field->is_array)
-			g_print("[%lld]", node->field->value_count);
-		g_print("\n");
 		break;
 	case LLIR_NODE_TYPE_METHOD:
-		g_print("method %s\n", node->method->identifier);
+		g_print("\nmethod %s\n", node->method->identifier);
 		break;
 	case LLIR_NODE_TYPE_OPERATION:
+		g_print("\t");
 		print_operand(node->operation->destination);
-		g_print(" = ");
 		if (node->operation->type == LLIR_OPERATION_TYPE_MOVE) {
+			g_print(" = ");
 			print_operand(node->operation->source);
 		} else if (node->operation->type == LLIR_OPERATION_TYPE_NOT ||
 			   node->operation->type ==
 				   LLIR_OPERATION_TYPE_NEGATE) {
+			g_print(" = ");
 			g_print("%s",
 				OPERATION_TYPE_TO_STRING[node->operation->type]);
 			print_operand(node->operation->source);
+		} else if (node->operation->type == LLIR_OPERATION_TYPE_ADD ||
+			   node->operation->type ==
+				   LLIR_OPERATION_TYPE_SUBTRACT ||
+			   node->operation->type ==
+				   LLIR_OPERATION_TYPE_MULTIPLY ||
+			   node->operation->type ==
+				   LLIR_OPERATION_TYPE_DIVIDE ||
+			   node->operation->type ==
+				   LLIR_OPERATION_TYPE_MODULO) {
+			g_print(" %s= ",
+				OPERATION_TYPE_TO_STRING[node->operation->type]);
+			print_operand(node->operation->source);
 		} else {
+			g_print(" = ");
 			print_operand(node->operation->destination);
 			g_print(" %s ",
 				OPERATION_TYPE_TO_STRING[node->operation->type]);
@@ -90,6 +100,7 @@ void llir_node_print(struct llir_node *node)
 		g_print("\n");
 		break;
 	case LLIR_NODE_TYPE_METHOD_CALL:
+		g_print("\t");
 		print_operand(node->method_call->destination);
 		g_print(" = %s(...)\n", node->method_call->identifier);
 		break;
@@ -97,22 +108,22 @@ void llir_node_print(struct llir_node *node)
 		g_print("%s:\n", node->label->name);
 		break;
 	case LLIR_NODE_TYPE_BRANCH:
-		g_print("branch ");
+		g_print("\tbranch ");
 		print_operand(node->branch->left);
 		g_print(" %s ", BRANCH_TYPE_TO_STRING[node->branch->type]);
 		print_operand(node->branch->right);
 		g_print(" %s\n", node->branch->label->name);
 		break;
 	case LLIR_NODE_TYPE_JUMP:
-		g_print("jump %s\n", node->jump->label->name);
+		g_print("\tjump %s\n", node->jump->label->name);
 		break;
 	case LLIR_NODE_TYPE_RETURN:
-		g_print("return ");
+		g_print("\treturn ");
 		print_operand(node->llir_return->source);
 		g_print("\n");
 		break;
 	case LLIR_NODE_TYPE_SHIT_YOURSELF:
-		g_print("exit %lld\n", node->shit_yourself->return_value);
+		g_print("\texit %lld\n", node->shit_yourself->return_value);
 		break;
 	default:
 		g_assert(!"you fucked up");

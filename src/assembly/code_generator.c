@@ -161,19 +161,6 @@ static void generate_method_declaration(struct code_generator *generator)
 		generate_global_field_initialization(node->field);
 }
 
-static void generate_field_initialization(struct code_generator *generator)
-{
-	struct llir_field *field = generator->node->field;
-
-	uint64_t offset = (uint64_t)g_hash_table_lookup(generator->offsets,
-							field->identifier);
-	g_assert(offset != 0);
-
-	for (int64_t i = 0; i < field->value_count; i++)
-		g_print("\tmovq $%lld, -%lld(%%rbp)\n", field->values[i],
-			offset - 8 * i);
-}
-
 static void load_to_register(struct code_generator *generator,
 			     struct llir_operand operand,
 			     const char *destination)
@@ -204,15 +191,20 @@ static void load_to_register(struct code_generator *generator,
 	case LLIR_OPERAND_TYPE_DEREFERENCE:
 		offset = (uint64_t)g_hash_table_lookup(
 			generator->offsets, operand.dereference.identifier);
-		is_array = (uint64_t)g_hash_table_lookup(generator->is_array,
-							 operand.identifier);
-		if (is_array)
-			g_assert(!"not implemented");
+		is_array = (uint64_t)g_hash_table_lookup(
+			generator->is_array, operand.dereference.identifier);
 
 		if (offset != 0) {
-			g_print("\tmovq -%llu(%%rbp), %%rax\n", offset);
-			g_print("\tmovq %lld(%%rax), %%%s\n",
-				operand.dereference.offset, destination);
+			if (is_array) {
+				g_print("\tmovq -%llu(%%rbp), %%%s\n",
+					offset - operand.dereference.offset,
+					destination);
+			} else {
+				g_print("\tmovq -%llu(%%rbp), %%rax\n", offset);
+				g_print("\tmovq %lld(%%rax), %%%s\n",
+					operand.dereference.offset,
+					destination);
+			}
 		} else {
 			g_print("\tmovq %s+%lld(%%rip), %%%s\n",
 				operand.dereference.identifier,
@@ -235,7 +227,7 @@ static void load_to_register(struct code_generator *generator,
 static void store_from_register(struct code_generator *generator,
 				struct llir_operand operand, const char *source)
 {
-	uint64_t offset;
+	uint64_t offset, is_array;
 
 	switch (operand.type) {
 	case LLIR_OPERAND_TYPE_VARIABLE:
@@ -250,10 +242,19 @@ static void store_from_register(struct code_generator *generator,
 	case LLIR_OPERAND_TYPE_DEREFERENCE:
 		offset = (uint64_t)g_hash_table_lookup(
 			generator->offsets, operand.dereference.identifier);
+		is_array = (uint64_t)g_hash_table_lookup(
+			generator->is_array, operand.dereference.identifier);
+
 		if (offset != 0) {
-			g_print("\tmovq -%llu(%%rbp), %%rax\n", offset);
-			g_print("\tmovq %%%s, %lld(%%rax)\n", source,
-				operand.dereference.offset);
+			if (is_array) {
+				g_print("\tmovq %%%s, -%lld(%%rbp)\n", source,
+					offset - operand.dereference.offset);
+			} else {
+				g_print("\tmovq -%llu(%%rbp), %%rax\n", offset);
+				g_print("\tmovq %%%s, %lld(%%rax)\n", source,
+					operand.dereference.offset);
+			}
+
 		} else {
 			g_print("\tmovq %%%s, %s+%lld(%%rip)\n", source,
 				operand.dereference.identifier,
@@ -488,7 +489,6 @@ static void generate_text_section(struct code_generator *generator)
 	     generator->node = generator->node->next) {
 		switch (generator->node->type) {
 		case LLIR_NODE_TYPE_FIELD:
-			generate_field_initialization(generator);
 			break;
 		case LLIR_NODE_TYPE_METHOD:
 			generate_method_declaration(generator);

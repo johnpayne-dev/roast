@@ -76,12 +76,12 @@ static void pop_loop(struct assembly *assembly)
 }
 
 static void nodes_from_field(struct assembly *assembly,
-			     struct ir_field *ir_field);
+			     struct ir_field *ir_field, bool initialize);
 static struct llir_operand
 nodes_from_expression(struct assembly *assembly,
 		      struct ir_expression *ir_expression);
 static void nodes_from_block(struct assembly *assembly,
-			     struct ir_block *ir_block);
+			     struct ir_block *ir_block, bool new_scope);
 
 static void nodes_from_bounds_check(struct assembly *assembly,
 				    struct llir_operand index, int64_t length)
@@ -384,7 +384,7 @@ static void nodes_from_if_statement(struct assembly *assembly,
 		llir_branch_new(LLIR_BRANCH_TYPE_EQUAL, false, expression,
 				llir_operand_from_literal(0), end_if);
 	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
-	nodes_from_block(assembly, ir_if_statement->if_block);
+	nodes_from_block(assembly, ir_if_statement->if_block, true);
 
 	if (ir_if_statement->else_block != NULL) {
 		struct llir_label *end_else = new_label(assembly);
@@ -392,7 +392,7 @@ static void nodes_from_if_statement(struct assembly *assembly,
 
 		add_node(assembly, LLIR_NODE_TYPE_JUMP, jump);
 		add_node(assembly, LLIR_NODE_TYPE_LABEL, end_if);
-		nodes_from_block(assembly, ir_if_statement->else_block);
+		nodes_from_block(assembly, ir_if_statement->else_block, true);
 		add_node(assembly, LLIR_NODE_TYPE_LABEL, end_else);
 	} else {
 		add_node(assembly, LLIR_NODE_TYPE_LABEL, end_if);
@@ -434,7 +434,7 @@ static void nodes_from_for_statement(struct assembly *assembly,
 				llir_operand_from_literal(0), break_label);
 	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
 
-	nodes_from_block(assembly, ir_for_statement->block);
+	nodes_from_block(assembly, ir_for_statement->block, true);
 	add_node(assembly, LLIR_NODE_TYPE_LABEL, continue_label);
 	nodes_from_for_update(assembly, ir_for_statement->update);
 
@@ -462,7 +462,7 @@ nodes_from_while_statement(struct assembly *assembly,
 				llir_operand_from_literal(0), break_label);
 	add_node(assembly, LLIR_NODE_TYPE_BRANCH, branch);
 
-	nodes_from_block(assembly, ir_while_statement->block);
+	nodes_from_block(assembly, ir_while_statement->block, true);
 
 	struct llir_jump *jump = llir_jump_new(continue_label);
 	add_node(assembly, LLIR_NODE_TYPE_JUMP, jump);
@@ -536,14 +536,15 @@ static void nodes_from_statement(struct assembly *assembly,
 }
 
 static void nodes_from_block(struct assembly *assembly,
-			     struct ir_block *ir_block)
+			     struct ir_block *ir_block, bool new_scope)
 {
-	symbol_table_push_scope(assembly->symbol_table);
+	if (new_scope)
+		symbol_table_push_scope(assembly->symbol_table);
 
 	for (uint32_t i = 0; i < ir_block->fields->len; i++) {
 		struct ir_field *ir_field =
 			g_array_index(ir_block->fields, struct ir_field *, i);
-		nodes_from_field(assembly, ir_field);
+		nodes_from_field(assembly, ir_field, true);
 	}
 
 	for (uint32_t i = 0; i < ir_block->statements->len; i++) {
@@ -552,7 +553,8 @@ static void nodes_from_block(struct assembly *assembly,
 		nodes_from_statement(assembly, ir_statement);
 	}
 
-	symbol_table_pop_scope(assembly->symbol_table);
+	if (new_scope)
+		symbol_table_pop_scope(assembly->symbol_table);
 }
 
 static void nodes_from_method(struct assembly *assembly,
@@ -583,7 +585,7 @@ static void nodes_from_method(struct assembly *assembly,
 
 	add_node(assembly, LLIR_NODE_TYPE_METHOD, method);
 
-	nodes_from_block(assembly, ir_method->block);
+	nodes_from_block(assembly, ir_method->block, false);
 
 	if (ir_method->return_type == IR_DATA_TYPE_VOID) {
 		struct llir_operand return_value = llir_operand_from_literal(0);
@@ -597,8 +599,31 @@ static void nodes_from_method(struct assembly *assembly,
 	symbol_table_pop_scope(assembly->symbol_table);
 }
 
+static void nodes_from_field_initialization(struct assembly *assembly,
+					    struct llir_field *field)
+{
+	if (!field->is_array) {
+		struct llir_operand source =
+			llir_operand_from_literal(field->values[0]);
+		struct llir_operand destination =
+			llir_operand_from_identifier(field->identifier);
+		add_operation(assembly, LLIR_OPERATION_TYPE_MOVE, source,
+			      destination);
+		return;
+	}
+
+	for (uint32_t i = 0; i < field->value_count; i++) {
+		struct llir_operand source =
+			llir_operand_from_literal(field->values[i]);
+		struct llir_operand destination =
+			llir_operand_from_dereference(field->identifier, 8 * i);
+		add_operation(assembly, LLIR_OPERATION_TYPE_MOVE, source,
+			      destination);
+	}
+}
+
 static void nodes_from_field(struct assembly *assembly,
-			     struct ir_field *ir_field)
+			     struct ir_field *ir_field, bool initialize)
 {
 	uint32_t scope_level =
 		symbol_table_get_scope_level(assembly->symbol_table);
@@ -621,6 +646,9 @@ static void nodes_from_field(struct assembly *assembly,
 	add_node(assembly, LLIR_NODE_TYPE_FIELD, field);
 
 	symbol_table_set(assembly->symbol_table, ir_field->identifier, field);
+
+	if (initialize)
+		nodes_from_field_initialization(assembly, field);
 }
 
 static void nodes_from_program(struct assembly *assembly,
@@ -629,7 +657,7 @@ static void nodes_from_program(struct assembly *assembly,
 	for (uint32_t i = 0; i < ir_program->fields->len; i++) {
 		struct ir_field *ir_field =
 			g_array_index(ir_program->fields, struct ir_field *, i);
-		nodes_from_field(assembly, ir_field);
+		nodes_from_field(assembly, ir_field, false);
 	}
 
 	for (uint32_t i = 0; i < ir_program->methods->len; i++) {
