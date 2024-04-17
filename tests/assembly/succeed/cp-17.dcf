@@ -1,0 +1,10 @@
+import printf;
+
+void main ( ) {
+  const int a = 2, b = 3, c = 4, d = 5;
+  int f;
+
+  f = a + b + c;
+  printf ( "%d\n", f );
+  printf ( "%d\n", d );
+}
