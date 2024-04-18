@@ -278,7 +278,8 @@ static int run_target(struct options *options, char *source)
 		return run_intermediate_target(options->input_file, source,
 					       NULL);
 	case TARGET_ASSEMBLY:
-		return run_assembly_target(options->input_file, source, options->debug);
+		return run_assembly_target(options->input_file, source,
+					   options->debug);
 	default:
 		g_assert(!"Unknown target");
 		return -1;
