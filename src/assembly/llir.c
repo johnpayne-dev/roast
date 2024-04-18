@@ -87,7 +87,7 @@ void llir_method_free(struct llir_method *method)
 	g_free(method);
 }
 
-struct llir_block *llir_block_new(void)
+struct llir_block *llir_block_new(uint32_t id)
 {
 	struct llir_block *block = g_new(struct llir_block, 1);
 
@@ -97,6 +97,7 @@ struct llir_block *llir_block_new(void)
 	block->parents = g_array_new(false, false, sizeof(struct llir_block *));
 	block->terminal_type = LLIR_BLOCK_TERMINAL_TYPE_UNKNOWN;
 	block->terminal = NULL;
+	block->id = id;
 
 	return block;
 }

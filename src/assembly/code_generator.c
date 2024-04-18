@@ -18,43 +18,60 @@ static void generate_global_string(struct code_generator *generator,
 	generator->string_counter++;
 }
 
-static void generate_global_strings(struct code_generator *generator)
+static void find_strings_in_method_call(struct code_generator *generator,
+					struct llir_assignment *call)
 {
-	for (struct llir_node *node = generator->node; node != NULL;
-	     node = node->next) {
-		if (node->type != LLIR_NODE_TYPE_ASSIGNMENT ||
-		    node->assignment->type != LLIR_ASSIGNMENT_TYPE_METHOD_CALL)
+	for (uint32_t i = 0; i < call->argument_count; i++) {
+		struct llir_operand argument = call->arguments[i];
+		if (argument.type != LLIR_OPERAND_TYPE_STRING)
 			continue;
 
-		struct llir_assignment *call = node->assignment;
-
-		for (uint32_t i = 0; i < call->argument_count; i++) {
-			struct llir_operand argument = call->arguments[i];
-
-			if (argument.type != LLIR_OPERAND_TYPE_STRING)
-				continue;
-
-			generate_global_string(generator, argument.string);
-		}
+		generate_global_string(generator, argument.string);
 	}
 }
 
-static void generate_global_field(struct code_generator *generator)
+static void find_strings_in_block(struct code_generator *generator,
+				  struct llir_block *block)
 {
-	struct llir_field *field = generator->node->field;
+	for (uint32_t i = 0; i < block->assignments->len; i++) {
+		struct llir_assignment *assignment = g_array_index(
+			block->assignments, struct llir_assignment *, i);
+		if (assignment->type != LLIR_ASSIGNMENT_TYPE_METHOD_CALL)
+			continue;
 
-	g_print("%s:\n", field->identifier);
-	g_print("\t.fill %llu\n", 8 * field->value_count);
-	g_print("\t.align 16\n");
+		find_strings_in_method_call(generator, assignment);
+	}
+}
+
+static void find_strings_in_method(struct code_generator *generator,
+				   struct llir_method *method)
+{
+	for (uint32_t i = 0; i < method->blocks->len; i++) {
+		struct llir_block *block =
+			g_array_index(method->blocks, struct llir_block *, i);
+		find_strings_in_block(generator, block);
+	}
+}
+
+static void generate_global_strings(struct code_generator *generator)
+{
+	for (uint32_t i = 0; i < generator->llir->methods->len; i++) {
+		struct llir_method *method = g_array_index(
+			generator->llir->methods, struct llir_method *, i);
+		find_strings_in_method(generator, method);
+	}
 }
 
 static void generate_global_fields(struct code_generator *generator)
 {
-	generator->global_fields = generator->node;
+	for (uint32_t i = 0; i < generator->llir->fields->len; i++) {
+		struct llir_field *field = g_array_index(
+			generator->llir->fields, struct llir_field *, i);
 
-	for (; generator->node->type == LLIR_NODE_TYPE_FIELD;
-	     generator->node = generator->node->next)
-		generate_global_field(generator);
+		g_print("%s:\n", field->identifier);
+		g_print("\t.fill %llu\n", 8 * field->value_count);
+		g_print("\t.align 16\n");
+	}
 }
 
 static void generate_data_section(struct code_generator *generator)
@@ -64,21 +81,33 @@ static void generate_data_section(struct code_generator *generator)
 	generate_global_fields(generator);
 }
 
-static void generate_stack_allocation(struct code_generator *generator)
+static void generate_stack_allocation(struct code_generator *generator,
+				      struct llir_method *method)
 {
 	uint64_t stack_size = 0;
 
-	for (struct llir_node *node = generator->node->next;
-	     node != NULL && node->type != LLIR_NODE_TYPE_METHOD;
-	     node = node->next) {
-		if (node->type != LLIR_NODE_TYPE_FIELD)
-			continue;
-
-		struct llir_field *field = node->field;
+	for (uint32_t i = 0; i < method->arguments->len; i++) {
+		struct llir_field *field = g_array_index(
+			method->arguments, struct llir_field *, i);
 
 		stack_size += field->value_count * 8;
 		g_hash_table_insert(generator->offsets, field->identifier,
 				    (gpointer)stack_size);
+	}
+
+	for (uint32_t i = 0; i < method->blocks->len; i++) {
+		struct llir_block *block =
+			g_array_index(method->blocks, struct llir_block *, i);
+
+		for (uint32_t j = 0; j < block->fields->len; j++) {
+			struct llir_field *field = g_array_index(
+				block->fields, struct llir_field *, j);
+
+			stack_size += field->value_count * 8;
+			g_hash_table_insert(generator->offsets,
+					    field->identifier,
+					    (gpointer)stack_size);
+		}
 	}
 
 	if (stack_size % 16 != 0)
@@ -87,15 +116,15 @@ static void generate_stack_allocation(struct code_generator *generator)
 	g_print("\tsubq $%llu, %%rsp\n", stack_size);
 }
 
-static void generate_method_arguments(struct code_generator *generator)
+static void generate_method_arguments(struct code_generator *generator,
+				      struct llir_method *method)
 {
-	struct llir_method *method = generator->node->method;
-
-	for (uint32_t i = 0; i < method->argument_count; i++) {
-		char *field = method->arguments[i];
+	for (uint32_t i = 0; i < method->arguments->len; i++) {
+		struct llir_field *field = g_array_index(
+			method->arguments, struct llir_field *, i);
 
 		uint64_t offset = (uint64_t)g_hash_table_lookup(
-			generator->offsets, field);
+			generator->offsets, field->identifier);
 		g_assert(offset != 0);
 
 		if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
@@ -121,10 +150,9 @@ static void generate_global_field_initialization(struct llir_field *field)
 	}
 }
 
-static void generate_method_declaration(struct code_generator *generator)
+static void generate_method_declaration(struct code_generator *generator,
+					struct llir_method *method)
 {
-	struct llir_method *method = generator->node->method;
-
 #ifdef __APPLE__
 	g_print(".globl _%s\n", method->identifier);
 	g_print("_%s:\n", method->identifier);
@@ -135,15 +163,17 @@ static void generate_method_declaration(struct code_generator *generator)
 	g_print("\tpushq %%rbp\n");
 	g_print("\tmovq %%rsp, %%rbp\n");
 
-	generate_stack_allocation(generator);
-	generate_method_arguments(generator);
+	generate_stack_allocation(generator, method);
+	generate_method_arguments(generator, method);
 
-	if (g_strcmp0(generator->node->method->identifier, "main") != 0)
+	if (g_strcmp0(method->identifier, "main") != 0)
 		return;
 
-	for (struct llir_node *node = generator->global_fields;
-	     node->type == LLIR_NODE_TYPE_FIELD; node = node->next)
-		generate_global_field_initialization(node->field);
+	for (uint32_t i = 0; i < generator->llir->fields->len; i++) {
+		struct llir_field *field = g_array_index(
+			generator->llir->fields, struct llir_field *, i);
+		generate_global_field_initialization(field);
+	}
 }
 
 static void load_to_register(struct code_generator *generator,
@@ -202,10 +232,9 @@ static void store_from_register(struct code_generator *generator,
 		g_print("\tmovq %%%s, %s(%%rip)\n", source, destination);
 }
 
-static void generate_method_call(struct code_generator *generator)
+static void generate_method_call(struct code_generator *generator,
+				 struct llir_assignment *call)
 {
-	struct llir_assignment *call = generator->node->assignment;
-
 	int32_t stack_argument_count =
 		call->argument_count - G_N_ELEMENTS(ARGUMENT_REGISTERS);
 	int32_t extra_stack_size =
@@ -240,10 +269,9 @@ static void generate_method_call(struct code_generator *generator)
 	store_from_register(generator, call->destination, "rax");
 }
 
-static void generate_assignment(struct code_generator *generator)
+static void generate_assignment(struct code_generator *generator,
+				struct llir_assignment *assignment)
 {
-	struct llir_assignment *assignment = generator->node->assignment;
-
 	switch (assignment->type) {
 	case LLIR_ASSIGNMENT_TYPE_MOVE:
 		load_to_register(generator, assignment->source, "r10");
@@ -373,7 +401,7 @@ static void generate_assignment(struct code_generator *generator)
 		g_print("\tmovq %%r11, 0(%%r10)\n");
 		break;
 	case LLIR_ASSIGNMENT_TYPE_METHOD_CALL:
-		generate_method_call(generator);
+		generate_method_call(generator, assignment);
 		break;
 	default:
 		g_assert(!"you fucked up");
@@ -381,16 +409,9 @@ static void generate_assignment(struct code_generator *generator)
 	}
 }
 
-static void generate_label(struct code_generator *generator)
+static void generate_branch(struct code_generator *generator,
+			    struct llir_branch *branch)
 {
-	struct llir_label *label = generator->node->label;
-	g_print("%s:\n", label->name);
-}
-
-static void generate_branch(struct code_generator *generator)
-{
-	struct llir_branch *branch = generator->node->branch;
-
 	load_to_register(generator, branch->left, "r11");
 	load_to_register(generator, branch->right, "r10");
 
@@ -433,29 +454,27 @@ static void generate_branch(struct code_generator *generator)
 		g_assert(!"you fucked up");
 		break;
 	}
-	g_print(" %s\n", branch->label->name);
+	g_print(" block_%u\n", branch->false_block->id);
 }
 
-static void generate_jump(struct code_generator *generator)
+static void generate_jump(struct code_generator *generator,
+			  struct llir_jump *jump)
 {
-	struct llir_jump *jump = generator->node->jump;
-	g_print("\tjmp %s\n", jump->label->name);
+	g_print("\tjmp block_%u\n", jump->block->id);
 }
 
-static void generate_return(struct code_generator *generator)
+static void generate_return(struct code_generator *generator,
+			    struct llir_return *llir_return)
 {
-	struct llir_operand source = generator->node->llir_return->source;
-
-	load_to_register(generator, source, "rax");
+	load_to_register(generator, llir_return->source, "rax");
 	g_print("\tmovq %%rbp, %%rsp\n");
 	g_print("\tpopq %%rbp\n");
 	g_print("\tret\n");
 }
 
-static void generate_shit_yourself(struct code_generator *generator)
+static void generate_shit_yourself(struct code_generator *generator,
+				   struct llir_shit_yourself *exit)
 {
-	struct llir_shit_yourself *exit = generator->node->shit_yourself;
-
 	g_print("\tmovq $%lld, %%rdi\n", exit->return_value);
 #ifdef __APPLE__
 	g_print("\tcall _exit\n");
@@ -464,41 +483,52 @@ static void generate_shit_yourself(struct code_generator *generator)
 #endif
 }
 
+static void generate_method_body(struct code_generator *generator,
+				 struct llir_method *method)
+{
+	for (uint32_t i = 0; i < method->blocks->len; i++) {
+		struct llir_block *block =
+			g_array_index(method->blocks, struct llir_block *, i);
+		g_print("block_%u:\n", block->id);
+
+		for (uint32_t j = 0; j < block->assignments->len; j++) {
+			struct llir_assignment *assignment =
+				g_array_index(block->assignments,
+					      struct llir_assignment *, j);
+			generate_assignment(generator, assignment);
+		}
+
+		switch (block->terminal_type) {
+		case LLIR_BLOCK_TERMINAL_TYPE_JUMP:
+			generate_jump(generator, block->jump);
+			break;
+		case LLIR_BLOCK_TERMINAL_TYPE_BRANCH:
+			generate_branch(generator, block->branch);
+			break;
+		case LLIR_BLOCK_TERMINAL_TYPE_RETURN:
+			generate_return(generator, block->llir_return);
+			break;
+		case LLIR_BLOCK_TERMINAL_TYPE_SHIT_YOURSELF:
+			generate_shit_yourself(generator, block->shit_yourself);
+			break;
+		default:
+			g_assert(!"you fucked up");
+			break;
+		}
+	}
+}
+
 static void generate_text_section(struct code_generator *generator)
 {
 	g_print(".text\n");
 
-	for (; generator->node != NULL;
-	     generator->node = generator->node->next) {
-		switch (generator->node->type) {
-		case LLIR_NODE_TYPE_FIELD:
-			break;
-		case LLIR_NODE_TYPE_METHOD:
-			generate_method_declaration(generator);
-			break;
-		case LLIR_NODE_TYPE_ASSIGNMENT:
-			generate_assignment(generator);
-			break;
-		case LLIR_NODE_TYPE_LABEL:
-			generate_label(generator);
-			break;
-		case LLIR_NODE_TYPE_BRANCH:
-			generate_branch(generator);
-			break;
-		case LLIR_NODE_TYPE_JUMP:
-			generate_jump(generator);
-			break;
-		case LLIR_NODE_TYPE_RETURN:
-			generate_return(generator);
-			break;
-		case LLIR_NODE_TYPE_SHIT_YOURSELF:
-			generate_shit_yourself(generator);
-			break;
-		default:
-			g_assert(
-				!"bruh the fuck kinda of bombaclot node is this arf arf");
-			break;
-		}
+	struct llir *llir = generator->llir;
+
+	for (uint32_t i = 0; i < llir->methods->len; i++) {
+		struct llir_method *method =
+			g_array_index(llir->methods, struct llir_method *, i);
+		generate_method_declaration(generator, method);
+		generate_method_body(generator, method);
 	}
 }
 
@@ -510,9 +540,9 @@ struct code_generator *code_generator_new(void)
 }
 
 void code_generator_generate(struct code_generator *generator,
-			     struct llir_node *llir)
+			     struct llir *llir)
 {
-	generator->node = llir;
+	generator->llir = llir;
 	generator->strings = g_hash_table_new(g_str_hash, g_str_equal);
 	generator->string_counter = 1;
 

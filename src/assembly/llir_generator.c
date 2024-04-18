@@ -59,6 +59,11 @@ static char *new_temporary(struct llir_generator *assembly)
 	return field->identifier;
 }
 
+static struct llir_block *new_block(struct llir_generator *assembly)
+{
+	return llir_block_new(assembly->block_counter++);
+}
+
 static void next_block(struct llir_generator *assembly,
 		       struct llir_block *block)
 {
@@ -124,8 +129,8 @@ generate_expression(struct llir_generator *assembly,
 static void generate_bounds_check(struct llir_generator *assembly,
 				  struct llir_operand index, int64_t length)
 {
-	struct llir_block *true_block = llir_block_new();
-	struct llir_block *false_block = llir_block_new();
+	struct llir_block *true_block = new_block(assembly);
+	struct llir_block *false_block = new_block(assembly);
 
 	struct llir_operand length_operand = llir_operand_from_literal(length);
 
@@ -265,8 +270,8 @@ generate_short_circuit(struct llir_generator *assembly,
 			LLIR_BRANCH_TYPE_NOT_EQUAL;
 	struct llir_operand literal = llir_operand_from_literal(1);
 
-	struct llir_block *true_block = llir_block_new();
-	struct llir_block *false_block = llir_block_new();
+	struct llir_block *true_block = new_block(assembly);
+	struct llir_block *false_block = new_block(assembly);
 
 	struct llir_branch *branch = llir_branch_new(
 		comparison, false, left, literal, true_block, false_block);
@@ -421,8 +426,8 @@ static void generate_if_statement(struct llir_generator *assembly,
 	struct llir_operand expression =
 		generate_expression(assembly, ir_if_statement->condition);
 
-	struct llir_block *true_block = llir_block_new();
-	struct llir_block *false_block = llir_block_new();
+	struct llir_block *true_block = new_block(assembly);
+	struct llir_block *false_block = new_block(assembly);
 
 	struct llir_branch *branch = llir_branch_new(
 		LLIR_BRANCH_TYPE_EQUAL, false, expression,
@@ -439,7 +444,7 @@ static void generate_if_statement(struct llir_generator *assembly,
 					LLIR_BLOCK_TERMINAL_TYPE_JUMP, jump);
 		next_block(assembly, false_block);
 	} else {
-		struct llir_block *end_block = llir_block_new();
+		struct llir_block *end_block = new_block(assembly);
 
 		struct llir_jump *jump = llir_jump_new(end_block);
 		llir_block_set_terminal(assembly->current_block,
@@ -476,10 +481,10 @@ static void generate_for_statement(struct llir_generator *assembly,
 {
 	generate_assignment(assembly, ir_for_statement->initial);
 
-	struct llir_block *condition_block = llir_block_new();
-	struct llir_block *loop_block = llir_block_new();
-	struct llir_block *update_block = llir_block_new();
-	struct llir_block *end_block = llir_block_new();
+	struct llir_block *condition_block = new_block(assembly);
+	struct llir_block *loop_block = new_block(assembly);
+	struct llir_block *update_block = new_block(assembly);
+	struct llir_block *end_block = new_block(assembly);
 	push_loop(assembly, end_block, update_block);
 
 	struct llir_jump *jump = llir_jump_new(condition_block);
@@ -518,9 +523,9 @@ static void
 generate_while_statement(struct llir_generator *assembly,
 			 struct ir_while_statement *ir_while_statement)
 {
-	struct llir_block *condition_block = llir_block_new();
-	struct llir_block *loop_block = llir_block_new();
-	struct llir_block *end_block = llir_block_new();
+	struct llir_block *condition_block = new_block(assembly);
+	struct llir_block *loop_block = new_block(assembly);
+	struct llir_block *end_block = new_block(assembly);
 	push_loop(assembly, end_block, condition_block);
 
 	struct llir_jump *jump = llir_jump_new(condition_block);
@@ -560,7 +565,7 @@ static void generate_return_statement(struct llir_generator *assembly,
 	struct llir_return *llir_return = llir_return_new(return_value);
 	llir_block_set_terminal(assembly->current_block,
 				LLIR_BLOCK_TERMINAL_TYPE_RETURN, llir_return);
-	next_block(assembly, llir_block_new());
+	next_block(assembly, new_block(assembly));
 }
 
 static void generate_break_statement(struct llir_generator *assembly)
@@ -569,7 +574,7 @@ static void generate_break_statement(struct llir_generator *assembly)
 	struct llir_jump *jump = llir_jump_new(block);
 	llir_block_set_terminal(assembly->current_block,
 				LLIR_BLOCK_TERMINAL_TYPE_JUMP, jump);
-	next_block(assembly, llir_block_new());
+	next_block(assembly, new_block(assembly));
 }
 
 static void generate_continue_statement(struct llir_generator *assembly)
@@ -578,7 +583,7 @@ static void generate_continue_statement(struct llir_generator *assembly)
 	struct llir_jump *jump = llir_jump_new(block);
 	llir_block_set_terminal(assembly->current_block,
 				LLIR_BLOCK_TERMINAL_TYPE_JUMP, jump);
-	next_block(assembly, llir_block_new());
+	next_block(assembly, new_block(assembly));
 }
 
 static void generate_statement(struct llir_generator *assembly,
@@ -678,7 +683,7 @@ static struct llir_method *generate_method(struct llir_generator *assembly,
 	}
 
 	assembly->current_method = method;
-	assembly->current_block = llir_block_new();
+	assembly->current_block = new_block(assembly);
 
 	generate_block(assembly, ir_method->block, false);
 
@@ -771,7 +776,7 @@ struct llir *llir_generator_generate_llir(struct llir_generator *assembly,
 					  struct ir_program *ir)
 {
 	assembly->temporary_counter = 0;
-	assembly->label_counter = 0;
+	assembly->block_counter = 0;
 	return generate_llir(assembly, ir);
 }
 

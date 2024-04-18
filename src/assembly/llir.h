@@ -39,6 +39,8 @@ struct llir_block {
 		struct llir_return *llir_return;
 		struct llir_shit_yourself *shit_yourself;
 	};
+
+	uint32_t id;
 };
 
 struct llir_operand {
@@ -144,7 +146,7 @@ void llir_method_add_block(struct llir_method *method,
 			   struct llir_block *block);
 void llir_method_free(struct llir_method *method);
 
-struct llir_block *llir_block_new(void);
+struct llir_block *llir_block_new(uint32_t id);
 void llir_block_add_field(struct llir_block *block, struct llir_field *field);
 void llir_block_add_assignment(struct llir_block *block,
 			       struct llir_assignment *assignment);

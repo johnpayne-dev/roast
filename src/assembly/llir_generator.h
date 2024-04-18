@@ -4,7 +4,7 @@
 
 struct llir_generator {
 	uint32_t temporary_counter;
-	uint32_t label_counter;
+	uint32_t block_counter;
 	struct symbol_table *symbol_table;
 	GArray *break_blocks;
 	GArray *continue_blocks;
