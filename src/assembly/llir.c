@@ -12,11 +12,8 @@ struct llir_node *llir_node_new(enum llir_node_type type, void *data)
 static void print_operand(struct llir_operand operand)
 {
 	switch (operand.type) {
-	case LLIR_OPERAND_TYPE_GLOBAL_FIELD:
-		g_print("%s", operand.global_field->identifier);
-		break;
 	case LLIR_OPERAND_TYPE_FIELD:
-		g_print("$%llu", operand.field);
+		g_print("%s", operand.field);
 		break;
 	case LLIR_OPERAND_TYPE_LITERAL:
 		g_print("%lld", operand.literal);
@@ -61,14 +58,13 @@ void llir_node_print(struct llir_node *node)
 	};
 
 	switch (node->type) {
-	case LLIR_NODE_TYPE_GLOBAL_FIELD:
-		g_print("field %s\n", node->global_field->identifier);
+	case LLIR_NODE_TYPE_FIELD:
 		break;
 	case LLIR_NODE_TYPE_METHOD:
 		g_print("\nmethod %s\n", node->method->identifier);
 		break;
 	case LLIR_NODE_TYPE_ASSIGNMENT:
-		g_print("\t$%llu", node->assignment->destination);
+		g_print("\t%s", node->assignment->destination);
 		if (node->assignment->type == LLIR_ASSIGNMENT_TYPE_MOVE) {
 			g_print(" = ");
 			print_operand(node->assignment->source);
@@ -81,13 +77,13 @@ void llir_node_print(struct llir_node *node)
 		} else if (node->assignment->type ==
 			   LLIR_ASSIGNMENT_TYPE_ARRAY_UPDATE) {
 			g_print("[");
-			print_operand(node->assignment->update_offset);
+			print_operand(node->assignment->update_index);
 			g_print("] = ");
 			print_operand(node->assignment->update_value);
 		} else if (node->assignment->type ==
 			   LLIR_ASSIGNMENT_TYPE_ARRAY_ACCESS) {
-			g_print(" = $%lld[", node->assignment->access_array);
-			print_operand(node->assignment->access_offset);
+			g_print(" = %s[", node->assignment->access_array);
+			print_operand(node->assignment->access_index);
 			g_print("]");
 		} else if (node->assignment->type ==
 			   LLIR_ASSIGNMENT_TYPE_METHOD_CALL) {
@@ -135,8 +131,8 @@ void llir_node_print(struct llir_node *node)
 void llir_node_free(struct llir_node *node)
 {
 	switch (node->type) {
-	case LLIR_NODE_TYPE_GLOBAL_FIELD:
-		llir_global_field_free(node->global_field);
+	case LLIR_NODE_TYPE_FIELD:
+		llir_field_free(node->field);
 		break;
 	case LLIR_NODE_TYPE_METHOD:
 		llir_method_free(node->method);
@@ -170,10 +166,10 @@ void llir_node_free(struct llir_node *node)
 	g_free(node);
 }
 
-struct llir_global_field *llir_global_field_new(char *identifier, bool is_array,
-						int64_t length)
+struct llir_field *llir_field_new(char *identifier, bool is_array,
+				  int64_t length)
 {
-	struct llir_global_field *field = g_new(struct llir_global_field, 1);
+	struct llir_field *field = g_new(struct llir_field, 1);
 
 	field->identifier = g_strdup(identifier);
 	field->is_array = is_array;
@@ -183,7 +179,7 @@ struct llir_global_field *llir_global_field_new(char *identifier, bool is_array,
 	return field;
 }
 
-void llir_global_field_free(struct llir_global_field *field)
+void llir_field_free(struct llir_field *field)
 {
 	g_free(field->identifier);
 	g_free(field->values);
@@ -196,7 +192,7 @@ struct llir_method *llir_method_new(char *identifier, uint32_t argument_count)
 
 	method->identifier = g_strdup(identifier);
 	method->argument_count = argument_count;
-	method->arguments = g_new(llir_field_t, argument_count);
+	method->arguments = g_new(char *, argument_count);
 
 	return method;
 }
@@ -208,16 +204,7 @@ void llir_method_free(struct llir_method *method)
 	g_free(method);
 }
 
-struct llir_operand
-llir_operand_from_global_field(struct llir_global_field *field)
-{
-	return (struct llir_operand){
-		.type = LLIR_OPERAND_TYPE_GLOBAL_FIELD,
-		.global_field = field,
-	};
-}
-
-struct llir_operand llir_operand_from_field(llir_field_t field)
+struct llir_operand llir_operand_from_field(char *field)
 {
 	return (struct llir_operand){
 		.type = LLIR_OPERAND_TYPE_FIELD,
@@ -243,7 +230,7 @@ struct llir_operand llir_operand_from_string(char *string)
 
 struct llir_assignment *
 llir_assignment_new_unary(enum llir_assignment_type type,
-			  struct llir_operand source, llir_field_t destination)
+			  struct llir_operand source, char *destination)
 {
 	struct llir_assignment *assignment = g_new(struct llir_assignment, 1);
 
@@ -257,7 +244,7 @@ llir_assignment_new_unary(enum llir_assignment_type type,
 struct llir_assignment *
 llir_assignment_new_binary(enum llir_assignment_type type,
 			   struct llir_operand left, struct llir_operand right,
-			   llir_field_t destination)
+			   char *destination)
 {
 	struct llir_assignment *assignment = g_new(struct llir_assignment, 1);
 
@@ -270,37 +257,36 @@ llir_assignment_new_binary(enum llir_assignment_type type,
 }
 
 struct llir_assignment *
-llir_assignment_new_array_update(struct llir_operand offset,
-				 struct llir_operand value,
-				 llir_field_t destination)
+llir_assignment_new_array_update(struct llir_operand index,
+				 struct llir_operand value, char *destination)
 {
 	struct llir_assignment *assignment = g_new(struct llir_assignment, 1);
 
 	assignment->type = LLIR_ASSIGNMENT_TYPE_ARRAY_UPDATE;
 	assignment->destination = destination;
-	assignment->update_offset = offset;
+	assignment->update_index = index;
 	assignment->update_value = value;
 
 	return assignment;
 }
 
 struct llir_assignment *
-llir_assignment_new_array_access(struct llir_operand offset, llir_field_t array,
-				 llir_field_t destination)
+llir_assignment_new_array_access(struct llir_operand index, char *array,
+				 char *destination)
 {
 	struct llir_assignment *assignment = g_new(struct llir_assignment, 1);
 
 	assignment->type = LLIR_ASSIGNMENT_TYPE_ARRAY_ACCESS;
 	assignment->destination = destination;
-	assignment->access_offset = offset;
+	assignment->access_index = index;
 	assignment->access_array = array;
 
 	return assignment;
 }
 
-struct llir_assignment *
-llir_assignment_new_method_call(char *method, uint32_t argument_count,
-				llir_field_t destination)
+struct llir_assignment *llir_assignment_new_method_call(char *method,
+							uint32_t argument_count,
+							char *destination)
 {
 	struct llir_assignment *assignment = g_new(struct llir_assignment, 1);
 
