@@ -5,7 +5,7 @@
 #include "scanner/scanner.h"
 #include "parser/parser.h"
 #include "semantics/semantics.h"
-#include "assembly/assembly.h"
+#include "assembly/llir_generator.h"
 #include "assembly/code_generator.h"
 
 enum target {
@@ -250,9 +250,9 @@ static int run_assembly_target(char *file_name, char *source, bool debug)
 	if (run_intermediate_target(file_name, source, &ir) != 0)
 		return -1;
 
-	struct assembly *assembly = assembly_new();
-	struct llir_node *llir = assembly_generate_llir(assembly, ir);
-	assembly_free(assembly);
+	struct llir_generator *llir_generator = llir_generator_new();
+	struct llir_node *llir = llir_generator_generate_llir(llir_generator, ir);
+	llir_generator_free(llir_generator);
 
 	if (debug) {
 		llir_node_print(llir);

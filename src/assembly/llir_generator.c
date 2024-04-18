@@ -1,6 +1,6 @@
-#include "assembly/assembly.h"
+#include "assembly/llir_generator.h"
 
-static void add_node(struct assembly *assembly, enum llir_node_type type,
+static void add_node(struct llir_generator *assembly, enum llir_node_type type,
 		     void *data)
 {
 	struct llir_node *node = llir_node_new(type, data);
@@ -15,7 +15,7 @@ static void add_node(struct assembly *assembly, enum llir_node_type type,
 	assembly->current = node;
 }
 
-static void add_move(struct assembly *assembly, struct llir_operand source,
+static void add_move(struct llir_generator *assembly, struct llir_operand source,
 		     char *destination)
 {
 	struct llir_assignment *assignment = llir_assignment_new_unary(
@@ -23,7 +23,7 @@ static void add_move(struct assembly *assembly, struct llir_operand source,
 	add_node(assembly, LLIR_NODE_TYPE_ASSIGNMENT, assignment);
 }
 
-static void add_array_update(struct assembly *assembly,
+static void add_array_update(struct llir_generator *assembly,
 			     struct llir_operand index,
 			     struct llir_operand value, char *destination)
 {
@@ -32,7 +32,7 @@ static void add_array_update(struct assembly *assembly,
 	add_node(assembly, LLIR_NODE_TYPE_ASSIGNMENT, assignment);
 }
 
-static void add_array_access(struct assembly *assembly,
+static void add_array_access(struct llir_generator *assembly,
 			     struct llir_operand index, char *array,
 			     char *destination)
 {
@@ -41,7 +41,7 @@ static void add_array_access(struct assembly *assembly,
 	add_node(assembly, LLIR_NODE_TYPE_ASSIGNMENT, assignment);
 }
 
-static void add_unary_assignment(struct assembly *assembly,
+static void add_unary_assignment(struct llir_generator *assembly,
 				 enum llir_assignment_type type,
 				 struct llir_operand source, char *destination)
 {
@@ -50,7 +50,7 @@ static void add_unary_assignment(struct assembly *assembly,
 	add_node(assembly, LLIR_NODE_TYPE_ASSIGNMENT, assignment);
 }
 
-static void add_binary_assignment(struct assembly *assembly,
+static void add_binary_assignment(struct llir_generator *assembly,
 				  enum llir_assignment_type type,
 				  struct llir_operand left,
 				  struct llir_operand right, char *destination)
@@ -60,7 +60,7 @@ static void add_binary_assignment(struct assembly *assembly,
 	add_node(assembly, LLIR_NODE_TYPE_ASSIGNMENT, assignment);
 }
 
-static char *new_temporary(struct assembly *assembly)
+static char *new_temporary(struct llir_generator *assembly)
 {
 	char *identifier =
 		g_strdup_printf("$%u", assembly->temporary_counter++);
@@ -74,33 +74,33 @@ static char *new_temporary(struct assembly *assembly)
 	return field->identifier;
 }
 
-static struct llir_label *new_label(struct assembly *assembly)
+static struct llir_label *new_label(struct llir_generator *assembly)
 {
 	return llir_label_new(assembly->label_counter++);
 }
 
-static void push_loop(struct assembly *assembly, struct llir_label *break_label,
+static void push_loop(struct llir_generator *assembly, struct llir_label *break_label,
 		      struct llir_label *continue_label)
 {
 	g_array_append_val(assembly->break_labels, break_label);
 	g_array_append_val(assembly->continue_labels, continue_label);
 }
 
-static struct llir_label *get_break_label(struct assembly *assembly)
+static struct llir_label *get_break_label(struct llir_generator *assembly)
 {
 	g_assert(assembly->break_labels->len > 0);
 	return g_array_index(assembly->break_labels, struct llir_label *,
 			     assembly->break_labels->len - 1);
 }
 
-static struct llir_label *get_continue_label(struct assembly *assembly)
+static struct llir_label *get_continue_label(struct llir_generator *assembly)
 {
 	g_assert(assembly->continue_labels->len > 0);
 	return g_array_index(assembly->continue_labels, struct llir_label *,
 			     assembly->continue_labels->len - 1);
 }
 
-static void pop_loop(struct assembly *assembly)
+static void pop_loop(struct llir_generator *assembly)
 {
 	g_assert(assembly->break_labels->len > 0);
 	g_assert(assembly->continue_labels->len > 0);
@@ -138,15 +138,15 @@ static void get_field_initializer(struct ir_initializer *initializer,
 	}
 }
 
-static char *nodes_from_field(struct assembly *assembly,
+static char *nodes_from_field(struct llir_generator *assembly,
 			      struct ir_field *ir_field, bool initialize);
 static struct llir_operand
-nodes_from_expression(struct assembly *assembly,
+nodes_from_expression(struct llir_generator *assembly,
 		      struct ir_expression *ir_expression);
-static void nodes_from_block(struct assembly *assembly,
+static void nodes_from_block(struct llir_generator *assembly,
 			     struct ir_block *ir_block, bool new_scope);
 
-static void nodes_from_bounds_check(struct assembly *assembly,
+static void nodes_from_bounds_check(struct llir_generator *assembly,
 				    struct llir_operand index, int64_t length)
 {
 	struct llir_label *label = new_label(assembly);
@@ -162,7 +162,7 @@ static void nodes_from_bounds_check(struct assembly *assembly,
 	add_node(assembly, LLIR_NODE_TYPE_LABEL, label);
 }
 
-static struct llir_operand nodes_from_location(struct assembly *assembly,
+static struct llir_operand nodes_from_location(struct llir_generator *assembly,
 					       struct ir_location *ir_location)
 {
 	struct llir_field *field = symbol_table_get(assembly->symbol_table,
@@ -184,7 +184,7 @@ static struct llir_operand nodes_from_location(struct assembly *assembly,
 	return llir_operand_from_field(destination);
 }
 
-static struct llir_operand nodes_from_literal(struct assembly *assembly,
+static struct llir_operand nodes_from_literal(struct llir_generator *assembly,
 					      struct ir_literal *literal)
 {
 	int64_t value = literal_to_int64(literal);
@@ -196,7 +196,7 @@ static struct llir_operand nodes_from_literal(struct assembly *assembly,
 }
 
 static struct llir_operand
-nodes_from_method_call(struct assembly *assembly,
+nodes_from_method_call(struct llir_generator *assembly,
 		       struct ir_method_call *ir_method_call)
 {
 	char *destination = new_temporary(assembly);
@@ -227,7 +227,7 @@ nodes_from_method_call(struct assembly *assembly,
 }
 
 static struct llir_operand
-nodes_from_len_expression(struct assembly *assembly,
+nodes_from_len_expression(struct llir_generator *assembly,
 			  struct ir_length_expression *length_expression)
 {
 	struct llir_operand source =
@@ -239,7 +239,7 @@ nodes_from_len_expression(struct assembly *assembly,
 }
 
 static struct llir_operand
-nodes_from_not_expression(struct assembly *assembly,
+nodes_from_not_expression(struct llir_generator *assembly,
 			  struct ir_expression *ir_expression)
 {
 	struct llir_operand source =
@@ -252,7 +252,7 @@ nodes_from_not_expression(struct assembly *assembly,
 }
 
 static struct llir_operand
-nodes_from_negate_expression(struct assembly *assembly,
+nodes_from_negate_expression(struct llir_generator *assembly,
 			     struct ir_expression *ir_expression)
 {
 	struct llir_operand source =
@@ -265,7 +265,7 @@ nodes_from_negate_expression(struct assembly *assembly,
 }
 
 static struct llir_operand
-nodes_from_short_circuit(struct assembly *assembly,
+nodes_from_short_circuit(struct llir_generator *assembly,
 			 struct ir_binary_expression *ir_binary_expression)
 {
 	g_assert(ir_binary_expression->binary_operator ==
@@ -300,7 +300,7 @@ nodes_from_short_circuit(struct assembly *assembly,
 }
 
 static struct llir_operand
-nodes_from_binary_expression(struct assembly *assembly,
+nodes_from_binary_expression(struct llir_generator *assembly,
 			     struct ir_binary_expression *ir_binary_expression)
 {
 	if (ir_binary_expression->binary_operator == IR_BINARY_OPERATOR_OR ||
@@ -337,7 +337,7 @@ nodes_from_binary_expression(struct assembly *assembly,
 }
 
 static struct llir_operand
-nodes_from_expression(struct assembly *assembly,
+nodes_from_expression(struct llir_generator *assembly,
 		      struct ir_expression *ir_expression)
 {
 	switch (ir_expression->type) {
@@ -366,7 +366,7 @@ nodes_from_expression(struct assembly *assembly,
 	}
 }
 
-static void nodes_from_assignment(struct assembly *assembly,
+static void nodes_from_assignment(struct llir_generator *assembly,
 				  struct ir_assignment *ir_assignment)
 {
 	struct llir_field *field = symbol_table_get(
@@ -428,7 +428,7 @@ static void nodes_from_assignment(struct assembly *assembly,
 			 destination);
 }
 
-static void nodes_from_if_statement(struct assembly *assembly,
+static void nodes_from_if_statement(struct llir_generator *assembly,
 				    struct ir_if_statement *ir_if_statement)
 {
 	struct llir_operand expression =
@@ -454,7 +454,7 @@ static void nodes_from_if_statement(struct assembly *assembly,
 	}
 }
 
-static void nodes_from_for_update(struct assembly *assembly,
+static void nodes_from_for_update(struct llir_generator *assembly,
 				  struct ir_for_update *ir_for_update)
 {
 	switch (ir_for_update->type) {
@@ -470,7 +470,7 @@ static void nodes_from_for_update(struct assembly *assembly,
 	}
 }
 
-static void nodes_from_for_statement(struct assembly *assembly,
+static void nodes_from_for_statement(struct llir_generator *assembly,
 				     struct ir_for_statement *ir_for_statement)
 {
 	nodes_from_assignment(assembly, ir_for_statement->initial);
@@ -501,7 +501,7 @@ static void nodes_from_for_statement(struct assembly *assembly,
 }
 
 static void
-nodes_from_while_statement(struct assembly *assembly,
+nodes_from_while_statement(struct llir_generator *assembly,
 			   struct ir_while_statement *ir_while_statement)
 {
 	struct llir_label *break_label = new_label(assembly);
@@ -527,7 +527,7 @@ nodes_from_while_statement(struct assembly *assembly,
 	pop_loop(assembly);
 }
 
-static void nodes_from_return_statement(struct assembly *assembly,
+static void nodes_from_return_statement(struct llir_generator *assembly,
 					struct ir_expression *ir_expression)
 {
 	struct llir_operand return_value;
@@ -540,21 +540,21 @@ static void nodes_from_return_statement(struct assembly *assembly,
 	add_node(assembly, LLIR_NODE_TYPE_RETURN, llir_return);
 }
 
-static void nodes_from_break_statement(struct assembly *assembly)
+static void nodes_from_break_statement(struct llir_generator *assembly)
 {
 	struct llir_label *label = get_break_label(assembly);
 	struct llir_jump *jump = llir_jump_new(label);
 	add_node(assembly, LLIR_NODE_TYPE_JUMP, jump);
 }
 
-static void nodes_from_continue_statement(struct assembly *assembly)
+static void nodes_from_continue_statement(struct llir_generator *assembly)
 {
 	struct llir_label *label = get_continue_label(assembly);
 	struct llir_jump *jump = llir_jump_new(label);
 	add_node(assembly, LLIR_NODE_TYPE_JUMP, jump);
 }
 
-static void nodes_from_statement(struct assembly *assembly,
+static void nodes_from_statement(struct llir_generator *assembly,
 				 struct ir_statement *ir_statement)
 {
 	switch (ir_statement->type) {
@@ -590,7 +590,7 @@ static void nodes_from_statement(struct assembly *assembly,
 	}
 }
 
-static void nodes_from_block(struct assembly *assembly,
+static void nodes_from_block(struct llir_generator *assembly,
 			     struct ir_block *ir_block, bool new_scope)
 {
 	if (new_scope)
@@ -612,7 +612,7 @@ static void nodes_from_block(struct assembly *assembly,
 		symbol_table_pop_scope(assembly->symbol_table);
 }
 
-static void nodes_from_method(struct assembly *assembly,
+static void nodes_from_method(struct llir_generator *assembly,
 			      struct ir_method *ir_method)
 {
 	symbol_table_push_scope(assembly->symbol_table);
@@ -643,7 +643,7 @@ static void nodes_from_method(struct assembly *assembly,
 	symbol_table_pop_scope(assembly->symbol_table);
 }
 
-static void nodes_from_field_initialization(struct assembly *assembly,
+static void nodes_from_field_initialization(struct llir_generator *assembly,
 					    struct llir_field *field)
 {
 	if (!field->is_array) {
@@ -661,7 +661,7 @@ static void nodes_from_field_initialization(struct assembly *assembly,
 	}
 }
 
-static char *nodes_from_field(struct assembly *assembly,
+static char *nodes_from_field(struct llir_generator *assembly,
 			      struct ir_field *ir_field, bool initialize)
 {
 	uint32_t scope_level =
@@ -680,7 +680,7 @@ static char *nodes_from_field(struct assembly *assembly,
 	return field->identifier;
 }
 
-static void nodes_from_program(struct assembly *assembly,
+static void nodes_from_program(struct llir_generator *assembly,
 			       struct ir_program *ir_program)
 {
 	for (uint32_t i = 0; i < ir_program->fields->len; i++) {
@@ -696,9 +696,9 @@ static void nodes_from_program(struct assembly *assembly,
 	}
 }
 
-struct assembly *assembly_new(void)
+struct llir_generator *llir_generator_new(void)
 {
-	struct assembly *assembly = g_new(struct assembly, 1);
+	struct llir_generator *assembly = g_new(struct llir_generator, 1);
 
 	assembly->break_labels =
 		g_array_new(false, false, sizeof(struct llir_label *));
@@ -709,7 +709,7 @@ struct assembly *assembly_new(void)
 	return assembly;
 }
 
-struct llir_node *assembly_generate_llir(struct assembly *assembly,
+struct llir_node *llir_generator_generate_llir(struct llir_generator *assembly,
 					 struct ir_program *ir)
 {
 	assembly->temporary_counter = 0;
@@ -722,7 +722,7 @@ struct llir_node *assembly_generate_llir(struct assembly *assembly,
 	return assembly->head;
 }
 
-void assembly_free(struct assembly *assembly)
+void llir_generator_free(struct llir_generator *assembly)
 {
 	g_array_free(assembly->break_labels, true);
 	g_array_free(assembly->continue_labels, true);
