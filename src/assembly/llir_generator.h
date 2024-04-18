@@ -15,6 +15,6 @@ struct llir_generator {
 struct llir_generator *llir_generator_new(void);
 
 struct llir_node *llir_generator_generate_llir(struct llir_generator *assembly,
-					 struct ir_program *ir);
+					       struct ir_program *ir);
 
 void llir_generator_free(struct llir_generator *assembly);

@@ -251,7 +251,8 @@ static int run_assembly_target(char *file_name, char *source, bool debug)
 		return -1;
 
 	struct llir_generator *llir_generator = llir_generator_new();
-	struct llir_node *llir = llir_generator_generate_llir(llir_generator, ir);
+	struct llir_node *llir =
+		llir_generator_generate_llir(llir_generator, ir);
 	llir_generator_free(llir_generator);
 
 	if (debug) {

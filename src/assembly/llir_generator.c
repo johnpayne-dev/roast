@@ -15,8 +15,8 @@ static void add_node(struct llir_generator *assembly, enum llir_node_type type,
 	assembly->current = node;
 }
 
-static void add_move(struct llir_generator *assembly, struct llir_operand source,
-		     char *destination)
+static void add_move(struct llir_generator *assembly,
+		     struct llir_operand source, char *destination)
 {
 	struct llir_assignment *assignment = llir_assignment_new_unary(
 		LLIR_ASSIGNMENT_TYPE_MOVE, source, destination);
@@ -79,7 +79,8 @@ static struct llir_label *new_label(struct llir_generator *assembly)
 	return llir_label_new(assembly->label_counter++);
 }
 
-static void push_loop(struct llir_generator *assembly, struct llir_label *break_label,
+static void push_loop(struct llir_generator *assembly,
+		      struct llir_label *break_label,
 		      struct llir_label *continue_label)
 {
 	g_array_append_val(assembly->break_labels, break_label);
@@ -710,7 +711,7 @@ struct llir_generator *llir_generator_new(void)
 }
 
 struct llir_node *llir_generator_generate_llir(struct llir_generator *assembly,
-					 struct ir_program *ir)
+					       struct ir_program *ir)
 {
 	assembly->temporary_counter = 0;
 	assembly->label_counter = 0;
