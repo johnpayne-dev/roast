@@ -76,6 +76,7 @@ struct llir_assignment {
 		LLIR_ASSIGNMENT_TYPE_ARRAY_UPDATE,
 		LLIR_ASSIGNMENT_TYPE_ARRAY_ACCESS,
 		LLIR_ASSIGNMENT_TYPE_METHOD_CALL,
+		LLIR_ASSIGNMENT_TYPE_PHI,
 	} type;
 
 	char *destination;
@@ -99,6 +100,7 @@ struct llir_assignment {
 			uint32_t argument_count;
 			struct llir_operand *arguments;
 		};
+		GArray *phi_arguments;
 	};
 };
 
@@ -183,6 +185,9 @@ llir_assignment_new_array_access(struct llir_operand index, char *array,
 struct llir_assignment *llir_assignment_new_method_call(char *method,
 							uint32_t argument_count,
 							char *destination);
+struct llir_assignment *llir_assignment_new_phi(char *destination);
+void llir_assignment_add_phi_argument(struct llir_assignment *assignment,
+				      struct llir_operand argument);
 void llir_assignment_print(struct llir_assignment *assignment);
 void llir_assignment_free(struct llir_assignment *assignment);
 

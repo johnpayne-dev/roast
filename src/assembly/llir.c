@@ -346,6 +346,24 @@ struct llir_assignment *llir_assignment_new_method_call(char *method,
 	return assignment;
 }
 
+struct llir_assignment *llir_assignment_new_phi(char *destination)
+{
+	struct llir_assignment *assignment = g_new(struct llir_assignment, 1);
+
+	assignment->type = LLIR_ASSIGNMENT_TYPE_PHI;
+	assignment->destination = destination;
+	assignment->phi_arguments =
+		g_array_new(false, false, sizeof(struct llir_operand));
+
+	return assignment;
+}
+
+void llir_assignment_add_phi_argument(struct llir_assignment *assignment,
+				      struct llir_operand argument)
+{
+	g_array_append_val(assignment->phi_arguments, argument);
+}
+
 void llir_assignment_print(struct llir_assignment *assignment)
 {
 	static const char *BINARY_OPERATOR_TO_STRING[] = {
@@ -385,7 +403,25 @@ void llir_assignment_print(struct llir_assignment *assignment)
 		llir_operand_print(assignment->access_index);
 		g_print("]");
 	} else if (assignment->type == LLIR_ASSIGNMENT_TYPE_METHOD_CALL) {
-		g_print(" = %s(...)", assignment->method);
+		g_print(" = %s(", assignment->method);
+		for (uint32_t i = 0; i < assignment->argument_count; i++) {
+			struct llir_operand operand = assignment->arguments[i];
+			llir_operand_print(operand);
+			if (i != assignment->argument_count - 1)
+				g_print(", ");
+		}
+		g_print(")");
+	} else if (assignment->type == LLIR_ASSIGNMENT_TYPE_PHI) {
+		g_print(" = ^(");
+		for (uint32_t i = 0; i < assignment->phi_arguments->len; i++) {
+			struct llir_operand operand =
+				g_array_index(assignment->phi_arguments,
+					      struct llir_operand, i);
+			llir_operand_print(operand);
+			if (i != assignment->phi_arguments->len - 1)
+				g_print(", ");
+		}
+		g_print(")");
 	} else {
 		g_print(" = ");
 		llir_operand_print(assignment->left);
@@ -399,6 +435,8 @@ void llir_assignment_free(struct llir_assignment *assignment)
 {
 	if (assignment->type == LLIR_ASSIGNMENT_TYPE_METHOD_CALL)
 		g_free(assignment->arguments);
+	else if (assignment->type == LLIR_ASSIGNMENT_TYPE_PHI)
+		g_array_free(assignment->phi_arguments, true);
 
 	g_free(assignment);
 }
