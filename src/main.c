@@ -5,7 +5,7 @@
 #include "scanner/scanner.h"
 #include "parser/parser.h"
 #include "semantics/semantics.h"
-#include "assembly/assembly.h"
+#include "assembly/llir_generator.h"
 #include "assembly/code_generator.h"
 
 enum target {
@@ -244,19 +244,24 @@ static int run_intermediate_target(char *file_name, char *source,
 	return result;
 }
 
-static int run_assembly_target(char *file_name, char *source)
+static int run_assembly_target(char *file_name, char *source, bool debug)
 {
 	struct ir_program *ir;
 	if (run_intermediate_target(file_name, source, &ir) != 0)
 		return -1;
 
-	struct assembly *assembly = assembly_new();
-	struct llir_node *llir = assembly_generate_llir(assembly, ir);
-	assembly_free(assembly);
+	struct llir_generator *llir_generator = llir_generator_new();
+	struct llir_node *llir =
+		llir_generator_generate_llir(llir_generator, ir);
+	llir_generator_free(llir_generator);
 
-	struct code_generator *generator = code_generator_new();
-	code_generator_generate(generator, llir);
-	code_generator_free(generator);
+	if (debug) {
+		llir_node_print(llir);
+	} else {
+		struct code_generator *generator = code_generator_new();
+		code_generator_generate(generator, llir);
+		code_generator_free(generator);
+	}
 
 	llir_node_free(llir);
 	ir_program_free(ir);
@@ -274,7 +279,8 @@ static int run_target(struct options *options, char *source)
 		return run_intermediate_target(options->input_file, source,
 					       NULL);
 	case TARGET_ASSEMBLY:
-		return run_assembly_target(options->input_file, source);
+		return run_assembly_target(options->input_file, source,
+					   options->debug);
 	default:
 		g_assert(!"Unknown target");
 		return -1;

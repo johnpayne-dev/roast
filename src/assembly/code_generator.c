@@ -22,10 +22,11 @@ static void generate_global_strings(struct code_generator *generator)
 {
 	for (struct llir_node *node = generator->node; node != NULL;
 	     node = node->next) {
-		if (node->type != LLIR_NODE_TYPE_METHOD_CALL)
+		if (node->type != LLIR_NODE_TYPE_ASSIGNMENT ||
+		    node->assignment->type != LLIR_ASSIGNMENT_TYPE_METHOD_CALL)
 			continue;
 
-		struct llir_method_call *call = node->method_call;
+		struct llir_assignment *call = node->assignment;
 
 		for (uint32_t i = 0; i < call->argument_count; i++) {
 			struct llir_operand argument = call->arguments[i];
@@ -45,10 +46,6 @@ static void generate_global_field(struct code_generator *generator)
 	g_print("%s:\n", field->identifier);
 	g_print("\t.fill %llu\n", 8 * field->value_count);
 	g_print("\t.align 16\n");
-
-	if (field->is_array)
-		g_hash_table_insert(generator->is_array, field->identifier,
-				    (gpointer)1);
 }
 
 static void generate_global_fields(struct code_generator *generator)
@@ -71,15 +68,6 @@ static void generate_stack_allocation(struct code_generator *generator)
 {
 	uint64_t stack_size = 0;
 
-	struct llir_method *method = generator->node->method;
-	for (uint32_t i = 0; i < method->argument_count; i++) {
-		struct llir_field *field = method->arguments[i];
-
-		stack_size += field->value_count * 8;
-		g_hash_table_insert(generator->offsets, field->identifier,
-				    (gpointer)stack_size);
-	}
-
 	for (struct llir_node *node = generator->node->next;
 	     node != NULL && node->type != LLIR_NODE_TYPE_METHOD;
 	     node = node->next) {
@@ -91,9 +79,6 @@ static void generate_stack_allocation(struct code_generator *generator)
 		stack_size += field->value_count * 8;
 		g_hash_table_insert(generator->offsets, field->identifier,
 				    (gpointer)stack_size);
-		if (field->is_array)
-			g_hash_table_insert(generator->is_array,
-					    field->identifier, (gpointer)1);
 	}
 
 	if (stack_size % 16 != 0)
@@ -107,10 +92,10 @@ static void generate_method_arguments(struct code_generator *generator)
 	struct llir_method *method = generator->node->method;
 
 	for (uint32_t i = 0; i < method->argument_count; i++) {
-		struct llir_field *field = method->arguments[i];
+		char *field = method->arguments[i];
 
 		uint64_t offset = (uint64_t)g_hash_table_lookup(
-			generator->offsets, field->identifier);
+			generator->offsets, field);
 		g_assert(offset != 0);
 
 		if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
@@ -161,63 +146,26 @@ static void generate_method_declaration(struct code_generator *generator)
 		generate_global_field_initialization(node->field);
 }
 
-static void generate_field_initialization(struct code_generator *generator)
-{
-	struct llir_field *field = generator->node->field;
-
-	uint64_t offset = (uint64_t)g_hash_table_lookup(generator->offsets,
-							field->identifier);
-	g_assert(offset != 0);
-
-	for (int64_t i = 0; i < field->value_count; i++)
-		g_print("\tmovq $%lld, -%lld(%%rbp)\n", field->values[i],
-			offset - 8 * i);
-}
-
 static void load_to_register(struct code_generator *generator,
 			     struct llir_operand operand,
 			     const char *destination)
 {
-	uint64_t offset, is_array, string_id;
+	uint64_t offset, string_id;
 
 	switch (operand.type) {
 	case LLIR_OPERAND_TYPE_LITERAL:
 		g_print("\tmovq $%lld, %%%s\n", operand.literal, destination);
 		break;
-	case LLIR_OPERAND_TYPE_VARIABLE:
+	case LLIR_OPERAND_TYPE_FIELD:
 		offset = (uint64_t)g_hash_table_lookup(generator->offsets,
-						       operand.identifier);
-		is_array = (uint64_t)g_hash_table_lookup(generator->is_array,
-							 operand.identifier);
-
-		if (is_array)
-			g_print("\tleaq ");
-		else
-			g_print("\tmovq ");
+						       operand.field);
 
 		if (offset != 0)
-			g_print("-%llu(%%rbp), %%%s\n", offset, destination);
-		else
-			g_print("%s(%%rip), %%%s\n", operand.identifier,
+			g_print("\tmovq -%llu(%%rbp), %%%s\n", offset,
 				destination);
-		break;
-	case LLIR_OPERAND_TYPE_DEREFERENCE:
-		offset = (uint64_t)g_hash_table_lookup(
-			generator->offsets, operand.dereference.identifier);
-		is_array = (uint64_t)g_hash_table_lookup(generator->is_array,
-							 operand.identifier);
-		if (is_array)
-			g_assert(!"not implemented");
-
-		if (offset != 0) {
-			g_print("\tmovq -%llu(%%rbp), %%rax\n", offset);
-			g_print("\tmovq %lld(%%rax), %%%s\n",
-				operand.dereference.offset, destination);
-		} else {
-			g_print("\tmovq %s+%lld(%%rip), %%%s\n",
-				operand.dereference.identifier,
-				operand.dereference.offset, destination);
-		}
+		else
+			g_print("\tmovq %s(%%rip), %%%s\n", operand.field,
+				destination);
 		break;
 	case LLIR_OPERAND_TYPE_STRING:
 		string_id = (uint64_t)g_hash_table_lookup(generator->strings,
@@ -232,147 +180,42 @@ static void load_to_register(struct code_generator *generator,
 	}
 }
 
-static void store_from_register(struct code_generator *generator,
-				struct llir_operand operand, const char *source)
+static void load_array_to_register(struct code_generator *generator,
+				   char *array, const char *destination)
 {
-	uint64_t offset;
-
-	switch (operand.type) {
-	case LLIR_OPERAND_TYPE_VARIABLE:
-		offset = (uint64_t)g_hash_table_lookup(generator->offsets,
-						       operand.identifier);
-		if (offset != 0)
-			g_print("\tmovq %%%s, -%llu(%%rbp)\n", source, offset);
-		else
-			g_print("\tmovq %%%s, %s(%%rip)\n", source,
-				operand.identifier);
-		break;
-	case LLIR_OPERAND_TYPE_DEREFERENCE:
-		offset = (uint64_t)g_hash_table_lookup(
-			generator->offsets, operand.dereference.identifier);
-		if (offset != 0) {
-			g_print("\tmovq -%llu(%%rbp), %%rax\n", offset);
-			g_print("\tmovq %%%s, %lld(%%rax)\n", source,
-				operand.dereference.offset);
-		} else {
-			g_print("\tmovq %%%s, %s+%lld(%%rip)\n", source,
-				operand.dereference.identifier,
-				operand.dereference.offset);
-		}
-		break;
-	default:
-		g_assert(!"you fucked up");
-	}
+	uint64_t offset =
+		(uint64_t)g_hash_table_lookup(generator->offsets, array);
+	if (offset != 0)
+		g_print("\tleaq -%llu(%%rbp), %%%s\n", offset, destination);
+	else
+		g_print("\tleaq %s(%%rip), %%%s\n", array, destination);
 }
 
-static void generate_operation(struct code_generator *generator)
+static void store_from_register(struct code_generator *generator,
+				char *destination, const char *source)
 {
-	struct llir_operation *operation = generator->node->operation;
-
-	load_to_register(generator, operation->source, "r11");
-	load_to_register(generator, operation->destination, "r10");
-
-	switch (operation->type) {
-	case LLIR_OPERATION_TYPE_MOVE:
-		g_print("\tmovq %%r11, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_ADD:
-		g_print("\taddq %%r11, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_SUBTRACT:
-		g_print("\tsubq %%r11, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_MULTIPLY:
-		g_print("\timulq %%r11, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_DIVIDE:
-		g_print("\tmovq %%r10, %%rax\n");
-		g_print("\tcqto\n");
-		g_print("\tidivq %%r11\n");
-		g_print("\tmovq %%rax, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_MODULO:
-		g_print("\tmovq %%r10, %%rax\n");
-		g_print("\tcqto\n");
-		g_print("\tidivq %%r11\n");
-		g_print("\tmovq %%rdx, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_EQUAL:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsete %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbl  %%al, %%eax\n");
-		g_print("\tcltq\n");
-		g_print("\tmovq %%rax, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_NOT_EQUAL:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsetne %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbl  %%al, %%eax\n");
-		g_print("\tcltq\n");
-		g_print("\tmovq %%rax, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_LESS:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsetl %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbq %%al, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_LESS_EQUAL:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsetle %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbq %%al, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_GREATER_EQUAL:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsetge %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbq %%al, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_GREATER:
-		g_print("\tcmpq %%r11, %%r10\n");
-		g_print("\tsetg %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbq %%al, %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_NEGATE:
-		g_print("\tmovq %%r11, %%r10\n");
-		g_print("\tnegq %%r10\n");
-		break;
-	case LLIR_OPERATION_TYPE_NOT:
-		g_print("\tmovq %%r11, %%r10\n");
-		g_print("\tcmpq $0, %%r10\n");
-		g_print("\tsetne %%al\n");
-		g_print("\txorb $-1, %%al\n");
-		g_print("\tandb $1, %%al\n");
-		g_print("\tmovzbl  %%al, %%eax\n");
-		g_print("\tcltq\n");
-		g_print("\tmovq %%rax, %%r10\n");
-		break;
-	default:
-		g_assert(!"you fucked up");
-		break;
-	}
-
-	store_from_register(generator, operation->destination, "r10");
+	uint64_t offset =
+		(uint64_t)g_hash_table_lookup(generator->offsets, destination);
+	if (offset != 0)
+		g_print("\tmovq %%%s, -%llu(%%rbp)\n", source, offset);
+	else
+		g_print("\tmovq %%%s, %s(%%rip)\n", source, destination);
 }
 
 static void generate_method_call(struct code_generator *generator)
 {
-	struct llir_method_call *method_call = generator->node->method_call;
+	struct llir_assignment *call = generator->node->assignment;
 
 	int32_t stack_argument_count =
-		method_call->argument_count - G_N_ELEMENTS(ARGUMENT_REGISTERS);
+		call->argument_count - G_N_ELEMENTS(ARGUMENT_REGISTERS);
 	int32_t extra_stack_size =
 		8 * (stack_argument_count + stack_argument_count % 2);
 
 	if (stack_argument_count > 0)
 		g_print("\tsubq $%d, %%rsp\n", extra_stack_size);
 
-	for (uint32_t i = 0; i < method_call->argument_count; i++) {
-		struct llir_operand argument = method_call->arguments[i];
+	for (uint32_t i = 0; i < call->argument_count; i++) {
+		struct llir_operand argument = call->arguments[i];
 
 		if (i < G_N_ELEMENTS(ARGUMENT_REGISTERS)) {
 			load_to_register(generator, argument,
@@ -387,14 +230,155 @@ static void generate_method_call(struct code_generator *generator)
 
 	g_print("\tmovq $0, %%rax\n");
 #ifdef __APPLE__
-	g_print("\tcall _%s\n", method_call->identifier);
+	g_print("\tcall _%s\n", call->method);
 #else
-	g_print("\tcall %s\n", method_call->identifier);
+	g_print("\tcall %s\n", call->method);
 #endif
 	if (stack_argument_count > 0)
 		g_print("\taddq $%i, %%rsp\n", extra_stack_size);
 
-	store_from_register(generator, method_call->destination, "rax");
+	store_from_register(generator, call->destination, "rax");
+}
+
+static void generate_assignment(struct code_generator *generator)
+{
+	struct llir_assignment *assignment = generator->node->assignment;
+
+	switch (assignment->type) {
+	case LLIR_ASSIGNMENT_TYPE_MOVE:
+		load_to_register(generator, assignment->source, "r10");
+		store_from_register(generator, assignment->destination, "r10");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_ADD:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\taddq %%r11, %%r10\n");
+		store_from_register(generator, assignment->destination, "r10");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_SUBTRACT:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\tsubq %%r11, %%r10\n");
+		store_from_register(generator, assignment->destination, "r10");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_MULTIPLY:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\timulq %%r11, %%r10\n");
+		store_from_register(generator, assignment->destination, "r10");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_DIVIDE:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\tmovq %%r10, %%rax\n");
+		g_print("\tcqto\n");
+		g_print("\tidivq %%r11\n");
+		store_from_register(generator, assignment->destination, "rax");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_MODULO:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\tmovq %%r10, %%rax\n");
+		g_print("\tcqto\n");
+		g_print("\tidivq %%r11\n");
+		store_from_register(generator, assignment->destination, "rdx");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_EQUAL:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsete %%al\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbl  %%al, %%eax\n");
+		g_print("\tcltq\n");
+		store_from_register(generator, assignment->destination, "rax");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_NOT_EQUAL:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsetne %%al\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbl  %%al, %%eax\n");
+		g_print("\tcltq\n");
+		store_from_register(generator, assignment->destination, "rax");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_LESS:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsetl %%al\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbq %%al, %%r10\n");
+		store_from_register(generator, assignment->destination, "r10");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_LESS_EQUAL:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsetle %%al\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbq %%al, %%r10\n");
+		store_from_register(generator, assignment->destination, "r10");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_GREATER_EQUAL:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsetge %%al\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbq %%al, %%r10\n");
+		store_from_register(generator, assignment->destination, "r10");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_GREATER:
+		load_to_register(generator, assignment->left, "r10");
+		load_to_register(generator, assignment->right, "r11");
+		g_print("\tcmpq %%r11, %%r10\n");
+		g_print("\tsetg %%al\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbq %%al, %%r10\n");
+		store_from_register(generator, assignment->destination, "r10");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_NEGATE:
+		load_to_register(generator, assignment->source, "r10");
+		g_print("\tnegq %%r10\n");
+		store_from_register(generator, assignment->destination, "r10");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_NOT:
+		load_to_register(generator, assignment->source, "r10");
+		g_print("\tcmpq $0, %%r10\n");
+		g_print("\tsetne %%al\n");
+		g_print("\txorb $-1, %%al\n");
+		g_print("\tandb $1, %%al\n");
+		g_print("\tmovzbl  %%al, %%eax\n");
+		g_print("\tcltq\n");
+		store_from_register(generator, assignment->destination, "rax");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_ARRAY_ACCESS:
+		load_array_to_register(generator, assignment->access_array,
+				       "r10");
+		load_to_register(generator, assignment->access_index, "r11");
+		g_print("\timulq $8, %%r11\n");
+		g_print("\taddq %%r11, %%r10\n");
+		g_print("\tmovq 0(%%r10), %%r11\n");
+		store_from_register(generator, assignment->destination, "r11");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_ARRAY_UPDATE:
+		load_array_to_register(generator, assignment->destination,
+				       "r10");
+		load_to_register(generator, assignment->update_index, "r11");
+		g_print("\timulq $8, %%r11\n");
+		g_print("\taddq %%r11, %%r10\n");
+		load_to_register(generator, assignment->update_value, "r11");
+		g_print("\tmovq %%r11, 0(%%r10)\n");
+		break;
+	case LLIR_ASSIGNMENT_TYPE_METHOD_CALL:
+		generate_method_call(generator);
+		break;
+	default:
+		g_assert(!"you fucked up");
+		break;
+	}
 }
 
 static void generate_label(struct code_generator *generator)
@@ -488,16 +472,12 @@ static void generate_text_section(struct code_generator *generator)
 	     generator->node = generator->node->next) {
 		switch (generator->node->type) {
 		case LLIR_NODE_TYPE_FIELD:
-			generate_field_initialization(generator);
 			break;
 		case LLIR_NODE_TYPE_METHOD:
 			generate_method_declaration(generator);
 			break;
-		case LLIR_NODE_TYPE_OPERATION:
-			generate_operation(generator);
-			break;
-		case LLIR_NODE_TYPE_METHOD_CALL:
-			generate_method_call(generator);
+		case LLIR_NODE_TYPE_ASSIGNMENT:
+			generate_assignment(generator);
 			break;
 		case LLIR_NODE_TYPE_LABEL:
 			generate_label(generator);
@@ -526,7 +506,6 @@ struct code_generator *code_generator_new(void)
 {
 	struct code_generator *generator = g_new(struct code_generator, 1);
 	generator->offsets = g_hash_table_new(g_str_hash, g_str_equal);
-	generator->is_array = g_hash_table_new(g_str_hash, g_str_equal);
 	return generator;
 }
 
@@ -545,7 +524,6 @@ void code_generator_generate(struct code_generator *generator,
 
 void code_generator_free(struct code_generator *generator)
 {
-	g_hash_table_unref(generator->is_array);
 	g_hash_table_unref(generator->offsets);
 	g_free(generator);
 }

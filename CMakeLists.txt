@@ -6,12 +6,12 @@ project(roast)
 set(PROJECT_FILES
     README.md
     src/main.c
-    src/assembly/assembly.c
-    src/assembly/assembly.h
     src/assembly/code_generator.c
     src/assembly/code_generator.h
     src/assembly/llir.c
     src/assembly/llir.h
+    src/assembly/llir_generator.c
+    src/assembly/llir_generator.h
     src/assembly/symbol_table.c
     src/assembly/symbol_table.h
     src/parser/ast.c

@@ -5,8 +5,7 @@ struct llir_node {
 	enum llir_node_type {
 		LLIR_NODE_TYPE_FIELD,
 		LLIR_NODE_TYPE_METHOD,
-		LLIR_NODE_TYPE_OPERATION,
-		LLIR_NODE_TYPE_METHOD_CALL,
+		LLIR_NODE_TYPE_ASSIGNMENT,
 		LLIR_NODE_TYPE_LABEL,
 		LLIR_NODE_TYPE_BRANCH,
 		LLIR_NODE_TYPE_JUMP,
@@ -18,8 +17,7 @@ struct llir_node {
 		void *data;
 		struct llir_field *field;
 		struct llir_method *method;
-		struct llir_operation *operation;
-		struct llir_method_call *method_call;
+		struct llir_assignment *assignment;
 		struct llir_label *label;
 		struct llir_branch *branch;
 		struct llir_jump *jump;
@@ -43,92 +41,97 @@ struct llir_field {
 
 struct llir_field *llir_field_new(char *identifier, uint32_t scope_level,
 				  bool is_array, int64_t length);
-void llir_field_set_value(struct llir_field *field, uint32_t index,
-			  int64_t value);
-int64_t llir_field_get_value(struct llir_field *field, uint32_t index);
 void llir_field_free(struct llir_field *field);
 
 struct llir_method {
 	char *identifier;
 	uint32_t argument_count;
-	struct llir_field **arguments;
+	char **arguments;
 };
 
 struct llir_method *llir_method_new(char *identifier, uint32_t argument_count);
-void llir_method_set_argument(struct llir_method *method, uint32_t index,
-			      struct llir_field *field);
-struct llir_field *llir_method_get_argument(struct llir_method *method,
-					    uint32_t index);
 void llir_method_free(struct llir_method *method);
 
 struct llir_operand {
 	enum llir_operand_type {
-		LLIR_OPERAND_TYPE_VARIABLE,
-		LLIR_OPERAND_TYPE_DEREFERENCE,
+		LLIR_OPERAND_TYPE_FIELD,
 		LLIR_OPERAND_TYPE_LITERAL,
 		LLIR_OPERAND_TYPE_STRING,
 	} type;
 
 	union {
-		char *identifier;
+		char *field;
 		int64_t literal;
-		struct llir_dereference {
-			char *identifier;
-			int64_t offset;
-		} dereference;
 		char *string;
 	};
 };
 
-struct llir_operand llir_operand_from_identifier(char *identifier);
-struct llir_operand llir_operand_from_dereference(char *identifier,
-						  int64_t offset);
+struct llir_operand llir_operand_from_field(char *field);
 struct llir_operand llir_operand_from_literal(int64_t literal);
 struct llir_operand llir_operand_from_string(char *string);
 
-struct llir_operation {
-	enum llir_operation_type {
-		LLIR_OPERATION_TYPE_MOVE,
-		LLIR_OPERATION_TYPE_ADD,
-		LLIR_OPERATION_TYPE_SUBTRACT,
-		LLIR_OPERATION_TYPE_MULTIPLY,
-		LLIR_OPERATION_TYPE_DIVIDE,
-		LLIR_OPERATION_TYPE_MODULO,
-		LLIR_OPERATION_TYPE_GREATER,
-		LLIR_OPERATION_TYPE_GREATER_EQUAL,
-		LLIR_OPERATION_TYPE_LESS,
-		LLIR_OPERATION_TYPE_LESS_EQUAL,
-		LLIR_OPERATION_TYPE_EQUAL,
-		LLIR_OPERATION_TYPE_NOT_EQUAL,
-		LLIR_OPERATION_TYPE_NEGATE,
-		LLIR_OPERATION_TYPE_NOT,
+struct llir_assignment {
+	enum llir_assignment_type {
+		LLIR_ASSIGNMENT_TYPE_MOVE,
+		LLIR_ASSIGNMENT_TYPE_ADD,
+		LLIR_ASSIGNMENT_TYPE_SUBTRACT,
+		LLIR_ASSIGNMENT_TYPE_MULTIPLY,
+		LLIR_ASSIGNMENT_TYPE_DIVIDE,
+		LLIR_ASSIGNMENT_TYPE_MODULO,
+		LLIR_ASSIGNMENT_TYPE_GREATER,
+		LLIR_ASSIGNMENT_TYPE_GREATER_EQUAL,
+		LLIR_ASSIGNMENT_TYPE_LESS,
+		LLIR_ASSIGNMENT_TYPE_LESS_EQUAL,
+		LLIR_ASSIGNMENT_TYPE_EQUAL,
+		LLIR_ASSIGNMENT_TYPE_NOT_EQUAL,
+		LLIR_ASSIGNMENT_TYPE_NEGATE,
+		LLIR_ASSIGNMENT_TYPE_NOT,
+		LLIR_ASSIGNMENT_TYPE_ARRAY_UPDATE,
+		LLIR_ASSIGNMENT_TYPE_ARRAY_ACCESS,
+		LLIR_ASSIGNMENT_TYPE_METHOD_CALL,
 	} type;
 
-	struct llir_operand source;
-	struct llir_operand destination;
+	char *destination;
+
+	union {
+		struct llir_operand source;
+		struct {
+			struct llir_operand left;
+			struct llir_operand right;
+		};
+		struct {
+			struct llir_operand update_index;
+			struct llir_operand update_value;
+		};
+		struct {
+			struct llir_operand access_index;
+			char *access_array;
+		};
+		struct {
+			char *method;
+			uint32_t argument_count;
+			struct llir_operand *arguments;
+		};
+	};
 };
 
-struct llir_operation *llir_operation_new(enum llir_operation_type type,
-					  struct llir_operand source,
-					  struct llir_operand destination);
-void llir_operation_free(struct llir_operation *operation);
-
-struct llir_method_call {
-	char *identifier;
-	struct llir_operand *arguments;
-	uint32_t argument_count;
-	struct llir_operand destination;
-};
-
-struct llir_method_call *llir_method_call_new(char *method,
-					      uint32_t argument_count,
-					      struct llir_operand destination);
-void llir_method_call_set_argument(struct llir_method_call *call,
-				   uint32_t index,
-				   struct llir_operand argument);
-struct llir_operand llir_method_call_get_argument(struct llir_method_call *call,
-						  uint32_t index);
-void llir_method_call_free(struct llir_method_call *call);
+struct llir_assignment *
+llir_assignment_new_unary(enum llir_assignment_type type,
+			  struct llir_operand source, char *destination);
+struct llir_assignment *
+llir_assignment_new_binary(enum llir_assignment_type type,
+			   struct llir_operand left, struct llir_operand right,
+			   char *destination);
+struct llir_assignment *
+llir_assignment_new_array_update(struct llir_operand index,
+				 struct llir_operand value, char *destination);
+struct llir_assignment *
+llir_assignment_new_array_access(struct llir_operand index, char *array,
+				 char *destination);
+struct llir_assignment *llir_assignment_new_method_call(char *method,
+							uint32_t argument_count,
+							char *destination);
+void llir_assignment_free(struct llir_assignment *assignment);
 
 struct llir_label {
 	char *name;

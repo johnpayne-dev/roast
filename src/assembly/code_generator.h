@@ -8,7 +8,6 @@ struct code_generator {
 	uint64_t string_counter;
 	struct llir_node *global_fields;
 	GHashTable *offsets;
-	GHashTable *is_array;
 };
 
 struct code_generator *code_generator_new(void);
