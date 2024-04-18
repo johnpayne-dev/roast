@@ -412,10 +412,20 @@ static void nodes_from_assignment(struct assembly *assembly,
 		[IR_ASSIGN_OPERATOR_INCREMENT] = LLIR_ASSIGNMENT_TYPE_ADD,
 		[IR_ASSIGN_OPERATOR_DECREMENT] = LLIR_ASSIGNMENT_TYPE_SUBTRACT,
 	};
+
+	char *binary_destination = new_temporary(assembly);
 	add_binary_assignment(assembly,
 			      ASSIGNMENT_TYPE[ir_assignment->assign_operator],
 			      llir_operand_from_field(left_destination), source,
-			      destination);
+			      binary_destination);
+
+	if (ir_assignment->location->index != NULL)
+		add_array_update(assembly, index,
+				 llir_operand_from_field(binary_destination),
+				 destination);
+	else
+		add_move(assembly, llir_operand_from_field(binary_destination),
+			 destination);
 }
 
 static void nodes_from_if_statement(struct assembly *assembly,
