@@ -1,36 +1,10 @@
 #pragma once
 #include "semantics/ir.h"
 
-struct llir_node {
-	enum llir_node_type {
-		LLIR_NODE_TYPE_FIELD,
-		LLIR_NODE_TYPE_METHOD,
-		LLIR_NODE_TYPE_ASSIGNMENT,
-		LLIR_NODE_TYPE_LABEL,
-		LLIR_NODE_TYPE_BRANCH,
-		LLIR_NODE_TYPE_JUMP,
-		LLIR_NODE_TYPE_RETURN,
-		LLIR_NODE_TYPE_SHIT_YOURSELF,
-	} type;
-
-	union {
-		void *data;
-		struct llir_field *field;
-		struct llir_method *method;
-		struct llir_assignment *assignment;
-		struct llir_label *label;
-		struct llir_branch *branch;
-		struct llir_jump *jump;
-		struct llir_return *llir_return;
-		struct llir_shit_yourself *shit_yourself;
-	};
-
-	struct llir_node *next;
+struct llir {
+	GArray *fields;
+	GArray *methods;
 };
-
-struct llir_node *llir_node_new(enum llir_node_type type, void *data);
-void llir_node_print(struct llir_node *node);
-void llir_node_free(struct llir_node *node);
 
 struct llir_field {
 	char *identifier;
@@ -39,18 +13,33 @@ struct llir_field {
 	int64_t *values;
 };
 
-struct llir_field *llir_field_new(char *identifier, uint32_t scope_level,
-				  bool is_array, int64_t length);
-void llir_field_free(struct llir_field *field);
-
 struct llir_method {
 	char *identifier;
-	uint32_t argument_count;
-	char **arguments;
+	GArray *arguments;
+	GArray *blocks;
 };
 
-struct llir_method *llir_method_new(char *identifier, uint32_t argument_count);
-void llir_method_free(struct llir_method *method);
+struct llir_block {
+	GArray *fields;
+	GArray *assignments;
+	GArray *parents;
+
+	enum llir_block_terminal_type {
+		LLIR_BLOCK_TERMINAL_TYPE_UNKNOWN,
+		LLIR_BLOCK_TERMINAL_TYPE_BRANCH,
+		LLIR_BLOCK_TERMINAL_TYPE_JUMP,
+		LLIR_BLOCK_TERMINAL_TYPE_RETURN,
+		LLIR_BLOCK_TERMINAL_TYPE_SHIT_YOURSELF,
+	} terminal_type;
+
+	union {
+		void *terminal;
+		struct llir_branch *branch;
+		struct llir_jump *jump;
+		struct llir_return *llir_return;
+		struct llir_shit_yourself *shit_yourself;
+	};
+};
 
 struct llir_operand {
 	enum llir_operand_type {
@@ -65,10 +54,6 @@ struct llir_operand {
 		char *string;
 	};
 };
-
-struct llir_operand llir_operand_from_field(char *field);
-struct llir_operand llir_operand_from_literal(int64_t literal);
-struct llir_operand llir_operand_from_string(char *string);
 
 struct llir_assignment {
 	enum llir_assignment_type {
@@ -115,6 +100,68 @@ struct llir_assignment {
 	};
 };
 
+struct llir_branch {
+	enum llir_branch_type {
+		LLIR_BRANCH_TYPE_EQUAL,
+		LLIR_BRANCH_TYPE_NOT_EQUAL,
+		LLIR_BRANCH_TYPE_LESS,
+		LLIR_BRANCH_TYPE_LESS_EQUAL,
+		LLIR_BRANCH_TYPE_GREATER,
+		LLIR_BRANCH_TYPE_GREATER_EQUAL,
+	} type;
+
+	bool unsigned_comparison;
+
+	struct llir_operand left;
+	struct llir_operand right;
+
+	struct llir_block *true_block;
+	struct llir_block *false_block;
+};
+
+struct llir_return {
+	struct llir_operand source;
+};
+
+struct llir_jump {
+	struct llir_block *block;
+};
+
+struct llir_shit_yourself {
+	int64_t return_value;
+};
+
+struct llir *llir_new(void);
+void llir_add_field(struct llir *llir, struct llir_field *field);
+void llir_add_method(struct llir *llir, struct llir_method *method);
+void llir_print(struct llir *llir);
+void llir_free(struct llir *llir);
+
+struct llir_method *llir_method_new(char *identifier);
+void llir_method_add_argument(struct llir_method *method,
+			      struct llir_field *field);
+void llir_method_add_block(struct llir_method *method,
+			   struct llir_block *block);
+void llir_method_free(struct llir_method *method);
+
+struct llir_block *llir_block_new(void);
+void llir_block_add_field(struct llir_block *block, struct llir_field *field);
+void llir_block_add_assignment(struct llir_block *block,
+			       struct llir_assignment *assignment);
+void llir_block_add_parent(struct llir_block *block, struct llir_block *parent);
+void llir_block_set_terminal(struct llir_block *block,
+			     enum llir_block_terminal_type type,
+			     void *terminal);
+void llir_block_free(struct llir_block *block);
+
+struct llir_field *llir_field_new(char *identifier, uint32_t scope_level,
+				  bool is_array, int64_t length);
+void llir_field_free(struct llir_field *field);
+
+struct llir_operand llir_operand_from_field(char *field);
+struct llir_operand llir_operand_from_literal(int64_t literal);
+struct llir_operand llir_operand_from_string(char *string);
+
 struct llir_assignment *
 llir_assignment_new_unary(enum llir_assignment_type type,
 			  struct llir_operand source, char *destination);
@@ -133,55 +180,17 @@ struct llir_assignment *llir_assignment_new_method_call(char *method,
 							char *destination);
 void llir_assignment_free(struct llir_assignment *assignment);
 
-struct llir_label {
-	char *name;
-};
-
-struct llir_label *llir_label_new(uint32_t id);
-void llir_label_free(struct llir_label *label);
-
-struct llir_branch {
-	enum llir_branch_type {
-		LLIR_BRANCH_TYPE_EQUAL,
-		LLIR_BRANCH_TYPE_NOT_EQUAL,
-		LLIR_BRANCH_TYPE_LESS,
-		LLIR_BRANCH_TYPE_LESS_EQUAL,
-		LLIR_BRANCH_TYPE_GREATER,
-		LLIR_BRANCH_TYPE_GREATER_EQUAL,
-	} type;
-
-	bool unsigned_comparison;
-
-	struct llir_operand left;
-	struct llir_operand right;
-
-	struct llir_label *label;
-};
-
-struct llir_branch *llir_branch_new(enum llir_branch_type type,
-				    bool unsigned_comparison,
-				    struct llir_operand left,
-				    struct llir_operand right,
-				    struct llir_label *label);
+struct llir_branch *
+llir_branch_new(enum llir_branch_type type, bool unsigned_comparison,
+		struct llir_operand left, struct llir_operand right,
+		struct llir_block *true_block, struct llir_block *false_block);
 void llir_branch_free(struct llir_branch *branch);
 
-struct llir_jump {
-	struct llir_label *label;
-};
-
-struct llir_jump *llir_jump_new(struct llir_label *label);
+struct llir_jump *llir_jump_new(struct llir_block *block);
 void llir_jump_free(struct llir_jump *jump);
-
-struct llir_return {
-	struct llir_operand source;
-};
 
 struct llir_return *llir_return_new(struct llir_operand source);
 void llir_return_free(struct llir_return *llir_return);
-
-struct llir_shit_yourself {
-	int64_t return_value;
-};
 
 struct llir_shit_yourself *llir_shit_yourself_new(int64_t return_value);
 void llir_shit_yourself_free(struct llir_shit_yourself *shit_yourself);
