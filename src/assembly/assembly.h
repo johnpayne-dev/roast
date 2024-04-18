@@ -5,7 +5,7 @@
 struct assembly {
 	struct llir_node *head;
 	struct llir_node *current;
-	uint32_t temporary_variable_counter;
+	uint32_t temporary_counter;
 	uint32_t label_counter;
 	struct symbol_table *symbol_table;
 	GArray *break_labels;
