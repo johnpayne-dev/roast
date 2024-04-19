@@ -22,7 +22,6 @@ struct llir_method {
 struct llir_block {
 	GArray *fields;
 	GArray *assignments;
-	GArray *parents;
 
 	enum llir_block_terminal_type {
 		LLIR_BLOCK_TERMINAL_TYPE_UNKNOWN,
@@ -41,6 +40,7 @@ struct llir_block {
 	};
 
 	uint32_t id;
+	uint32_t predecessor_count;
 };
 
 struct llir_operand {
@@ -151,9 +151,10 @@ void llir_method_free(struct llir_method *method);
 
 struct llir_block *llir_block_new(uint32_t id);
 void llir_block_add_field(struct llir_block *block, struct llir_field *field);
+void llir_block_prepend_assignment(struct llir_block *block,
+				   struct llir_assignment *assignment);
 void llir_block_add_assignment(struct llir_block *block,
 			       struct llir_assignment *assignment);
-void llir_block_add_parent(struct llir_block *block, struct llir_block *parent);
 void llir_block_set_terminal(struct llir_block *block,
 			     enum llir_block_terminal_type type,
 			     void *terminal);

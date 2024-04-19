@@ -45,10 +45,10 @@ static void add_binary_assignment(struct llir_generator *assembly,
 	llir_block_add_assignment(assembly->current_block, assignment);
 }
 
-static char *new_temporary(struct llir_generator *assembly)
+static char *new_temporary(struct llir_generator *assembly, char prefix)
 {
 	char *identifier =
-		g_strdup_printf("$%u", assembly->temporary_counter++);
+		g_strdup_printf("%c%u", prefix, assembly->temporary_counter++);
 
 	struct llir_field *field = llir_field_new(identifier, 0, false, 1);
 	llir_block_add_field(assembly->current_block, field);
@@ -57,6 +57,16 @@ static char *new_temporary(struct llir_generator *assembly)
 
 	g_free(identifier);
 	return field->identifier;
+}
+
+static char *new_local_temporary(struct llir_generator *assembly)
+{
+	return new_temporary(assembly, '$');
+}
+
+static char *new_non_local_temporary(struct llir_generator *assembly)
+{
+	return new_temporary(assembly, '#');
 }
 
 static struct llir_block *new_block(struct llir_generator *assembly)
@@ -155,7 +165,7 @@ static struct llir_operand generate_location(struct llir_generator *assembly,
 	g_assert(field != NULL);
 
 	struct llir_operand source = llir_operand_from_field(field->identifier);
-	char *destination = new_temporary(assembly);
+	char *destination = new_local_temporary(assembly);
 
 	if (ir_location->index == NULL) {
 		add_move(assembly, source, destination);
@@ -174,7 +184,7 @@ static struct llir_operand generate_literal(struct llir_generator *assembly,
 {
 	int64_t value = literal_to_int64(literal);
 	struct llir_operand source = llir_operand_from_literal(value);
-	char *destination = new_temporary(assembly);
+	char *destination = new_local_temporary(assembly);
 
 	add_move(assembly, source, destination);
 	return llir_operand_from_field(destination);
@@ -184,7 +194,7 @@ static struct llir_operand
 generate_method_call(struct llir_generator *assembly,
 		     struct ir_method_call *ir_method_call)
 {
-	char *destination = new_temporary(assembly);
+	char *destination = new_local_temporary(assembly);
 
 	struct llir_assignment *call = llir_assignment_new_method_call(
 		ir_method_call->identifier, ir_method_call->arguments->len,
@@ -217,7 +227,7 @@ generate_len_expression(struct llir_generator *assembly,
 {
 	struct llir_operand source =
 		llir_operand_from_literal(length_expression->length);
-	char *destination = new_temporary(assembly);
+	char *destination = new_local_temporary(assembly);
 
 	add_move(assembly, source, destination);
 	return llir_operand_from_field(destination);
@@ -229,7 +239,7 @@ generate_not_expression(struct llir_generator *assembly,
 {
 	struct llir_operand source =
 		generate_expression(assembly, ir_expression);
-	char *destination = new_temporary(assembly);
+	char *destination = new_local_temporary(assembly);
 
 	add_unary_assignment(assembly, LLIR_ASSIGNMENT_TYPE_NOT, source,
 			     destination);
@@ -242,7 +252,7 @@ generate_negate_expression(struct llir_generator *assembly,
 {
 	struct llir_operand source =
 		generate_expression(assembly, ir_expression);
-	char *destination = new_temporary(assembly);
+	char *destination = new_local_temporary(assembly);
 
 	add_unary_assignment(assembly, LLIR_ASSIGNMENT_TYPE_NEGATE, source,
 			     destination);
@@ -258,7 +268,7 @@ generate_short_circuit(struct llir_generator *assembly,
 		 ir_binary_expression->binary_operator ==
 			 IR_BINARY_OPERATOR_OR);
 
-	char *destination = new_temporary(assembly);
+	char *destination = new_non_local_temporary(assembly);
 
 	struct llir_operand left =
 		generate_expression(assembly, ir_binary_expression->left);
@@ -303,7 +313,7 @@ generate_binary_expression(struct llir_generator *assembly,
 		generate_expression(assembly, ir_binary_expression->left);
 	struct llir_operand right =
 		generate_expression(assembly, ir_binary_expression->right);
-	char *destination = new_temporary(assembly);
+	char *destination = new_local_temporary(assembly);
 
 	static enum llir_assignment_type IR_OPERATOR_TO_ASSIGNMENT_TYPE[] = {
 		[IR_BINARY_OPERATOR_EQUAL] = LLIR_ASSIGNMENT_TYPE_EQUAL,
@@ -387,7 +397,7 @@ static void generate_assignment(struct llir_generator *assembly,
 		return;
 	}
 
-	char *left_destination = new_temporary(assembly);
+	char *left_destination = new_local_temporary(assembly);
 	if (ir_assignment->location->index != NULL)
 		add_array_access(assembly, index, destination,
 				 left_destination);
@@ -405,7 +415,7 @@ static void generate_assignment(struct llir_generator *assembly,
 		[IR_ASSIGN_OPERATOR_DECREMENT] = LLIR_ASSIGNMENT_TYPE_SUBTRACT,
 	};
 
-	char *binary_destination = new_temporary(assembly);
+	char *binary_destination = new_local_temporary(assembly);
 	add_binary_assignment(assembly,
 			      ASSIGNMENT_TYPE[ir_assignment->assign_operator],
 			      llir_operand_from_field(left_destination), source,

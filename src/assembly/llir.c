@@ -109,10 +109,10 @@ struct llir_block *llir_block_new(uint32_t id)
 	block->fields = g_array_new(false, false, sizeof(struct llir_field *));
 	block->assignments =
 		g_array_new(false, false, sizeof(struct llir_assignment *));
-	block->parents = g_array_new(false, false, sizeof(struct llir_block *));
 	block->terminal_type = LLIR_BLOCK_TERMINAL_TYPE_UNKNOWN;
 	block->terminal = NULL;
 	block->id = id;
+	block->predecessor_count = 0;
 
 	return block;
 }
@@ -128,9 +128,10 @@ void llir_block_add_assignment(struct llir_block *block,
 	g_array_append_val(block->assignments, assignment);
 }
 
-void llir_block_add_parent(struct llir_block *block, struct llir_block *parent)
+void llir_block_prepend_assignment(struct llir_block *block,
+				   struct llir_assignment *assignment)
 {
-	g_array_append_val(block->parents, parent);
+	g_array_prepend_val(block->assignments, assignment);
 }
 
 void llir_block_set_terminal(struct llir_block *block,
@@ -138,6 +139,13 @@ void llir_block_set_terminal(struct llir_block *block,
 {
 	block->terminal_type = type;
 	block->terminal = terminal;
+
+	if (type == LLIR_BLOCK_TERMINAL_TYPE_JUMP) {
+		block->jump->block->predecessor_count++;
+	} else if (type == LLIR_BLOCK_TERMINAL_TYPE_BRANCH) {
+		block->branch->true_block->predecessor_count++;
+		block->branch->false_block->predecessor_count++;
+	}
 }
 
 void llir_block_print(struct llir_block *block)
@@ -205,7 +213,6 @@ void llir_block_free(struct llir_block *block)
 		break;
 	}
 
-	g_array_free(block->parents, true);
 	g_free(block);
 }
 
@@ -473,7 +480,7 @@ void llir_branch_print(struct llir_branch *branch)
 	llir_operand_print(branch->left);
 	g_print(" %s ", BRANCH_TYPE_TO_STRING[branch->type]);
 	llir_operand_print(branch->right);
-	g_print(" branch %u\n", branch->false_block->id);
+	g_print(" block %u\n", branch->false_block->id);
 }
 
 void llir_branch_free(struct llir_branch *branch)
