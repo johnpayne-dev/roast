@@ -100,7 +100,10 @@ struct llir_assignment {
 			uint32_t argument_count;
 			struct llir_operand *arguments;
 		};
-		GArray *phi_arguments;
+		struct {
+			GArray *phi_arguments;
+			GArray *phi_blocks;
+		};
 	};
 };
 
@@ -188,7 +191,8 @@ struct llir_assignment *llir_assignment_new_method_call(char *method,
 							char *destination);
 struct llir_assignment *llir_assignment_new_phi(char *destination);
 void llir_assignment_add_phi_argument(struct llir_assignment *assignment,
-				      struct llir_operand argument);
+				      struct llir_operand argument,
+				      struct llir_block *block);
 void llir_assignment_print(struct llir_assignment *assignment);
 void llir_assignment_free(struct llir_assignment *assignment);
 

@@ -7,6 +7,7 @@
 #include "semantics/semantics.h"
 #include "assembly/llir_generator.h"
 #include "assembly/code_generator.h"
+#include "assembly/ssa.h"
 
 enum target {
 	TARGET_SCAN,
@@ -244,7 +245,8 @@ static int run_intermediate_target(char *file_name, char *source,
 	return result;
 }
 
-static int run_assembly_target(char *file_name, char *source, bool debug)
+static int run_assembly_target(char *file_name, char *source,
+			       enum optimzation optimizations, bool debug)
 {
 	struct ir_program *ir;
 	if (run_intermediate_target(file_name, source, &ir) != 0)
@@ -279,6 +281,7 @@ static int run_target(struct options *options, char *source)
 					       NULL);
 	case TARGET_ASSEMBLY:
 		return run_assembly_target(options->input_file, source,
+					   options->optimizations,
 					   options->debug);
 	default:
 		g_assert(!"Unknown target");

@@ -361,14 +361,18 @@ struct llir_assignment *llir_assignment_new_phi(char *destination)
 	assignment->destination = destination;
 	assignment->phi_arguments =
 		g_array_new(false, false, sizeof(struct llir_operand));
+	assignment->phi_blocks =
+		g_array_new(false, false, sizeof(struct llir_block *));
 
 	return assignment;
 }
 
 void llir_assignment_add_phi_argument(struct llir_assignment *assignment,
-				      struct llir_operand argument)
+				      struct llir_operand argument,
+				      struct llir_block *block)
 {
 	g_array_append_val(assignment->phi_arguments, argument);
+	g_array_append_val(assignment->phi_blocks, block);
 }
 
 void llir_assignment_print(struct llir_assignment *assignment)
@@ -440,10 +444,12 @@ void llir_assignment_print(struct llir_assignment *assignment)
 
 void llir_assignment_free(struct llir_assignment *assignment)
 {
-	if (assignment->type == LLIR_ASSIGNMENT_TYPE_METHOD_CALL)
+	if (assignment->type == LLIR_ASSIGNMENT_TYPE_METHOD_CALL) {
 		g_free(assignment->arguments);
-	else if (assignment->type == LLIR_ASSIGNMENT_TYPE_PHI)
+	} else if (assignment->type == LLIR_ASSIGNMENT_TYPE_PHI) {
 		g_array_free(assignment->phi_arguments, true);
+		g_array_free(assignment->phi_blocks, true);
+	}
 
 	g_free(assignment);
 }
