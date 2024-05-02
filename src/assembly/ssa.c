@@ -168,7 +168,10 @@ static void create_phi_assignments(struct ssa_context *ssa,
 static void transform_method(struct ssa_context *ssa,
 			     struct llir_method *method)
 {
-	g_array_remove_range(ssa->defined_fields, 0, ssa->defined_fields->len);
+	ssa->defined_fields = g_array_new(false, false, sizeof(char *));
+	ssa->counters = g_hash_table_new(g_str_hash, g_str_equal);
+	ssa->new_fields = g_hash_table_new(g_str_hash, g_str_equal);
+
 	add_defined_fields(ssa, method->arguments);
 
 	for (uint32_t i = 0; i < method->blocks->len; i++) {
@@ -186,6 +189,10 @@ static void transform_method(struct ssa_context *ssa,
 			g_array_index(method->blocks, struct llir_block *, i);
 		transform_block(ssa, block);
 	}
+
+	g_array_free(ssa->defined_fields, true);
+	g_hash_table_unref(ssa->counters);
+	g_hash_table_unref(ssa->new_fields);
 }
 
 static void transform_program(struct ssa_context *ssa, struct llir *llir)
@@ -200,15 +207,7 @@ static void transform_program(struct ssa_context *ssa, struct llir *llir)
 void ssa_transform(struct llir *llir)
 {
 	struct ssa_context ssa;
-	ssa.defined_fields = g_array_new(false, false, sizeof(char *));
-	ssa.counters = g_hash_table_new(g_str_hash, g_str_equal);
-	ssa.new_fields = g_hash_table_new(g_str_hash, g_str_equal);
-
 	transform_program(&ssa, llir);
-
-	g_array_free(ssa.defined_fields, true);
-	g_hash_table_unref(ssa.counters);
-	g_hash_table_unref(ssa.new_fields);
 }
 
 static void remove_phi_operands(struct ssa_context *ssa,
