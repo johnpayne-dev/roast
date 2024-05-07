@@ -7,6 +7,7 @@
 #include "semantics/semantics.h"
 #include "assembly/llir_generator.h"
 #include "assembly/code_generator.h"
+#include "assembly/ssa.h"
 
 enum target {
 	TARGET_SCAN,
@@ -244,26 +245,26 @@ static int run_intermediate_target(char *file_name, char *source,
 	return result;
 }
 
-static int run_assembly_target(char *file_name, char *source, bool debug)
+static int run_assembly_target(char *file_name, char *source,
+			       enum optimzation optimizations, bool debug)
 {
 	struct ir_program *ir;
 	if (run_intermediate_target(file_name, source, &ir) != 0)
 		return -1;
 
 	struct llir_generator *llir_generator = llir_generator_new();
-	struct llir_node *llir =
-		llir_generator_generate_llir(llir_generator, ir);
+	struct llir *llir = llir_generator_generate_llir(llir_generator, ir);
 	llir_generator_free(llir_generator);
 
 	if (debug) {
-		llir_node_print(llir);
+		llir_print(llir);
 	} else {
 		struct code_generator *generator = code_generator_new();
 		code_generator_generate(generator, llir);
 		code_generator_free(generator);
 	}
 
-	llir_node_free(llir);
+	llir_free(llir);
 	ir_program_free(ir);
 	return 0;
 }
@@ -280,6 +281,7 @@ static int run_target(struct options *options, char *source)
 					       NULL);
 	case TARGET_ASSEMBLY:
 		return run_assembly_target(options->input_file, source,
+					   options->optimizations,
 					   options->debug);
 	default:
 		g_assert(!"Unknown target");

@@ -12,6 +12,8 @@ set(PROJECT_FILES
     src/assembly/llir.h
     src/assembly/llir_generator.c
     src/assembly/llir_generator.h
+    src/assembly/ssa.c
+    src/assembly/ssa.h
     src/assembly/symbol_table.c
     src/assembly/symbol_table.h
     src/parser/ast.c
