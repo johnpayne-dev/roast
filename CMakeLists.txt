@@ -16,6 +16,8 @@ set(PROJECT_FILES
     src/assembly/ssa.h
     src/assembly/symbol_table.c
     src/assembly/symbol_table.h
+    src/optimizations/cf.c
+    src/optimizations/cf.h
     src/parser/ast.c
     src/parser/ast.h
     src/parser/parser.c

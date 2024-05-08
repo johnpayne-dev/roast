@@ -40,7 +40,7 @@ struct llir_block {
 	};
 
 	uint32_t id;
-	uint32_t predecessor_count;
+	GArray *predecessors;
 };
 
 struct llir_operand {
@@ -138,10 +138,24 @@ struct llir_shit_yourself {
 	int64_t return_value;
 };
 
+struct llir_iterator {
+	uint32_t method_index;
+	struct llir_method *method;
+	uint32_t block_index;
+	struct llir_block *block;
+	uint32_t assignment_index;
+	struct llir_assignment *assignment;
+};
+
+typedef void (*iterator_callback_t)(struct llir_iterator *);
+
 struct llir *llir_new(void);
 void llir_add_field(struct llir *llir, struct llir_field *field);
 void llir_add_method(struct llir *llir, struct llir_method *method);
 void llir_print(struct llir *llir);
+void llir_iterate(struct llir *llir, iterator_callback_t method,
+		  iterator_callback_t block, iterator_callback_t assignment,
+		  iterator_callback_t terminal);
 void llir_free(struct llir *llir);
 
 struct llir_method *llir_method_new(char *identifier);
@@ -171,6 +185,7 @@ void llir_field_free(struct llir_field *field);
 struct llir_operand llir_operand_from_field(char *field);
 struct llir_operand llir_operand_from_literal(int64_t literal);
 struct llir_operand llir_operand_from_string(char *string);
+bool llir_operand_is_field_global(struct llir_operand operand);
 void llir_operand_print(struct llir_operand operand);
 
 struct llir_assignment *
@@ -194,6 +209,8 @@ void llir_assignment_add_phi_argument(struct llir_assignment *assignment,
 				      struct llir_operand argument,
 				      struct llir_block *block);
 void llir_assignment_print(struct llir_assignment *assignment);
+bool llir_assignment_is_unary(struct llir_assignment *assignment);
+bool llir_assignment_is_binary(struct llir_assignment *assignment);
 void llir_assignment_free(struct llir_assignment *assignment);
 
 struct llir_branch *
