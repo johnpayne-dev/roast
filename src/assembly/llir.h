@@ -155,7 +155,7 @@ void llir_add_method(struct llir *llir, struct llir_method *method);
 void llir_print(struct llir *llir);
 void llir_iterate(struct llir *llir, iterator_callback_t method,
 		  iterator_callback_t block, iterator_callback_t assignment,
-		  iterator_callback_t terminal);
+		  iterator_callback_t terminal, bool forward);
 void llir_free(struct llir *llir);
 
 struct llir_method *llir_method_new(char *identifier);

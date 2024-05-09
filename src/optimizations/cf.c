@@ -273,5 +273,6 @@ static void optimize_terminal(struct llir_iterator *iterator)
 
 void optimization_constant_folding(struct llir *llir)
 {
-	llir_iterate(llir, NULL, NULL, optimize_assignment, optimize_terminal);
+	llir_iterate(llir, NULL, NULL, optimize_assignment, optimize_terminal,
+		     true);
 }
