@@ -20,6 +20,8 @@ set(PROJECT_FILES
     src/optimizations/cf.h
     src/optimizations/cp.c
     src/optimizations/cp.h
+    src/optimizations/dce.c
+    src/optimizations/dce.h
     src/optimizations/optimizations.c
     src/optimizations/optimizations.h
     src/parser/ast.c
