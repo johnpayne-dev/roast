@@ -1,8 +1,9 @@
-#include "optimizations/cf.h"
+#include "optimizations/cp.h"
 
 static void find_definition_in_block(struct llir_block *block,
 				     int32_t start_index, char *identifier,
-				     GHashTable *visited, GArray *definitions)
+				     GHashTable *visited, GArray *definitions,
+				     GHashTable *mutated)
 {
 	for (int32_t i = start_index; i >= 0; i--) {
 		struct llir_assignment *assignment = g_array_index(
@@ -11,6 +12,9 @@ static void find_definition_in_block(struct llir_block *block,
 			g_array_append_val(definitions, assignment);
 			return;
 		}
+
+		g_hash_table_insert(mutated, assignment->destination,
+				    (gpointer)1);
 	}
 
 	for (uint32_t i = 0; i < block->predecessors->len; i++) {
@@ -19,46 +23,56 @@ static void find_definition_in_block(struct llir_block *block,
 		if (g_hash_table_lookup(visited, predecessor))
 			continue;
 
-		g_hash_table_insert(visited, predecessor, (gpointer) true);
+		g_hash_table_insert(visited, predecessor, (gpointer)1);
 		find_definition_in_block(predecessor,
 					 predecessor->assignments->len - 1,
-					 identifier, visited, definitions);
+					 identifier, visited, definitions,
+					 mutated);
 	}
 }
 
 static GArray *find_definitions(struct llir_block *block,
-				uint32_t assignment_index, char *identifier)
+				uint32_t assignment_index, char *identifier,
+				GHashTable **mutated)
 {
 	GHashTable *visited = g_hash_table_new(g_direct_hash, g_direct_equal);
 	GArray *definitions =
 		g_array_new(false, false, sizeof(struct llir_assignment *));
+	*mutated = g_hash_table_new(g_str_hash, g_str_equal);
 	find_definition_in_block(block, assignment_index - 1, identifier,
-				 visited, definitions);
+				 visited, definitions, *mutated);
 
 	g_hash_table_unref(visited);
 	return definitions;
 }
 
-static bool all_definitions_are_constant(GArray *definitions, int64_t *constant)
+static bool can_propagate_copy(GArray *definitions, GHashTable *mutated,
+			       char **identifier)
 {
 	if (definitions->len == 0)
 		return false;
 
-	int64_t initializer = 0;
+	char *field = NULL;
 	for (uint32_t i = 0; i < definitions->len; i++) {
 		struct llir_assignment *assignment =
 			g_array_index(definitions, struct llir_assignment *, i);
 		if (assignment->type != LLIR_ASSIGNMENT_TYPE_MOVE ||
-		    assignment->source.type != LLIR_OPERAND_TYPE_LITERAL)
+		    assignment->source.type != LLIR_OPERAND_TYPE_FIELD)
+			return false;
+
+		if (llir_operand_is_field_global(assignment->source))
 			return false;
 
 		if (i == 0)
-			initializer = assignment->source.literal;
-		else if (assignment->source.literal != initializer)
+			field = assignment->source.field;
+		else if (g_strcmp0(field, assignment->source.field) != 0)
 			return false;
 	}
 
-	*constant = initializer;
+	if (g_hash_table_lookup(mutated, field))
+		return false;
+
+	*identifier = field;
 	return true;
 }
 
@@ -70,75 +84,23 @@ static void optimize_operand(struct llir_iterator *iterator,
 	if (llir_operand_is_field_global(*operand))
 		return;
 
-	GArray *definitions = find_definitions(
-		iterator->block, iterator->assignment_index, operand->field);
+	GHashTable *mutations;
+	GArray *definitions = find_definitions(iterator->block,
+					       iterator->assignment_index,
+					       operand->field, &mutations);
 
-	int64_t constant;
-	if (all_definitions_are_constant(definitions, &constant))
-		*operand = llir_operand_from_literal(constant);
+	char *field;
+	if (can_propagate_copy(definitions, mutations, &field))
+		*operand = llir_operand_from_field(field);
 
 	g_array_free(definitions, true);
-}
-
-static int64_t unary_operation(int64_t literal,
-			       enum llir_assignment_type operation)
-{
-	switch (operation) {
-	case LLIR_ASSIGNMENT_TYPE_MOVE:
-		return literal;
-	case LLIR_ASSIGNMENT_TYPE_NOT:
-		return !literal;
-	case LLIR_ASSIGNMENT_TYPE_NEGATE:
-		return -literal;
-	default:
-		g_assert(!"You fucked up");
-		return -1;
-	}
+	g_hash_table_unref(mutations);
 }
 
 static void optimize_unary_operation(struct llir_iterator *iterator)
 {
 	struct llir_assignment *assignment = iterator->assignment;
 	optimize_operand(iterator, &assignment->source);
-
-	if (assignment->source.type == LLIR_OPERAND_TYPE_LITERAL) {
-		int64_t new_literal = unary_operation(
-			assignment->source.literal, assignment->type);
-		assignment->type = LLIR_ASSIGNMENT_TYPE_MOVE;
-		assignment->source = llir_operand_from_literal(new_literal);
-	}
-}
-
-static int64_t binary_operation(int64_t left, int64_t right,
-				enum llir_assignment_type operation)
-{
-	switch (operation) {
-	case LLIR_ASSIGNMENT_TYPE_ADD:
-		return left + right;
-	case LLIR_ASSIGNMENT_TYPE_SUBTRACT:
-		return left - right;
-	case LLIR_ASSIGNMENT_TYPE_MULTIPLY:
-		return left * right;
-	case LLIR_ASSIGNMENT_TYPE_DIVIDE:
-		return left / right;
-	case LLIR_ASSIGNMENT_TYPE_MODULO:
-		return left % right;
-	case LLIR_ASSIGNMENT_TYPE_EQUAL:
-		return left == right;
-	case LLIR_ASSIGNMENT_TYPE_NOT_EQUAL:
-		return left != right;
-	case LLIR_ASSIGNMENT_TYPE_LESS:
-		return left < right;
-	case LLIR_ASSIGNMENT_TYPE_LESS_EQUAL:
-		return left <= right;
-	case LLIR_ASSIGNMENT_TYPE_GREATER:
-		return left > right;
-	case LLIR_ASSIGNMENT_TYPE_GREATER_EQUAL:
-		return left >= right;
-	default:
-		g_assert(!"You fucked up");
-		return -1;
-	}
 }
 
 static void optimize_binary_operation(struct llir_iterator *iterator)
@@ -146,16 +108,6 @@ static void optimize_binary_operation(struct llir_iterator *iterator)
 	struct llir_assignment *assignment = iterator->assignment;
 	optimize_operand(iterator, &assignment->left);
 	optimize_operand(iterator, &assignment->right);
-
-	if (assignment->left.type == LLIR_OPERAND_TYPE_LITERAL &&
-	    assignment->right.type == LLIR_OPERAND_TYPE_LITERAL) {
-		int64_t new_literal = binary_operation(
-			assignment->left.literal, assignment->right.literal,
-			assignment->type);
-		iterator->assignment->type = LLIR_ASSIGNMENT_TYPE_MOVE;
-		iterator->assignment->source =
-			llir_operand_from_literal(new_literal);
-	}
 }
 
 static void optimize_array_update(struct llir_iterator *iterator)
@@ -196,50 +148,6 @@ static void optimize_assignment(struct llir_iterator *iterator)
 		g_assert(!"You fucked up");
 }
 
-static int64_t branch_operation(int64_t left, int64_t right,
-				enum llir_branch_type operation)
-{
-	switch (operation) {
-	case LLIR_BRANCH_TYPE_LESS:
-		return left < right;
-	case LLIR_BRANCH_TYPE_LESS_EQUAL:
-		return left <= right;
-	case LLIR_BRANCH_TYPE_GREATER:
-		return left > right;
-	case LLIR_BRANCH_TYPE_GREATER_EQUAL:
-		return left >= right;
-	case LLIR_BRANCH_TYPE_EQUAL:
-		return left == right;
-	case LLIR_BRANCH_TYPE_NOT_EQUAL:
-		return left != right;
-	default:
-		g_assert(!"You fucked up");
-		return -1;
-	}
-}
-
-static int64_t branch_operation_unsigned(uint64_t left, uint64_t right,
-					 enum llir_branch_type operation)
-{
-	switch (operation) {
-	case LLIR_BRANCH_TYPE_LESS:
-		return left < right;
-	case LLIR_BRANCH_TYPE_LESS_EQUAL:
-		return left <= right;
-	case LLIR_BRANCH_TYPE_GREATER:
-		return left > right;
-	case LLIR_BRANCH_TYPE_GREATER_EQUAL:
-		return left >= right;
-	case LLIR_BRANCH_TYPE_EQUAL:
-		return left == right;
-	case LLIR_BRANCH_TYPE_NOT_EQUAL:
-		return left != right;
-	default:
-		g_assert(!"You fucked up");
-		return -1;
-	}
-}
-
 static void optimize_branch(struct llir_iterator *iterator)
 {
 	struct llir_branch *branch = iterator->block->branch;
@@ -271,7 +179,7 @@ static void optimize_terminal(struct llir_iterator *iterator)
 	}
 }
 
-void optimization_constant_folding(struct llir *llir)
+void optimization_copy_propagation(struct llir *llir)
 {
 	llir_iterate(llir, NULL, NULL, optimize_assignment, optimize_terminal);
 }
