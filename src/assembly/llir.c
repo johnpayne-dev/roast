@@ -29,6 +29,59 @@ void llir_print(struct llir *llir)
 	}
 }
 
+static void iterate_block(struct llir_iterator *iterator,
+			  iterator_callback_t assignment,
+			  iterator_callback_t terminal)
+{
+	for (iterator->assignment_index = 0;
+	     iterator->assignment_index < iterator->block->assignments->len;
+	     iterator->assignment_index++) {
+		iterator->assignment = g_array_index(
+			iterator->block->assignments, struct llir_assignment *,
+			iterator->assignment_index);
+		if (assignment != NULL)
+			assignment(iterator);
+	}
+
+	if (terminal != NULL)
+		terminal(iterator);
+}
+
+static void iterate_method(struct llir_iterator *iterator,
+			   iterator_callback_t block,
+			   iterator_callback_t assignment,
+			   iterator_callback_t terminal)
+{
+	for (iterator->block_index = 0;
+	     iterator->block_index < iterator->method->blocks->len;
+	     iterator->block_index++) {
+		iterator->block = g_array_index(iterator->method->blocks,
+						struct llir_block *,
+						iterator->block_index);
+		if (block != NULL)
+			block(iterator);
+		iterate_block(iterator, assignment, terminal);
+	}
+}
+
+void llir_iterate(struct llir *llir, iterator_callback_t method,
+		  iterator_callback_t block, iterator_callback_t assignment,
+		  iterator_callback_t terminal)
+{
+	struct llir_iterator iterator = { 0 };
+
+	for (iterator.method_index = 0;
+	     iterator.method_index < llir->methods->len;
+	     iterator.method_index++) {
+		iterator.method = g_array_index(llir->methods,
+						struct llir_method *,
+						iterator.method_index);
+		if (method != NULL)
+			method(&iterator);
+		iterate_method(&iterator, block, assignment, terminal);
+	}
+}
+
 void llir_free(struct llir *llir)
 {
 	for (uint32_t i = 0; i < llir->fields->len; i++) {
@@ -112,7 +165,8 @@ struct llir_block *llir_block_new(uint32_t id)
 	block->terminal_type = LLIR_BLOCK_TERMINAL_TYPE_UNKNOWN;
 	block->terminal = NULL;
 	block->id = id;
-	block->predecessor_count = 0;
+	block->predecessors =
+		g_array_new(false, false, sizeof(struct llir_block *));
 
 	return block;
 }
@@ -141,10 +195,12 @@ void llir_block_set_terminal(struct llir_block *block,
 	block->terminal = terminal;
 
 	if (type == LLIR_BLOCK_TERMINAL_TYPE_JUMP) {
-		block->jump->block->predecessor_count++;
+		g_array_append_val(block->jump->block->predecessors, block);
 	} else if (type == LLIR_BLOCK_TERMINAL_TYPE_BRANCH) {
-		block->branch->true_block->predecessor_count++;
-		block->branch->false_block->predecessor_count++;
+		g_array_append_val(block->branch->true_block->predecessors,
+				   block);
+		g_array_append_val(block->branch->false_block->predecessors,
+				   block);
 	}
 }
 
@@ -262,6 +318,18 @@ struct llir_operand llir_operand_from_string(char *string)
 		.type = LLIR_OPERAND_TYPE_STRING,
 		.string = string,
 	};
+}
+
+bool llir_operand_is_field_global(struct llir_operand operand)
+{
+	g_assert(operand.type == LLIR_OPERAND_TYPE_FIELD);
+
+	for (uint32_t i = 0; operand.field[i] != '\0'; i++) {
+		if (operand.field[i] == '$' || operand.field[i] == '@')
+			return false;
+	}
+
+	return true;
 }
 
 void llir_operand_print(struct llir_operand operand)
@@ -440,6 +508,50 @@ void llir_assignment_print(struct llir_assignment *assignment)
 		llir_operand_print(assignment->right);
 	}
 	g_print("\n");
+}
+
+bool llir_assignment_is_unary(struct llir_assignment *assignment)
+{
+	switch (assignment->type) {
+	case LLIR_ASSIGNMENT_TYPE_MOVE:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_NEGATE:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_NOT:
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool llir_assignment_is_binary(struct llir_assignment *assignment)
+{
+	switch (assignment->type) {
+	case LLIR_ASSIGNMENT_TYPE_ADD:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_SUBTRACT:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_MULTIPLY:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_DIVIDE:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_MODULO:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_EQUAL:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_NOT_EQUAL:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_LESS:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_LESS_EQUAL:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_GREATER:
+		return true;
+	case LLIR_ASSIGNMENT_TYPE_GREATER_EQUAL:
+		return true;
+	default:
+		return false;
+	}
 }
 
 void llir_assignment_free(struct llir_assignment *assignment)

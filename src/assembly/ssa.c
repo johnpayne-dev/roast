@@ -155,7 +155,7 @@ static void create_phi_assignments(struct ssa_context *ssa,
 		char *field = g_array_index(ssa->defined_fields, char *, i);
 		struct llir_assignment *phi = llir_assignment_new_phi(field);
 
-		for (uint32_t j = 0; j < block->predecessor_count; j++) {
+		for (uint32_t j = 0; j < block->predecessors->len; j++) {
 			struct llir_operand operand =
 				llir_operand_from_field(field);
 			llir_assignment_add_phi_argument(phi, operand, NULL);
@@ -178,7 +178,7 @@ static void transform_method(struct ssa_context *ssa,
 		struct llir_block *block =
 			g_array_index(method->blocks, struct llir_block *, i);
 
-		if (block->predecessor_count > 1)
+		if (block->predecessors->len > 1)
 			create_phi_assignments(ssa, block);
 
 		add_defined_fields(ssa, block->fields);
