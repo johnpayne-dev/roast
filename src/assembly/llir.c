@@ -36,14 +36,17 @@ static void iterate_block(struct llir_iterator *iterator,
 	uint32_t start = 0, step = 1;
 
 	if (!forward) {
-		start = iterator->method->blocks->len - 1;
+		start = iterator->block->assignments->len - 1;
 		step = -1;
 	}
+
+	if (!forward && terminal != NULL)
+		terminal(iterator);
 
 	for (iterator->assignment_index = start;
 	     0 <= iterator->assignment_index &&
 	     iterator->assignment_index < iterator->block->assignments->len;
-	     iterator->assignment_index++) {
+	     iterator->assignment_index += step) {
 		iterator->assignment = g_array_index(
 			iterator->block->assignments, struct llir_assignment *,
 			iterator->assignment_index);
@@ -51,7 +54,7 @@ static void iterate_block(struct llir_iterator *iterator,
 			assignment(iterator);
 	}
 
-	if (terminal != NULL)
+	if (forward && terminal != NULL)
 		terminal(iterator);
 }
 
@@ -74,9 +77,11 @@ static void iterate_method(struct llir_iterator *iterator,
 		iterator->block = g_array_index(iterator->method->blocks,
 						struct llir_block *,
 						iterator->block_index);
-		if (block != NULL)
+		if (forward && block != NULL)
 			block(iterator);
 		iterate_block(iterator, assignment, terminal, forward);
+		if (!forward && block != NULL)
+			block(iterator);
 	}
 }
 
@@ -100,9 +105,11 @@ void llir_iterate(struct llir *llir, iterator_callback_t method,
 		iterator.method = g_array_index(llir->methods,
 						struct llir_method *,
 						iterator.method_index);
-		if (method != NULL)
+		if (forward && method != NULL)
 			method(&iterator);
 		iterate_method(&iterator, block, assignment, terminal, forward);
+		if (!forward && method != NULL)
+			method(&iterator);
 	}
 }
 
