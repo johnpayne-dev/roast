@@ -8,19 +8,13 @@
 #include "assembly/llir_generator.h"
 #include "assembly/code_generator.h"
 #include "assembly/ssa.h"
+#include "optimizations/optimizations.h"
 
 enum target {
 	TARGET_SCAN,
 	TARGET_PARSE,
 	TARGET_INTER,
 	TARGET_ASSEMBLY,
-};
-
-enum optimzation {
-	OPTIMIZATION_CSE = 1 << 1,
-	OPTIMIZATION_CP = 1 << 2,
-	OPTIMIZATION_DCE = 1 << 3,
-	OPTIMIZATION_ALL = ~0,
 };
 
 struct options {
@@ -68,10 +62,10 @@ static int parse_optimizations(char *optimizations, struct options *options)
 	char **optimization_list = g_strsplit(optimizations, ",", -1);
 	for (uint32_t i = 0; optimization_list[i] != NULL; i++) {
 		char *optimization = optimization_list[i];
-		if (g_strcmp0(optimization, "cse") == 0)
-			options->optimizations |= OPTIMIZATION_CSE;
-		else if (g_strcmp0(optimization, "-cse") == 0)
-			options->optimizations &= ~OPTIMIZATION_CSE;
+		if (g_strcmp0(optimization, "cf") == 0)
+			options->optimizations |= OPTIMIZATION_CF;
+		else if (g_strcmp0(optimization, "-cf") == 0)
+			options->optimizations &= ~OPTIMIZATION_CF;
 		else if (g_strcmp0(optimization, "cp") == 0)
 			options->optimizations |= OPTIMIZATION_CP;
 		else if (g_strcmp0(optimization, "-cp") == 0)
@@ -99,8 +93,8 @@ static int parse_optimizations(char *optimizations, struct options *options)
 static int parse_options(int argc, char **argv, struct options *options)
 {
 	char *target = NULL;
-	char *output_file = NULL;
 	char *optimizations = NULL;
+	char *output_file = NULL;
 	bool debug = false;
 
 	const GOptionEntry option_entries[] = {
@@ -130,7 +124,7 @@ static int parse_options(int argc, char **argv, struct options *options)
 			.arg = G_OPTION_ARG_STRING,
 			.arg_data = (void *)&optimizations,
 			.description =
-				"<optimization> is one of 'cse', 'cp', 'dce' or 'all'.",
+				"<optimization> is one of 'cf', 'cp', 'dce' or 'all'.",
 			.arg_description = "<optimization>,...",
 		},
 		{
@@ -255,6 +249,8 @@ static int run_assembly_target(char *file_name, char *source,
 	struct llir_generator *llir_generator = llir_generator_new();
 	struct llir *llir = llir_generator_generate_llir(llir_generator, ir);
 	llir_generator_free(llir_generator);
+
+	optimization_apply(llir, optimizations);
 
 	if (debug) {
 		llir_print(llir);
