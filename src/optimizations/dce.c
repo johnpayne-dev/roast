@@ -42,9 +42,19 @@ static void live_set_print(void)
 	g_print("\n");
 }
 
+static void set_current_method(char *method)
+{
+	current_method = method;
+}
+
+static char *get_current_method(void)
+{
+	return current_method;
+}
+
 static bool is_current_method(struct llir_iterator *iterator)
 {
-	return strcmp(iterator->method->identifier, current_method) != 0;
+	return strcmp(iterator->method->identifier, get_current_method()) != 0;
 }
 
 static void add_live_variables_from_globals(struct llir *llir)
@@ -202,7 +212,7 @@ dead_code_elimination_of_current_method(struct llir_iterator *iterator)
 
 	add_live_variables_from_globals(iterator->llir);
 
-	current_method = iterator->method->identifier;
+	set_current_method(iterator->method->identifier);
 
 	llir_iterate(
 		iterator->llir, NULL,
@@ -222,6 +232,17 @@ dead_code_elimination_of_current_method(struct llir_iterator *iterator)
 
 	llir_iterate(iterator->llir, NULL, NULL,
 		     prune_dead_variables_of_curent_method, NULL, true);
+
+	/*
+        you currently have the live set
+        for every assignment:
+                if assignment's destination is in live set then loop for all
+                assignments if other asignment is in current_method and its
+                destination is the orignal destination but it isn't the same
+                pointer then prune the original assignment
+                keep going until reach the end or encounter a use of that
+                destination variable
+        */
 
 	live_set_free();
 }
