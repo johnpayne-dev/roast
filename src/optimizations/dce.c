@@ -1,12 +1,5 @@
 #include "optimizations/dce.h"
 
-/*
-pointer -> true | NULL
-destination = sources
-add assignment if destination is one of the previous sources
-
-*/
-
 GHashTable *live_set = NULL;
 
 char *current_method = NULL;
