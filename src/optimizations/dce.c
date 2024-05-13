@@ -50,36 +50,33 @@ static void get_live_variables_from_fields(struct llir_iterator *iterator)
 	}
 }
 
+static void add_live_variable_from_operand(struct llir_operand operand)
+{
+	if (operand.type == LLIR_OPERAND_TYPE_FIELD)
+		live_set_add(operand.field);
+}
+
 static void
-get_live_variables_from_method_call_arguments(struct llir_iterator *iterator)
+add_live_variables_from_method_call_arguments(struct llir_iterator *iterator)
 {
 	if (iterator->assignment->type == LLIR_ASSIGNMENT_TYPE_METHOD_CALL)
 		for (u_int32_t i = 0; i < iterator->assignment->argument_count;
 		     i++) {
-			if (iterator->assignment->arguments[i].type ==
-			    LLIR_OPERAND_TYPE_FIELD)
-				live_set_add(iterator->assignment->arguments[i]
-						     .field);
+			add_live_variable_from_operand(
+				iterator->assignment->arguments[i]);
 		}
 }
 
-static void get_live_variables_from_terminals(struct llir_iterator *iterator)
+static void add_live_variables_from_terminals(struct llir_iterator *iterator)
 {
 	switch (iterator->block->terminal_type) {
 	case LLIR_BLOCK_TERMINAL_TYPE_BRANCH:
-		if (iterator->block->branch->left.type ==
-		    LLIR_OPERAND_TYPE_FIELD)
-			live_set_add(iterator->block->branch->left.field);
-		if (iterator->block->branch->right.type ==
-		    LLIR_OPERAND_TYPE_FIELD)
-			live_set_add(iterator->block->branch->right.field);
+		add_live_variable_from_operand(iterator->block->branch->left);
+		add_live_variable_from_operand(iterator->block->branch->right);
 		break;
 	case LLIR_BLOCK_TERMINAL_TYPE_RETURN:
-		if (iterator->block->llir_return->source.type ==
-		    LLIR_OPERAND_TYPE_FIELD) {
-			live_set_add(
-				iterator->block->llir_return->source.field);
-		}
+		add_live_variable_from_operand(
+			iterator->block->llir_return->source);
 		break;
 	default:
 		break;
@@ -93,9 +90,9 @@ static void get_live_variables_from_assignments(struct llir_iterator *iterator)
 
 	switch (iterator->assignment->type) {
 	case LLIR_ASSIGNMENT_TYPE_MOVE:
-		if (iterator->assignment->source.type ==
-		    LLIR_OPERAND_TYPE_FIELD)
-			live_set_add(iterator->assignment->source.field);
+	case LLIR_ASSIGNMENT_TYPE_NEGATE:
+	case LLIR_ASSIGNMENT_TYPE_NOT:
+		add_live_variable_from_operand(iterator->assignment->source);
 		break;
 	case LLIR_ASSIGNMENT_TYPE_ADD:
 	case LLIR_ASSIGNMENT_TYPE_SUBTRACT:
@@ -108,37 +105,24 @@ static void get_live_variables_from_assignments(struct llir_iterator *iterator)
 	case LLIR_ASSIGNMENT_TYPE_LESS_EQUAL:
 	case LLIR_ASSIGNMENT_TYPE_EQUAL:
 	case LLIR_ASSIGNMENT_TYPE_NOT_EQUAL:
-		if (iterator->assignment->left.type == LLIR_OPERAND_TYPE_FIELD)
-			live_set_add(iterator->assignment->left.field);
-		if (iterator->assignment->right.type == LLIR_OPERAND_TYPE_FIELD)
-			live_set_add(iterator->assignment->right.field);
-		break;
-	case LLIR_ASSIGNMENT_TYPE_NEGATE:
-	case LLIR_ASSIGNMENT_TYPE_NOT:
-		if (iterator->assignment->source.type ==
-		    LLIR_OPERAND_TYPE_FIELD)
-			live_set_add(iterator->assignment->source.field);
+		add_live_variable_from_operand(iterator->assignment->left);
+		add_live_variable_from_operand(iterator->assignment->right);
 		break;
 	case LLIR_ASSIGNMENT_TYPE_ARRAY_UPDATE:
-		if (iterator->assignment->update_index.type ==
-		    LLIR_OPERAND_TYPE_FIELD)
-			live_set_add(iterator->assignment->update_index.field);
-		if (iterator->assignment->update_value.type ==
-		    LLIR_OPERAND_TYPE_FIELD)
-			live_set_add(iterator->assignment->update_value.field);
+		add_live_variable_from_operand(
+			iterator->assignment->update_index);
+		add_live_variable_from_operand(
+			iterator->assignment->update_value);
 		break;
 	case LLIR_ASSIGNMENT_TYPE_ARRAY_ACCESS:
-		if (iterator->assignment->access_index.type ==
-		    LLIR_OPERAND_TYPE_FIELD)
-			live_set_add(iterator->assignment->access_index.field);
+		add_live_variable_from_operand(
+			iterator->assignment->access_index);
 		break;
 	case LLIR_ASSIGNMENT_TYPE_METHOD_CALL:
 		for (u_int32_t i = 0; i < iterator->assignment->argument_count;
 		     i++) {
-			if (iterator->assignment->arguments[i].type ==
-			    LLIR_OPERAND_TYPE_FIELD)
-				live_set_add(iterator->assignment->arguments[i]
-						     .field);
+			add_live_variable_from_operand(
+				iterator->assignment->arguments[i]);
 		}
 		return;
 	default:
@@ -168,8 +152,8 @@ void optimization_dead_code_elimination(struct llir *llir)
 
 	// add terminal variables and method call arguments to live set
 	llir_iterate(llir, NULL, get_live_variables_from_fields,
-		     get_live_variables_from_method_call_arguments,
-		     get_live_variables_from_terminals, true);
+		     add_live_variables_from_method_call_arguments,
+		     add_live_variables_from_terminals, true);
 
 	uint32_t prev_live_count = 0;
 
