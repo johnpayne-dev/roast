@@ -1,6 +1,15 @@
 #include "optimizations/dce.h"
 
+/*
+pointer -> true | NULL
+destination = sources
+add assignment if destination is one of the previous sources
+
+*/
+
 GHashTable *live_set = NULL;
+
+char *current_method = NULL;
 
 static GHashTable *live_set_init(void)
 {
@@ -40,7 +49,20 @@ static void live_set_print(void)
 	g_print("\n");
 }
 
-static void get_live_variables_from_fields(struct llir_iterator *iterator)
+static bool is_current_method(struct llir_iterator *iterator)
+{
+	return strcmp(iterator->method->identifier, current_method) != 0;
+}
+
+static void add_live_variables_from_globals(struct llir *llir)
+{
+	for (uint32_t i = 0; i < llir->fields->len; i++) {
+		live_set_add(g_array_index(llir->fields, struct llir_field *, i)
+				     ->identifier);
+	}
+}
+
+static void add_live_variables_from_fields(struct llir_iterator *iterator)
 {
 	for (uint32_t i = 0; i < iterator->block->fields->len; i++) {
 		struct llir_field *field = g_array_index(
@@ -48,6 +70,14 @@ static void get_live_variables_from_fields(struct llir_iterator *iterator)
 		if (field->is_array)
 			live_set_add(field->identifier);
 	}
+}
+
+static void
+add_live_variables_from_fields_of_current_method(struct llir_iterator *iterator)
+{
+	if (is_current_method(iterator))
+		return;
+	add_live_variables_from_fields(iterator);
 }
 
 static void add_live_variable_from_operand(struct llir_operand operand)
@@ -67,6 +97,14 @@ add_live_variables_from_method_call_arguments(struct llir_iterator *iterator)
 		}
 }
 
+static void add_live_variables_from_method_call_arguments_of_current_method(
+	struct llir_iterator *iterator)
+{
+	if (is_current_method(iterator))
+		return;
+	add_live_variables_from_method_call_arguments(iterator);
+}
+
 static void add_live_variables_from_terminals(struct llir_iterator *iterator)
 {
 	switch (iterator->block->terminal_type) {
@@ -83,7 +121,15 @@ static void add_live_variables_from_terminals(struct llir_iterator *iterator)
 	}
 }
 
-static void get_live_variables_from_assignments(struct llir_iterator *iterator)
+static void add_live_variables_from_terminals_of_current_method(
+	struct llir_iterator *iterator)
+{
+	if (is_current_method(iterator))
+		return;
+	add_live_variables_from_terminals(iterator);
+}
+
+static void add_live_variables_from_assignments(struct llir_iterator *iterator)
 {
 	if (!live_set_contains(iterator->assignment->destination))
 		return;
@@ -130,6 +176,14 @@ static void get_live_variables_from_assignments(struct llir_iterator *iterator)
 	}
 }
 
+static void add_live_variables_from_assignments_of_current_method(
+	struct llir_iterator *iterator)
+{
+	if (is_current_method(iterator))
+		return;
+	add_live_variables_from_assignments(iterator);
+}
+
 static void prune_dead_variables(struct llir_iterator *iterator)
 {
 	if (!live_set_contains(iterator->assignment->destination) &&
@@ -140,32 +194,47 @@ static void prune_dead_variables(struct llir_iterator *iterator)
 	}
 }
 
-void optimization_dead_code_elimination(struct llir *llir)
+static void
+prune_dead_variables_of_curent_method(struct llir_iterator *iterator)
+{
+	if (is_current_method(iterator))
+		return;
+	prune_dead_variables(iterator);
+}
+
+static void
+dead_code_elimination_of_current_method(struct llir_iterator *iterator)
 {
 	live_set = live_set_init();
 
-	// add all global fields to live set
-	for (uint32_t i = 0; i < llir->fields->len; i++) {
-		live_set_add(g_array_index(llir->fields, struct llir_field *, i)
-				     ->identifier);
-	}
+	add_live_variables_from_globals(iterator->llir);
 
-	// add terminal variables and method call arguments to live set
-	llir_iterate(llir, NULL, get_live_variables_from_fields,
-		     add_live_variables_from_method_call_arguments,
-		     add_live_variables_from_terminals, true);
+	current_method = iterator->method->identifier;
+
+	llir_iterate(
+		iterator->llir, NULL,
+		add_live_variables_from_fields_of_current_method,
+		add_live_variables_from_method_call_arguments_of_current_method,
+		add_live_variables_from_terminals_of_current_method, true);
 
 	uint32_t prev_live_count = 0;
 
 	do {
 		prev_live_count = live_set_count();
-		llir_iterate(llir, NULL, NULL,
-			     get_live_variables_from_assignments, NULL, true);
+		llir_iterate(
+			iterator->llir, NULL, NULL,
+			add_live_variables_from_assignments_of_current_method,
+			NULL, true);
 	} while (live_set_count() != prev_live_count);
 
-	llir_iterate(llir, NULL, NULL, prune_dead_variables, NULL, true);
-
-	// live_set_print();
+	llir_iterate(iterator->llir, NULL, NULL,
+		     prune_dead_variables_of_curent_method, NULL, true);
 
 	live_set_free();
+}
+
+void optimization_dead_code_elimination(struct llir *llir)
+{
+	llir_iterate(llir, dead_code_elimination_of_current_method, NULL, NULL,
+		     NULL, true);
 }

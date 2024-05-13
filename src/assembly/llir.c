@@ -91,6 +91,8 @@ void llir_iterate(struct llir *llir, iterator_callback_t method,
 {
 	struct llir_iterator iterator = { 0 };
 
+	iterator.llir = llir;
+
 	uint32_t start = 0, step = 1;
 
 	if (!forward) {

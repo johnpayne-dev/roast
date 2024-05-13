@@ -139,6 +139,7 @@ struct llir_shit_yourself {
 };
 
 struct llir_iterator {
+	struct llir *llir;
 	uint32_t method_index;
 	struct llir_method *method;
 	uint32_t block_index;
