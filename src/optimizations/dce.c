@@ -4,6 +4,10 @@ GHashTable *live_set = NULL;
 
 char *current_method = NULL;
 
+struct llir_assignment *current_assignment = NULL;
+
+bool past_current_assignment = false;
+
 static GHashTable *live_set_init(void)
 {
 	return g_hash_table_new(g_str_hash, g_str_equal);
@@ -31,7 +35,8 @@ static void live_set_add(char *variable)
 	}
 }
 
-void live_set_print_helper(gpointer key, gpointer value, gpointer user_data)
+static void live_set_print_helper(gpointer key, gpointer value,
+				  gpointer user_data)
 {
 	g_print("%s,", (gchar *)key);
 }
@@ -54,7 +59,48 @@ static char *get_current_method(void)
 
 static bool is_current_method(struct llir_iterator *iterator)
 {
-	return strcmp(iterator->method->identifier, get_current_method()) != 0;
+	return strcmp(iterator->method->identifier, get_current_method()) == 0;
+}
+
+static bool is_not_current_method(struct llir_iterator *iterator)
+{
+	return !is_current_method(iterator);
+}
+
+static void set_current_assignment(struct llir_iterator *iterator)
+{
+	current_assignment = iterator->assignment;
+}
+
+static void reset_current_assignment(void)
+{
+	current_assignment = NULL;
+}
+
+static struct llir_assignment *get_current_assignment(void)
+{
+	return current_assignment;
+}
+
+static bool is_current_assignment(struct llir_iterator *iterator)
+{
+	return current_assignment == iterator->assignment;
+}
+
+static bool is_not_current_assignment(struct llir_iterator *iterator)
+{
+	return !is_current_assignment(iterator);
+}
+
+static bool is_current_destination(struct llir_iterator *iterator)
+{
+	return strcmp(iterator->assignment->destination,
+		      get_current_assignment()->destination) == 0;
+}
+
+static bool is_not_current_destination(struct llir_iterator *iterator)
+{
+	return !is_current_destination(iterator);
 }
 
 static void add_live_variables_from_globals(struct llir *llir)
@@ -78,7 +124,7 @@ static void add_live_variables_from_fields(struct llir_iterator *iterator)
 static void
 add_live_variables_from_fields_of_current_method(struct llir_iterator *iterator)
 {
-	if (is_current_method(iterator))
+	if (is_not_current_method(iterator))
 		return;
 	add_live_variables_from_fields(iterator);
 }
@@ -103,7 +149,7 @@ add_live_variables_from_method_call_arguments(struct llir_iterator *iterator)
 static void add_live_variables_from_method_call_arguments_of_current_method(
 	struct llir_iterator *iterator)
 {
-	if (is_current_method(iterator))
+	if (is_not_current_method(iterator))
 		return;
 	add_live_variables_from_method_call_arguments(iterator);
 }
@@ -127,7 +173,7 @@ static void add_live_variables_from_terminals(struct llir_iterator *iterator)
 static void add_live_variables_from_terminals_of_current_method(
 	struct llir_iterator *iterator)
 {
-	if (is_current_method(iterator))
+	if (is_not_current_method(iterator))
 		return;
 	add_live_variables_from_terminals(iterator);
 }
@@ -182,7 +228,7 @@ static void add_live_variables_from_assignments(struct llir_iterator *iterator)
 static void add_live_variables_from_assignments_of_current_method(
 	struct llir_iterator *iterator)
 {
-	if (is_current_method(iterator))
+	if (is_not_current_method(iterator))
 		return;
 	add_live_variables_from_assignments(iterator);
 }
@@ -200,9 +246,74 @@ static void prune_dead_variables(struct llir_iterator *iterator)
 static void
 prune_dead_variables_of_curent_method(struct llir_iterator *iterator)
 {
-	if (is_current_method(iterator))
+	if (is_not_current_method(iterator))
 		return;
 	prune_dead_variables(iterator);
+}
+
+static void
+tombstone_current_assignment_if_redifinition(struct llir_iterator *iterator)
+{
+	if (is_not_current_method(iterator))
+		return;
+
+	if (is_current_assignment(iterator)) {
+		past_current_assignment = true;
+		return;
+	}
+
+	if (!past_current_assignment)
+		return;
+
+	if (is_not_current_destination(iterator))
+		return;
+
+	llir_assignment_free(current_assignment);
+	current_assignment = NULL;
+}
+
+static void remove_assignment_if_redefined_later(struct llir_iterator *iterator)
+{
+	set_current_assignment(iterator);
+	llir_iterate(iterator->llir, NULL, NULL,
+		     tombstone_current_assignment_if_redifinition, NULL, true);
+	reset_current_assignment();
+	past_current_assignment = false;
+	if (iterator->assignment == NULL) {
+		g_array_remove_index(iterator->block->assignments,
+				     iterator->assignment_index);
+		iterator->assignment_index--;
+	}
+}
+
+static void remove_assignment_of_method_args_if_redefined_later(
+	struct llir_iterator *iterator)
+{
+	// WIP
+	// if (is_not_current_method(iterator))
+	// 	return;
+
+	// for (uint32_t i = 0; i < iterator->method->arguments->len; i++) {
+	// 	char *argument = g_array_index(iterator->method->arguments,
+	// 				       struct llir_field *, i)
+	// 				 ->identifier;
+	// 	for (uint32_t j = 0; j < iterator->method->blocks->len; j++) {
+	// 		GArray *assignments =
+	// 			g_array_index(iterator->method->blocks,
+	// 				      struct llir_block *, j)
+	// 				->assignments;
+	// 		for (uint32_t k = 0; k < assignments->len; k++) {
+	// 			char *destination =
+	// 				g_array_index(assignments,
+	// 					      struct llir_assignment *,
+	// 					      k)
+	// 					->destination;
+	// 			if (strcmp(argument, destination) != 0)
+	// 				return;
+
+	// 		}
+	// 	}
+	// }
 }
 
 static void
@@ -243,6 +354,10 @@ dead_code_elimination_of_current_method(struct llir_iterator *iterator)
                 keep going until reach the end or encounter a use of that
                 destination variable
         */
+
+	llir_iterate(iterator->llir, NULL,
+		     remove_assignment_of_method_args_if_redefined_later,
+		     remove_assignment_if_redefined_later, NULL, true);
 
 	live_set_free();
 }
