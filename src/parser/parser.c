@@ -1153,6 +1153,10 @@ int parser_parse(struct parser *parser, GArray *token_list,
 		.position = 0,
 		.parse_error = false,
 	};
+	if (parser->token_count == 0) {
+		g_printerr("goofy ass forgot to put code in the file\n");
+		return -1;
+	}
 	struct ast_node *program = parse_program(parser);
 
 	if (ast != NULL && !parser->parse_error)

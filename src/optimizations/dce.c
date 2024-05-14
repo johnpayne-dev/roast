@@ -4,9 +4,11 @@ GHashTable *live_set = NULL;
 
 char *current_method = NULL;
 
-struct llir_assignment *current_assignment = NULL;
+struct llir_assignment **current_assignment = NULL;
 
 bool past_current_assignment = false;
+
+bool current_assignment_destination_variable_used = false;
 
 static GHashTable *live_set_init(void)
 {
@@ -69,7 +71,7 @@ static bool is_not_current_method(struct llir_iterator *iterator)
 
 static void set_current_assignment(struct llir_iterator *iterator)
 {
-	current_assignment = iterator->assignment;
+	current_assignment = &iterator->assignment;
 }
 
 static void reset_current_assignment(void)
@@ -77,14 +79,24 @@ static void reset_current_assignment(void)
 	current_assignment = NULL;
 }
 
+static void tombstone_current_assignment(void)
+{
+	*current_assignment = NULL;
+}
+
+static bool is_current_assignment_tombstoned(void)
+{
+	return *current_assignment == NULL;
+}
+
 static struct llir_assignment *get_current_assignment(void)
 {
-	return current_assignment;
+	return *current_assignment;
 }
 
 static bool is_current_assignment(struct llir_iterator *iterator)
 {
-	return current_assignment == iterator->assignment;
+	return get_current_assignment() == iterator->assignment;
 }
 
 static bool is_not_current_assignment(struct llir_iterator *iterator)
@@ -219,7 +231,7 @@ static void add_live_variables_from_assignments(struct llir_iterator *iterator)
 			add_live_variable_from_operand(
 				iterator->assignment->arguments[i]);
 		}
-		return;
+		break;
 	default:
 		break;
 	}
@@ -251,9 +263,66 @@ prune_dead_variables_of_curent_method(struct llir_iterator *iterator)
 	prune_dead_variables(iterator);
 }
 
+static bool operand_contains_variable(struct llir_operand operand,
+				      char *variable)
+{
+	if (operand.type == LLIR_OPERAND_TYPE_FIELD)
+		return strcmp(operand.field, variable) == 0;
+	return false;
+}
+
+static bool assignment_uses_variable(struct llir_iterator *iterator,
+				     char *variable)
+{
+	switch (iterator->assignment->type) {
+	case LLIR_ASSIGNMENT_TYPE_MOVE:
+	case LLIR_ASSIGNMENT_TYPE_NEGATE:
+	case LLIR_ASSIGNMENT_TYPE_NOT:
+		return operand_contains_variable(iterator->assignment->source,
+						 variable);
+	case LLIR_ASSIGNMENT_TYPE_ADD:
+	case LLIR_ASSIGNMENT_TYPE_SUBTRACT:
+	case LLIR_ASSIGNMENT_TYPE_MULTIPLY:
+	case LLIR_ASSIGNMENT_TYPE_DIVIDE:
+	case LLIR_ASSIGNMENT_TYPE_MODULO:
+	case LLIR_ASSIGNMENT_TYPE_GREATER:
+	case LLIR_ASSIGNMENT_TYPE_GREATER_EQUAL:
+	case LLIR_ASSIGNMENT_TYPE_LESS:
+	case LLIR_ASSIGNMENT_TYPE_LESS_EQUAL:
+	case LLIR_ASSIGNMENT_TYPE_EQUAL:
+	case LLIR_ASSIGNMENT_TYPE_NOT_EQUAL:
+		return operand_contains_variable(iterator->assignment->left,
+						 variable) ||
+		       operand_contains_variable(iterator->assignment->right,
+						 variable);
+	case LLIR_ASSIGNMENT_TYPE_ARRAY_UPDATE:
+		return operand_contains_variable(
+			       iterator->assignment->update_index, variable) ||
+		       operand_contains_variable(
+			       iterator->assignment->update_value, variable);
+	case LLIR_ASSIGNMENT_TYPE_ARRAY_ACCESS:
+		return operand_contains_variable(
+			iterator->assignment->access_index, variable);
+	case LLIR_ASSIGNMENT_TYPE_METHOD_CALL:
+		for (u_int32_t i = 0; i < iterator->assignment->argument_count;
+		     i++) {
+			if (operand_contains_variable(
+				    iterator->assignment->arguments[i],
+				    variable))
+				return true;
+		}
+		return false;
+	default:
+		return false;
+	}
+}
+
 static void
 tombstone_current_assignment_if_redifinition(struct llir_iterator *iterator)
 {
+	if (is_current_assignment_tombstoned())
+		return;
+
 	if (is_not_current_method(iterator))
 		return;
 
@@ -265,11 +334,17 @@ tombstone_current_assignment_if_redifinition(struct llir_iterator *iterator)
 	if (!past_current_assignment)
 		return;
 
+	current_assignment_destination_variable_used = assignment_uses_variable(
+		iterator, get_current_assignment()->destination);
+
+	if (current_assignment_destination_variable_used)
+		return;
+
 	if (is_not_current_destination(iterator))
 		return;
 
-	llir_assignment_free(current_assignment);
-	current_assignment = NULL;
+	llir_assignment_free(get_current_assignment());
+	tombstone_current_assignment();
 }
 
 static void remove_assignment_if_redefined_later(struct llir_iterator *iterator)
@@ -279,6 +354,7 @@ static void remove_assignment_if_redefined_later(struct llir_iterator *iterator)
 		     tombstone_current_assignment_if_redifinition, NULL, true);
 	reset_current_assignment();
 	past_current_assignment = false;
+	current_assignment_destination_variable_used = false;
 	if (iterator->assignment == NULL) {
 		g_array_remove_index(iterator->block->assignments,
 				     iterator->assignment_index);
@@ -319,11 +395,15 @@ static void remove_assignment_of_method_args_if_redefined_later(
 static void
 dead_code_elimination_of_current_method(struct llir_iterator *iterator)
 {
+	set_current_method(iterator->method->identifier);
+
+	// llir_iterate(iterator->llir, NULL,
+	// 	     remove_assignment_of_method_args_if_redefined_later,
+	// 	     remove_assignment_if_redefined_later, NULL, true);
+
 	live_set = live_set_init();
 
 	add_live_variables_from_globals(iterator->llir);
-
-	set_current_method(iterator->method->identifier);
 
 	llir_iterate(
 		iterator->llir, NULL,
@@ -343,21 +423,6 @@ dead_code_elimination_of_current_method(struct llir_iterator *iterator)
 
 	llir_iterate(iterator->llir, NULL, NULL,
 		     prune_dead_variables_of_curent_method, NULL, true);
-
-	/*
-        you currently have the live set
-        for every assignment:
-                if assignment's destination is in live set then loop for all
-                assignments if other asignment is in current_method and its
-                destination is the orignal destination but it isn't the same
-                pointer then prune the original assignment
-                keep going until reach the end or encounter a use of that
-                destination variable
-        */
-
-	llir_iterate(iterator->llir, NULL,
-		     remove_assignment_of_method_args_if_redefined_later,
-		     remove_assignment_if_redefined_later, NULL, true);
 
 	live_set_free();
 }
