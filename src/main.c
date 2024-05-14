@@ -164,13 +164,13 @@ static int parse_options(int argc, char **argv, struct options *options)
 	}
 
 	options->output_file = output_file;
-	options->debug = debug;
+	options->debug = false;//debug;
 
 	if (parse_target(target, options) != 0)
 		result = -1;
 
-	if (parse_optimizations(optimizations, options) != 0)
-		result = -1;
+	//if (parse_optimizations(optimizations, options) != 0)
+	//	result = -1;
 
 	g_free(target);
 	g_free(optimizations);
@@ -254,13 +254,13 @@ static int run_assembly_target(char *file_name, char *source,
 	struct llir *llir = llir_generator_generate_llir(llir_generator, ir);
 	llir_generator_free(llir_generator);
 
-	optimization_apply(llir, optimizations);
+	optimization_apply(llir, OPTIMIZATION_ALL);
 
 	if (debug) {
 		llir_print(llir);
 	} else {
 		struct code_generator *generator =
-			code_generator_new(optimizations & OPTIMIZATION_PH);
+			code_generator_new(OPTIMIZATION_PH);
 		code_generator_generate(generator, llir);
 		code_generator_free(generator);
 	}
