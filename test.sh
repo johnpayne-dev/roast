@@ -42,7 +42,7 @@ for stage_dir in "./tests/"{"scan","parse","inter","assembly"}"/"; do
                 assemblies_dir=./bin/"${build_system}"_"${compiler}"/assemblies
                 mkdir -p "${assemblies_dir}"
                 assembly_file="${assemblies_dir}"/"$(basename "${test_file%????}")".asm
-                ./bin/"${build_system}"_"${compiler}"/roast "$test_file" -t "$stage_name" -o "${assembly_file}" 2>/dev/null
+                ./bin/"${build_system}"_"${compiler}"/roast "$test_file" -t "$stage_name" -O all -o "${assembly_file}" 2>/dev/null
 
                 executables_dir=./bin/"${build_system}"_"${compiler}"/executables
                 mkdir -p "${executables_dir}"

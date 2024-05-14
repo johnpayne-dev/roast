@@ -181,5 +181,6 @@ static void optimize_terminal(struct llir_iterator *iterator)
 
 void optimization_copy_propagation(struct llir *llir)
 {
-	llir_iterate(llir, NULL, NULL, optimize_assignment, optimize_terminal);
+	llir_iterate(llir, NULL, NULL, optimize_assignment, optimize_terminal,
+		     true);
 }

@@ -485,7 +485,8 @@ static void analyze_if_statement(struct semantics *semantics,
 }
 
 static void analyze_return_statement(struct semantics *semantics,
-				     struct ir_expression *expression)
+				     struct ir_expression *expression,
+				     struct token token)
 {
 	enum ir_data_type type = IR_DATA_TYPE_VOID;
 	if (expression != NULL)
@@ -493,7 +494,7 @@ static void analyze_return_statement(struct semantics *semantics,
 
 	if (type != semantics->current_method->return_type)
 		semantic_error(
-			semantics, expression->token,
+			semantics, token,
 			"return expression does not match method return type");
 }
 
@@ -534,7 +535,8 @@ static void analyze_statement(struct semantics *semantics,
 		break;
 	case IR_STATEMENT_TYPE_RETURN:
 		analyze_return_statement(semantics,
-					 statement->return_expression);
+					 statement->return_expression,
+					 statement->token);
 		break;
 	case IR_STATEMENT_TYPE_CONTINUE:
 		analyze_continue_statement(semantics, statement->token);
