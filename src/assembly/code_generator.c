@@ -3,6 +3,70 @@
 static const char *ARGUMENT_REGISTERS[] = { "rdi", "rsi", "rdx",
 					    "rcx", "r8",  "r9" };
 
+static const char *CALLEE_SAVED_REGISTERS[] = {
+	"rbx", "r12", "r13", "r14", "r15",
+};
+
+static void use_register(struct code_generator *generator, const char *reg)
+{
+	uint32_t i = 0;
+	for (; i < G_N_ELEMENTS(generator->least_recently_used); i++) {
+		if (g_strcmp0(generator->least_recently_used[i], reg) == 0)
+			break;
+	}
+	g_assert(i != G_N_ELEMENTS(generator->least_recently_used));
+
+	memmove(&generator->least_recently_used[i],
+		&generator->least_recently_used[i + 1],
+		(G_N_ELEMENTS(generator->least_recently_used) - i - 1) *
+			sizeof(generator->least_recently_used[0]));
+	generator->least_recently_used[G_N_ELEMENTS(
+					       generator->least_recently_used) -
+				       1] = reg;
+}
+
+static const char *allocate_register(struct code_generator *generator,
+				     char *variable)
+{
+	const char *reg =
+		g_hash_table_lookup(generator->variable_to_register, variable);
+	if (reg != NULL) {
+		use_register(generator, reg);
+		return reg;
+	}
+
+	reg = generator->least_recently_used[0];
+
+	char *old_variable =
+		g_hash_table_lookup(generator->register_to_variable, reg);
+	if (old_variable != NULL) {
+		uint64_t offset = (uint64_t)g_hash_table_lookup(
+			generator->offsets, old_variable);
+		if (offset != 0)
+			g_print("\tmovq %%%s, -%llu(%%rbp)\n", reg, offset);
+		else
+			g_print("\tmovq %%%s, %s(%%rip)\n", reg, old_variable);
+
+		g_hash_table_insert(generator->register_to_variable,
+				    (char *)reg, variable);
+		g_hash_table_insert(generator->variable_to_register, variable,
+				    (char *)reg);
+		g_hash_table_insert(generator->variable_to_register,
+				    old_variable, NULL);
+	}
+
+	uint64_t offset =
+		(uint64_t)g_hash_table_lookup(generator->offsets, variable);
+	if (offset != 0)
+		g_print("\tmovq -%llu(%%rbp), %%%s\n", offset, reg);
+	else
+		g_print("\tmovq %s(%%rip), %%%s\n", variable, reg);
+
+	use_register(generator, reg);
+
+	return reg;
+}
+
 static void generate_global_string(struct code_generator *generator,
 				   char *string)
 {
@@ -132,7 +196,8 @@ static void generate_method_arguments(struct code_generator *generator,
 				ARGUMENT_REGISTERS[i], offset);
 		} else {
 			int32_t argument_offset =
-				(i - G_N_ELEMENTS(ARGUMENT_REGISTERS)) * 8 + 16;
+				(i - G_N_ELEMENTS(ARGUMENT_REGISTERS)) * 8 +
+				16 + 5 * 8;
 			g_print("\tmovq %i(%%rbp), %%r10\n", argument_offset);
 			g_print("\tmovq %%r10, -%llu(%%rbp)\n", offset);
 		}
@@ -161,6 +226,9 @@ static void generate_method_declaration(struct code_generator *generator,
 	g_print("%s:\n", method->identifier);
 #endif
 	g_print("\tpushq %%rbp\n");
+	for (uint32_t i = 0; i < G_N_ELEMENTS(CALLEE_SAVED_REGISTERS); i++)
+		g_print("\tpushq %%%s\n", CALLEE_SAVED_REGISTERS[i]);
+
 	g_print("\tmovq %%rsp, %%rbp\n");
 
 	generate_stack_allocation(generator, method);
@@ -181,12 +249,23 @@ static void load_to_register(struct code_generator *generator,
 			     const char *destination)
 {
 	uint64_t offset, string_id;
+	char *reg;
 
 	switch (operand.type) {
 	case LLIR_OPERAND_TYPE_LITERAL:
 		g_print("\tmovq $%lld, %%%s\n", operand.literal, destination);
 		break;
 	case LLIR_OPERAND_TYPE_FIELD:
+		reg = g_hash_table_lookup(generator->variable_to_register,
+					  operand.field);
+		if (reg != NULL) {
+			if (g_strcmp0(reg, destination) == 0)
+				break;
+
+			g_print("\tmovq %%%s, %%%s\n", reg, destination);
+			break;
+		}
+
 		offset = (uint64_t)g_hash_table_lookup(generator->offsets,
 						       operand.field);
 
@@ -224,6 +303,16 @@ static void load_array_to_register(struct code_generator *generator,
 static void store_from_register(struct code_generator *generator,
 				char *destination, const char *source)
 {
+	char *reg = g_hash_table_lookup(generator->variable_to_register,
+					destination);
+	if (reg != NULL) {
+		if (g_strcmp0(source, reg) == 0)
+			return;
+
+		g_print("\tmovq %%%s, %%%s\n", reg, destination);
+		return;
+	}
+
 	uint64_t offset =
 		(uint64_t)g_hash_table_lookup(generator->offsets, destination);
 	if (offset != 0)
@@ -269,13 +358,25 @@ static void generate_method_call(struct code_generator *generator,
 	store_from_register(generator, call->destination, "rax");
 }
 
+static const char *operand_to_reg(struct code_generator *generator,
+				  struct llir_operand operand,
+				  const char *default_reg)
+{
+	if (operand.type != LLIR_OPERAND_TYPE_FIELD)
+		return default_reg;
+
+	return allocate_register(generator, operand.field);
+}
+
 static void generate_assignment(struct code_generator *generator,
 				struct llir_assignment *assignment)
 {
+	const char *reg1, *reg2;
 	switch (assignment->type) {
 	case LLIR_ASSIGNMENT_TYPE_MOVE:
-		load_to_register(generator, assignment->source, "r10");
-		store_from_register(generator, assignment->destination, "r10");
+		reg1 = operand_to_reg(generator, assignment->source, "r10");
+		load_to_register(generator, assignment->source, reg1);
+		store_from_register(generator, assignment->destination, reg1);
 		break;
 	case LLIR_ASSIGNMENT_TYPE_ADD:
 		load_to_register(generator, assignment->left, "r10");
@@ -467,7 +568,11 @@ static void generate_return(struct code_generator *generator,
 			    struct llir_return *llir_return)
 {
 	load_to_register(generator, llir_return->source, "rax");
+
 	g_print("\tmovq %%rbp, %%rsp\n");
+	for (int32_t i = G_N_ELEMENTS(CALLEE_SAVED_REGISTERS) - 1; i >= 0; i--)
+		g_print("\tpopq %%%s\n", CALLEE_SAVED_REGISTERS[i]);
+
 	g_print("\tpopq %%rbp\n");
 	g_print("\tret\n");
 }
@@ -544,6 +649,12 @@ void code_generator_generate(struct code_generator *generator,
 {
 	generator->llir = llir;
 	generator->strings = g_hash_table_new(g_str_hash, g_str_equal);
+	generator->variable_to_register =
+		g_hash_table_new(g_str_hash, g_str_equal);
+	generator->register_to_variable =
+		g_hash_table_new(g_str_hash, g_str_equal);
+	memcpy(generator->least_recently_used, CALLEE_SAVED_REGISTERS,
+	       sizeof(CALLEE_SAVED_REGISTERS));
 	generator->string_counter = 1;
 
 	generate_data_section(generator);
