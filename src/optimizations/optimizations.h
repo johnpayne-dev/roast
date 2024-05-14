@@ -5,6 +5,7 @@ enum optimzation {
 	OPTIMIZATION_CF = 1 << 0,
 	OPTIMIZATION_CP = 1 << 1,
 	OPTIMIZATION_DCE = 1 << 2,
+	OPTIMIZATION_PH = 1 << 3,
 	OPTIMIZATION_ALL = ~0,
 };
 

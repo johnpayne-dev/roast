@@ -74,6 +74,10 @@ static int parse_optimizations(char *optimizations, struct options *options)
 			options->optimizations |= OPTIMIZATION_DCE;
 		else if (g_strcmp0(optimization, "-dce") == 0)
 			options->optimizations &= ~OPTIMIZATION_DCE;
+		else if (g_strcmp0(optimization, "ph") == 0)
+			options->optimizations |= OPTIMIZATION_PH;
+		else if (g_strcmp0(optimization, "-ph") == 0)
+			options->optimizations &= ~OPTIMIZATION_PH;
 		else if (g_strcmp0(optimization, "all") == 0)
 			options->optimizations |= OPTIMIZATION_ALL;
 		else if (g_strcmp0(optimization, "-all") == 0)
@@ -255,7 +259,8 @@ static int run_assembly_target(char *file_name, char *source,
 	if (debug) {
 		llir_print(llir);
 	} else {
-		struct code_generator *generator = code_generator_new();
+		struct code_generator *generator =
+			code_generator_new(optimizations & OPTIMIZATION_PH);
 		code_generator_generate(generator, llir);
 		code_generator_free(generator);
 	}
