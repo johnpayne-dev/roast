@@ -559,8 +559,10 @@ static void generate_branch(struct code_generator *generator,
 }
 
 static void generate_jump(struct code_generator *generator,
-			  struct llir_jump *jump)
+			  struct llir_jump *jump, uint32_t next_block)
 {
+	if (generator->pinhole_optimize && (jump->block->id == next_block))
+		return;
 	g_print("\tjmp block_%u\n", jump->block->id);
 }
 
@@ -603,9 +605,16 @@ static void generate_method_body(struct code_generator *generator,
 			generate_assignment(generator, assignment);
 		}
 
+		uint32_t next_block_id =
+			(i < (method->blocks->len - 1)) ?
+				g_array_index(method->blocks,
+					      struct llir_block *, i + 1)
+					->id :
+				-1;
+
 		switch (block->terminal_type) {
 		case LLIR_BLOCK_TERMINAL_TYPE_JUMP:
-			generate_jump(generator, block->jump);
+			generate_jump(generator, block->jump, next_block_id);
 			break;
 		case LLIR_BLOCK_TERMINAL_TYPE_BRANCH:
 			generate_branch(generator, block->branch);
@@ -637,10 +646,11 @@ static void generate_text_section(struct code_generator *generator)
 	}
 }
 
-struct code_generator *code_generator_new(void)
+struct code_generator *code_generator_new(bool pinhole_optimize)
 {
 	struct code_generator *generator = g_new(struct code_generator, 1);
 	generator->offsets = g_hash_table_new(g_str_hash, g_str_equal);
+	generator->pinhole_optimize = pinhole_optimize;
 	return generator;
 }
 
