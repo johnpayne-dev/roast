@@ -7,9 +7,6 @@ struct code_generator {
 	GHashTable *strings;
 	uint64_t string_counter;
 	GHashTable *offsets;
-	GHashTable *variable_to_register;
-	GHashTable *register_to_variable;
-	const char *least_recently_used[5];
 	bool pinhole_optimize;
 };
 
